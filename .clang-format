@@ -1,0 +1,38 @@
+---
+# Greywater C++ formatting — per docs/10 §6.6.
+# Applied by CI; non-conforming PRs are blocked.
+BasedOnStyle: LLVM
+Language: Cpp
+Standard: c++20
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 100
+PointerAlignment: Left
+ReferenceAlignment: Left
+NamespaceIndentation: None
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+BinPackArguments: false
+BinPackParameters: false
+AlwaysBreakTemplateDeclarations: Yes
+BreakBeforeBraces: Attach
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^<.*\.h>$'
+    Priority: 1
+  - Regex: '^<.*>$'
+    Priority: 2
+  - Regex: '^"engine/.*"$'
+    Priority: 3
+  - Regex: '^".*"$'
+    Priority: 4
+SortIncludes: CaseSensitive
+FixNamespaceComments: true
+ShortNamespaceLines: 0
+SpacesInAngles: false
+SpaceAfterCStyleCast: false
+SpaceBeforeParens: ControlStatements
+PenaltyReturnTypeOnItsOwnLine: 200
+...

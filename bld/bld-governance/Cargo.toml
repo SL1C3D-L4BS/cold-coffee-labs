@@ -1,0 +1,15 @@
+[package]
+name = "bld-governance"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license-file.workspace = true
+description = "Three-tier governance, audit log, session replay, human-in-the-loop elicitation. Phase 9."
+
+[lib]
+
+[dependencies]
+thiserror = { workspace = true }
+
+# No unwrap / expect allowed in this crate (docs/00 §3, docs/12 §J Rust).

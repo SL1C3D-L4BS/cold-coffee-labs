@@ -1,0 +1,14 @@
+[package]
+name = "bld-tools"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license-file.workspace = true
+description = "Tool registry and the #[bld_tool] proc-macro facade. Phase 9."
+
+[lib]
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }

@@ -1,0 +1,37 @@
+[workspace]
+resolver = "2"
+members = [
+    "bld-mcp",
+    "bld-tools",
+    "bld-provider",
+    "bld-rag",
+    "bld-agent",
+    "bld-governance",
+    "bld-bridge",
+    "bld-ffi",
+]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.85"
+version = "0.0.1"
+authors = ["Cold Coffee Labs"]
+license-file = "../LICENSE"
+repository = "https://github.com/SL1C3D-L4BS/cold-coffee-labs"
+description = "BLD — Brewed Logic Directive, the native AI copilot subsystem for Greywater_Engine."
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
+thiserror = "2"
+anyhow = "1"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+debug = "line-tables-only"
+
+[profile.dev]
+opt-level = 0
+debug = true

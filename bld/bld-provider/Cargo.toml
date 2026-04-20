@@ -1,0 +1,14 @@
+[package]
+name = "bld-provider"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license-file.workspace = true
+description = "LLM provider abstraction — Claude cloud primary, local candle/llama-cpp-rs fallback. Phase 9."
+
+[lib]
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }

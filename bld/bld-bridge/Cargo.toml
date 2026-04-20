@@ -1,0 +1,14 @@
+[package]
+name = "bld-bridge"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license-file.workspace = true
+description = "Rust-side of the cxx bridge. Orchestrates bld-ffi exposure and the generated C header. Phase 9."
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+bld_ffi = { package = "bld-ffi", path = "../bld-ffi" }

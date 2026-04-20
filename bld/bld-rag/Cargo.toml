@@ -1,0 +1,12 @@
+[package]
+name = "bld-rag"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license-file.workspace = true
+description = "RAG subsystem — tree-sitter chunking, petgraph symbol graph, sqlite-vss vector store. Phase 9."
+
+[lib]
+
+[dependencies]

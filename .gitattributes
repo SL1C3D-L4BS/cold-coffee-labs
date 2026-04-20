@@ -1,0 +1,40 @@
+# Greywater repo — line endings and diff behavior.
+# Text files normalize to LF in the repository; checkout respects the platform.
+
+* text=auto eol=lf
+
+# Windows-only tooling that must retain CRLF (rare, but keeps batch scripts sane).
+*.bat    text eol=crlf
+*.cmd    text eol=crlf
+*.ps1    text eol=crlf
+
+# Source.
+*.cpp    text diff=cpp
+*.hpp    text diff=cpp
+*.h      text diff=cpp
+*.c      text diff=cpp
+*.rs     text diff=rust
+*.toml   text
+*.cmake  text
+CMakeLists.txt text
+
+# Shader source (SPIR-V target) — compiled at build time.
+*.vert   text
+*.frag   text
+*.comp   text
+*.hlsl   text
+*.glsl   text
+
+# Markdown.
+*.md     text diff=markdown
+
+# Binary: do not touch.
+*.png    binary
+*.jpg    binary
+*.ktx2   binary
+*.spv    binary
+*.dds    binary
+*.mp4    binary
+*.webm   binary
+*.gltf   binary
+*.glb    binary

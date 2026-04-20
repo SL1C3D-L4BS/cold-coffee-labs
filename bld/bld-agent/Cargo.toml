@@ -1,0 +1,12 @@
+[package]
+name = "bld-agent"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license-file.workspace = true
+description = "Agent plan/act/verify loop. Phase 9."
+
+[lib]
+
+[dependencies]

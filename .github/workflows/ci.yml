@@ -1,0 +1,166 @@
+name: ci
+
+# Greywater CI matrix — the required-check set on main.
+# {windows-latest, ubuntu-latest} × {Debug, Release}.
+# docs/05 week 003; docs/10 §3 Week 01 Thursday; docs/00 §2.2.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build (${{ matrix.os }} ${{ matrix.config }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:     [ubuntu-latest, windows-latest]
+        config: [Debug, Release]
+        include:
+          - os: ubuntu-latest
+            preset_debug:   dev-linux
+            preset_release: release-linux
+          - os: windows-latest
+            preset_debug:   dev-win
+            preset_release: release-win
+
+    env:
+      CPM_SOURCE_CACHE: ${{ github.workspace }}/.cpm-cache
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v5
+
+      - name: Setup Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Install Clang/LLVM 18+ (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euxo pipefail
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
+            | sudo gpg --dearmor -o /usr/share/keyrings/llvm-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-18 main" \
+            | sudo tee /etc/apt/sources.list.d/llvm.list
+          sudo apt-get update
+          sudo apt-get install -y clang-18 clang-tidy-18 lld-18 \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libwayland-dev libxkbcommon-dev
+          sudo update-alternatives --install /usr/bin/clang   clang   /usr/bin/clang-18 100
+          sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-18 100
+          sudo update-alternatives --install /usr/bin/ld.lld  ld.lld  /usr/bin/ld.lld-18 100
+
+      - name: Install LLVM (Windows, clang-cl)
+        if: runner.os == 'Windows'
+        # GitHub-hosted windows-latest images ship with LLVM on PATH; assert it.
+        shell: pwsh
+        run: |
+          clang-cl --version
+          ninja --version
+
+      - name: Install Vulkan SDK
+        uses: humbletim/install-vulkan-sdk@v1.2
+        with:
+          version: 1.3.290.0
+          cache: true
+
+      - name: Cache CPM source pulls
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CPM_SOURCE_CACHE }}
+          key: cpm-${{ runner.os }}-${{ hashFiles('cmake/dependencies.cmake') }}
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            bld/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('bld/**/Cargo.toml', 'rust-toolchain.toml') }}
+
+      - name: CMake configure (${{ matrix.config }})
+        shell: bash
+        run: |
+          set -euxo pipefail
+          if [ "${{ matrix.config }}" = "Debug" ]; then
+            cmake --preset ${{ matrix.preset_debug }}
+          else
+            cmake --preset ${{ matrix.preset_release }}
+          fi
+
+      - name: CMake build
+        shell: bash
+        run: |
+          set -euxo pipefail
+          if [ "${{ matrix.config }}" = "Debug" ]; then
+            cmake --build --preset ${{ matrix.preset_debug }}
+          else
+            cmake --build --preset ${{ matrix.preset_release }}
+          fi
+
+      - name: CTest (Debug only — tests run in dev preset)
+        if: matrix.config == 'Debug'
+        shell: bash
+        run: ctest --preset ${{ matrix.preset_debug }} --output-on-failure
+
+      - name: Cargo test (BLD workspace)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd bld
+          cargo test --workspace --release
+
+      - name: Cargo clippy (deny warnings)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd bld
+          cargo clippy --workspace --all-targets --release -- -D warnings
+
+      - name: Cargo fmt check
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd bld
+          cargo fmt --all -- --check
+
+  lint:
+    name: lint (format + C++)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install clang-format-18
+        run: |
+          set -euxo pipefail
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
+            | sudo gpg --dearmor -o /usr/share/keyrings/llvm-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-18 main" \
+            | sudo tee /etc/apt/sources.list.d/llvm.list
+          sudo apt-get update
+          sudo apt-get install -y clang-format-18
+
+      - name: clang-format check
+        run: |
+          set -euxo pipefail
+          shopt -s globstar nullglob
+          files=(engine/**/*.{hpp,cpp} editor/**/*.{hpp,cpp} sandbox/**/*.{hpp,cpp} runtime/**/*.{hpp,cpp} gameplay/**/*.{hpp,cpp} tools/**/*.{hpp,cpp} tests/**/*.{hpp,cpp})
+          if [ ${#files[@]} -gt 0 ]; then
+            clang-format-18 --dry-run --Werror "${files[@]}"
+          fi

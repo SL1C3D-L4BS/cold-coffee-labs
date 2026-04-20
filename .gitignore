@@ -1,0 +1,50 @@
+# Build trees (CMake preset output dir).
+/build/
+/out/
+/cmake-build-*/
+
+# Cargo.
+/target/
+/bld/target/
+**/target/
+Cargo.lock
+!bld/Cargo.lock
+
+# CPM cache.
+/cpm_cache/
+.cpm/
+
+# IDE / editor.
+/.vs/
+/.vscode/
+/.idea/
+/.cache/
+*.swp
+*.swo
+*~
+
+# Compiler / sanitizer artefacts.
+*.o
+*.obj
+*.lib
+*.a
+*.pdb
+*.dll
+*.so
+*.dylib
+*.exe
+compile_commands.json
+
+# Content source (per docs/10 §4 — tracked assets live in /assets, sources under /content are gitignored).
+/content/
+!/content/.gitkeep
+
+# Ephemeral.
+*.log
+.env
+.env.local
+*.key
+*.pem
+*.p12
+.DS_Store
+Thumbs.db

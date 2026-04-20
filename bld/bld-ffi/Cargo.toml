@@ -1,0 +1,18 @@
+[package]
+name        = "bld-ffi"
+version.workspace     = true
+edition.workspace     = true
+rust-version.workspace = true
+authors.workspace     = true
+license-file.workspace = true
+description = "Narrow C-ABI surface between the Greywater C++ engine and the BLD Rust crate. Miri-clean, no generics, no panics escape."
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+
+[dev-dependencies]
+
+# No unwrap / expect allowed in this crate per docs/00 §3 Rust style.
+# Miri runs nightly on this crate: cargo miri test -p bld-ffi

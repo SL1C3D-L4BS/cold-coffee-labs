@@ -1,0 +1,110 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": { "major": 3, "minor": 28, "patch": 0 },
+    "configurePresets": [
+        {
+            "name": "dev-linux",
+            "displayName": "Developer Linux (Debug)",
+            "description": "Default developer workflow on Linux. docs/11 §CMake presets.",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_C_COMPILER": "clang",
+                "CMAKE_CXX_COMPILER": "clang++",
+                "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/clang.cmake"
+            }
+        },
+        {
+            "name": "dev-win",
+            "displayName": "Developer Windows (Debug)",
+            "description": "Default developer workflow on Windows, clang-cl / MSVC ABI.",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/clang-cl.cmake"
+            }
+        },
+        {
+            "name": "release-linux",
+            "inherits": "dev-linux",
+            "displayName": "Release Linux",
+            "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+        },
+        {
+            "name": "release-win",
+            "inherits": "dev-win",
+            "displayName": "Release Windows",
+            "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+        },
+        {
+            "name": "linux-asan",
+            "inherits": "dev-linux",
+            "displayName": "Linux ASan (nightly)",
+            "cacheVariables": {
+                "CMAKE_CXX_FLAGS_DEBUG_INIT": "-O1 -g -fsanitize=address -fno-omit-frame-pointer",
+                "CMAKE_EXE_LINKER_FLAGS_DEBUG_INIT": "-fsanitize=address"
+            }
+        },
+        {
+            "name": "linux-ubsan",
+            "inherits": "dev-linux",
+            "displayName": "Linux UBSan (nightly)",
+            "cacheVariables": {
+                "CMAKE_CXX_FLAGS_DEBUG_INIT": "-O1 -g -fsanitize=undefined -fno-omit-frame-pointer",
+                "CMAKE_EXE_LINKER_FLAGS_DEBUG_INIT": "-fsanitize=undefined"
+            }
+        },
+        {
+            "name": "linux-tsan",
+            "inherits": "dev-linux",
+            "displayName": "Linux TSan (nightly)",
+            "cacheVariables": {
+                "CMAKE_CXX_FLAGS_DEBUG_INIT": "-O1 -g -fsanitize=thread -fno-omit-frame-pointer",
+                "CMAKE_EXE_LINKER_FLAGS_DEBUG_INIT": "-fsanitize=thread"
+            }
+        }
+    ],
+    "buildPresets": [
+        { "name": "dev-linux",     "configurePreset": "dev-linux" },
+        { "name": "dev-win",       "configurePreset": "dev-win" },
+        { "name": "release-linux", "configurePreset": "release-linux" },
+        { "name": "release-win",   "configurePreset": "release-win" },
+        { "name": "linux-asan",    "configurePreset": "linux-asan" },
+        { "name": "linux-ubsan",   "configurePreset": "linux-ubsan" },
+        { "name": "linux-tsan",    "configurePreset": "linux-tsan" }
+    ],
+    "testPresets": [
+        {
+            "name": "dev-linux",
+            "configurePreset": "dev-linux",
+            "output": { "outputOnFailure": true },
+            "execution": { "noTestsAction": "error", "stopOnFailure": false }
+        },
+        {
+            "name": "dev-win",
+            "configurePreset": "dev-win",
+            "output": { "outputOnFailure": true },
+            "execution": { "noTestsAction": "error", "stopOnFailure": false }
+        }
+    ],
+    "workflowPresets": [
+        {
+            "name": "dev-linux",
+            "steps": [
+                { "type": "configure", "name": "dev-linux" },
+                { "type": "build",     "name": "dev-linux" },
+                { "type": "test",      "name": "dev-linux" }
+            ]
+        },
+        {
+            "name": "dev-win",
+            "steps": [
+                { "type": "configure", "name": "dev-win" },
+                { "type": "build",     "name": "dev-win" },
+                { "type": "test",      "name": "dev-win" }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,35 @@
+---
+# Greywater C++ static analysis — per docs/10 §6.7.
+# Non-conforming PRs are blocked on CI.
+#
+# Disabled checks have an explicit reason:
+#   - readability-magic-numbers / cppcoreguidelines-avoid-magic-numbers:
+#     rendering / math code is dense with legitimate literals.
+#   - modernize-use-trailing-return-type: house style is classic C++ return
+#     syntax unless necessary; see docs/00 §3.
+#   - llvm-header-guard: we use #pragma once per docs/00 §3.
+#   - fuchsia-*: unrelated coding-style enforcement.
+#   - altera-*: FPGA-specific.
+
+Checks: >
+  bugprone-*,
+  cert-*,
+  clang-analyzer-*,
+  concurrency-*,
+  cppcoreguidelines-*,
+  misc-*,
+  modernize-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  -readability-magic-numbers,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -modernize-use-trailing-return-type,
+  -llvm-header-guard,
+  -fuchsia-*,
+  -altera-*
+
+HeaderFilterRegex: '^(?!.*third_party).*(engine|editor|sandbox|runtime|gameplay|tools|tests)\/.*\.hpp$'
+WarningsAsErrors: '*'
+FormatStyle: file
+...
