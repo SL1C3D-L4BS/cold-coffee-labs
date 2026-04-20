@@ -48,6 +48,13 @@ CPMAddPackage(
     GIT_TAG          v2.4.11
 )
 
+# --- Vulkan-Headers (always download for consistency) --------------------
+CPMAddPackage(
+    NAME Vulkan-Headers
+    GITHUB_REPOSITORY KhronosGroup/Vulkan-Headers
+    GIT_TAG v1.3.270
+)
+
 # --- Vulkan headers / loader (system-provided via VULKAN_SDK) -----------------
 # docs/00 §2.2: Vulkan 1.2 baseline; 1.3 features opportunistic.
 find_package(Vulkan 1.2 REQUIRED)

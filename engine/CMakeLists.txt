@@ -14,7 +14,24 @@ target_compile_features(greywater_core PUBLIC cxx_std_23)
 target_include_directories(greywater_core
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}
+        ${CMAKE_BINARY_DIR}/_deps/volk-src
+        ${CMAKE_BINARY_DIR}/_deps/VulkanMemoryAllocator-src
+        ${CMAKE_BINARY_DIR}/_deps/vulkan-headers-src/include
+        ${CMAKE_BINARY_DIR}/_deps/glfw-src/include
 )
+
+target_link_libraries(greywater_core
+    PRIVATE
+        glfw
+        ${Vulkan_LIBRARIES}
+        volk
+        VulkanMemoryAllocator
+)
+
+# Add render HAL
+add_subdirectory(render)
 
 # Add math library
 add_subdirectory(math)
@@ -48,6 +65,15 @@ target_sources(greywater_core
         platform/time.cpp
         platform/fs.cpp
         platform/dll.cpp
+        # Render HAL
+        render/hal/vulkan_instance.cpp
+        render/hal/vulkan_device.cpp
+        render/hal/vulkan_queue.cpp
+        render/hal/vulkan_command_buffer.cpp
+        render/hal/vulkan_memory.cpp
+        render/hal/vulkan_buffer.cpp
+        render/hal/vulkan_swapchain.cpp
+        render/hal/vulkan_descriptor.cpp
         memory/frame_allocator.cpp
         memory/arena_allocator.cpp
         memory/pool_allocator.cpp
