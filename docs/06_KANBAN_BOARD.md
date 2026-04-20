@@ -157,6 +157,7 @@ Done at the start of every coding session, before writing any code.
 ## Milestone tracker
 
 Checkbox per milestone. Unticked until the gated demo exists as a recorded video.
+Current state note (2026-04-20): *First Light* engineering deliverables are complete and locally validated on Windows; keep the checkbox unticked until the required narrated recording evidence is captured.
 
 - [ ] *First Light* (week 004 · Phase 1)
 - [ ] *Foundations Set* (week 016 · Phase 3)

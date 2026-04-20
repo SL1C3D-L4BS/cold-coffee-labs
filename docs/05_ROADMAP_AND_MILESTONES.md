@@ -19,7 +19,7 @@ Greywater is two products in one build: the engine (`Greywater_Engine`) and the 
 
 | Phase | Name                                         | Weeks     | Duration | Milestone                    | Status   |
 | ----- | -------------------------------------------- | --------- | -------- | ---------------------------- | -------- |
-| 1     | Scaffolding & CI/CD                          | 001–004   | 4w       | *First Light*                | planned  |
+| 1     | Scaffolding & CI/CD                          | 001–004   | 4w       | *First Light*                | in-signoff |
 | 2     | Platform & Core Utilities                    | 005–009   | 5w       | —                            | planned  |
 | 3     | Math, ECS, Jobs & Reflection                 | 010–016   | 7w       | *Foundations Set*            | planned  |
 | 4     | Renderer HAL & Vulkan Bootstrap              | 017–024   | 8w       | —                            | planned  |
@@ -358,6 +358,7 @@ Each milestone is a **gated demo** requiring a two-minute narrated recording. No
 
 ### *First Light* (week 004)
 Hello-triangle sandbox on Windows and Linux from the same preset invocation. Hello-BLD C-ABI smoke test returns a structured response. CI green.
+Sign-off state (2026-04-20): engineering artifacts, local Windows validation, and CI definitions are complete; final milestone tick remains gated on the required narrated recording evidence.
 
 ### *Foundations Set* (week 016)
 Sandbox simulates 10 000 entities at a stable frame time. Job system within 5 % of reference targets. ≥ 80 % unit coverage on core/math/memory/jobs/ECS. Zero sanitizer warnings. Reflection + serialization primitives in place and unit-tested.
