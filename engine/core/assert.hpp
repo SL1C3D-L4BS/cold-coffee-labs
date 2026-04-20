@@ -2,11 +2,13 @@
 
 #include <string_view>
 
-namespace gw::core {
+namespace gw {
+namespace core {
 
 [[noreturn]] void assert_fail(const char* expr, const char* file, int line, std::string_view message);
 
-}  // namespace gw::core
+}  // namespace core
+}  // namespace gw
 
 #define GW_ASSERT(expr, msg)                                    \
     do {                                                        \

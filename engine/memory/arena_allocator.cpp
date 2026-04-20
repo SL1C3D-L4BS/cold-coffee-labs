@@ -3,7 +3,8 @@
 #include <bit>
 #include <stdexcept>
 
-namespace gw::memory {
+namespace gw {
+namespace memory {
 
 ArenaAllocator::ArenaAllocator(std::size_t block_size)
     : block_size_(block_size) {
@@ -46,4 +47,5 @@ void ArenaAllocator::add_block() {
     blocks_.push_back(std::move(block));
 }
 
-}  // namespace gw::memory
+}  // namespace memory
+}  // namespace gw

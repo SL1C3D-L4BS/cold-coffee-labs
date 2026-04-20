@@ -2,7 +2,8 @@
 
 #include <variant>
 
-namespace gw::core {
+namespace gw {
+namespace core {
 
 template <typename T, typename E>
 class Result final {
@@ -41,4 +42,5 @@ private:
     std::variant<T, E> storage_;
 };
 
-}  // namespace gw::core
+}  // namespace core
+}  // namespace gw

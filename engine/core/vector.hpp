@@ -2,9 +2,11 @@
 
 #include <vector>
 
-namespace gw::core {
+namespace gw {
+namespace core {
 
 template <typename T>
 using Vector = std::vector<T>;
 
-}  // namespace gw::core
+}  // namespace core
+}  // namespace gw

@@ -5,7 +5,8 @@
 #include <map>
 #include <memory>
 
-namespace gw::memory {
+namespace gw {
+namespace memory {
 
 class FreelistAllocator final {
 public:
@@ -26,4 +27,5 @@ private:
     std::size_t capacity_bytes_{0};
 };
 
-}  // namespace gw::memory
+}  // namespace memory
+}  // namespace gw

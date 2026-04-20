@@ -2,7 +2,8 @@
 
 #include <string>
 
-namespace gw::platform {
+namespace gw {
+namespace platform {
 
 class DynamicLibrary final {
 public:
@@ -25,4 +26,5 @@ private:
     void* handle_{nullptr};
 };
 
-}  // namespace gw::platform
+}  // namespace platform
+}  // namespace gw

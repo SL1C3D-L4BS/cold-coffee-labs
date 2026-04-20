@@ -4,6 +4,8 @@
 # Phase 1 deliverable set: version surface + public include root.
 # Phase 2+ fills out platform/, memory/, core/, math/, jobs/, ecs/.
 
+# Greywater Engine Core Library
+
 add_library(greywater_core STATIC)
 add_library(greywater::core ALIAS greywater_core)
 
@@ -14,8 +16,26 @@ target_include_directories(greywater_core
         $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
 )
 
-# Single compile unit for Phase 1 — the version surface. Phase 2 lands
-# platform/, memory/, core/ containers, math/, jobs/, ecs/, etc.
+# Add math library
+add_subdirectory(math)
+
+# Add ECS library
+add_subdirectory(ecs)
+
+# Add jobs library
+add_subdirectory(jobs)
+
+# Add core library
+add_subdirectory(core)
+
+# Generated version header
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/core/version.generated.hpp.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/gen/engine/core/version.generated.hpp"
+    @ONLY
+)
+
+
 target_sources(greywater_core
     PRIVATE
         core/version.cpp

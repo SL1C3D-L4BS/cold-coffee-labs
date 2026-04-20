@@ -3,7 +3,8 @@
 #include <optional>
 #include <vector>
 
-namespace gw::core {
+namespace gw {
+namespace core {
 
 template <typename T>
 class RingBuffer final {
@@ -43,4 +44,5 @@ private:
     std::size_t size_{0};
 };
 
-}  // namespace gw::core
+}  // namespace core
+}  // namespace gw

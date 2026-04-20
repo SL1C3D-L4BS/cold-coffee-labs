@@ -3,7 +3,8 @@
 #include <cstdint>
 #include <string>
 
-namespace gw::platform {
+namespace gw {
+namespace platform {
 
 struct WindowDesc {
     std::string title{"Greywater"};
@@ -39,4 +40,5 @@ private:
     std::string title_{};
 };
 
-}  // namespace gw::platform
+}  // namespace platform
+}  // namespace gw

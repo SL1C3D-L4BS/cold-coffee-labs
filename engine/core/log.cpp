@@ -2,7 +2,8 @@
 
 #include <iostream>
 
-namespace gw::core {
+namespace gw {
+namespace core {
 
 namespace {
 const char* to_string(LogLevel level) noexcept {
@@ -24,4 +25,5 @@ void log_message(LogLevel level, std::string_view category, std::string_view mes
     std::cout << "[" << to_string(level) << "][" << category << "] " << message << "\n";
 }
 
-}  // namespace gw::core
+}  // namespace core
+}  // namespace gw

@@ -4,7 +4,8 @@
 #include <cstdint>
 #include <memory>
 
-namespace gw::memory {
+namespace gw {
+namespace memory {
 
 class FrameAllocator final {
 public:
@@ -26,4 +27,5 @@ private:
     std::size_t offset_{0};
 };
 
-}  // namespace gw::memory
+}  // namespace memory
+}  // namespace gw

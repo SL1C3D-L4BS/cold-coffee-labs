@@ -1,6 +1,7 @@
 #include "engine/core/version.hpp"
 
-namespace gw::core {
+namespace gw {
+namespace core {
 
 const char* version_string() noexcept {
     // Stored in .rodata; 'static lifetime. Safe as a C string.
@@ -9,4 +10,5 @@ const char* version_string() noexcept {
     return kVersionString;
 }
 
-}  // namespace gw::core
+}  // namespace core
+}  // namespace gw

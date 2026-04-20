@@ -3,7 +3,8 @@
 #include <string>
 #include <string_view>
 
-namespace gw::core {
+namespace gw {
+namespace core {
 
 enum class ErrorCode {
     Unknown = 0,
@@ -21,4 +22,5 @@ struct Error {
 
 [[nodiscard]] std::string_view error_code_name(ErrorCode code) noexcept;
 
-}  // namespace gw::core
+}  // namespace core
+}  // namespace gw

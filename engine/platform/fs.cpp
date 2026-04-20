@@ -2,7 +2,8 @@
 
 #include <fstream>
 
-namespace gw::platform {
+namespace gw {
+namespace platform {
 
 bool FileSystem::exists(const std::filesystem::path& path) noexcept {
     std::error_code ec;
@@ -36,4 +37,5 @@ bool FileSystem::write_bytes(const std::filesystem::path& path, const std::vecto
     return static_cast<bool>(output);
 }
 
-}  // namespace gw::platform
+}  // namespace platform
+}  // namespace gw

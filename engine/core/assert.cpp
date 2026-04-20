@@ -3,7 +3,8 @@
 #include <cstdlib>
 #include <iostream>
 
-namespace gw::core {
+namespace gw {
+namespace core {
 
 [[noreturn]] void assert_fail(const char* expr, const char* file, int line, std::string_view message) {
     std::cerr << "GW_ASSERT failed: " << expr << " at " << file << ":" << line
@@ -11,4 +12,5 @@ namespace gw::core {
     std::abort();
 }
 
-}  // namespace gw::core
+}  // namespace core
+}  // namespace gw

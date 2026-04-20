@@ -1,6 +1,7 @@
 #include "engine/core/error.hpp"
 
-namespace gw::core {
+namespace gw {
+namespace core {
 
 std::string_view error_code_name(ErrorCode code) noexcept {
     switch (code) {
@@ -20,4 +21,5 @@ std::string_view error_code_name(ErrorCode code) noexcept {
     return "Unknown";
 }
 
-}  // namespace gw::core
+}  // namespace core
+}  // namespace gw

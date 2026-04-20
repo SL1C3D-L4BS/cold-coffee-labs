@@ -1,6 +1,7 @@
 #include "engine/platform/time.hpp"
 
-namespace gw::platform {
+namespace gw {
+namespace platform {
 
 std::uint64_t Clock::now_ns() noexcept {
     const auto now = steady_clock::now().time_since_epoch();
@@ -13,4 +14,5 @@ double Clock::now_seconds() noexcept {
     return std::chrono::duration_cast<std::chrono::duration<double>>(now).count();
 }
 
-}  // namespace gw::platform
+}  // namespace platform
+}  // namespace gw

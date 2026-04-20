@@ -6,7 +6,8 @@
 
 #include <string_view>
 
-namespace gw::core {
+namespace gw {
+namespace core {
 
 // Compile-time semantic version components, wired from the top-level
 // CMake project() call via version.generated.hpp.
@@ -24,14 +25,17 @@ struct Version {
 // safe to pass directly to C APIs. See docs/12 §E1.
 [[nodiscard]] const char* version_string() noexcept;
 
-}  // namespace gw::core
+}  // namespace gw
+}  // namespace core
 
 #include <engine/core/version.generated.hpp>
 
-namespace gw::core {
+namespace gw {
+namespace core {
 
 constexpr Version version() noexcept {
     return Version{GW_VERSION_MAJOR, GW_VERSION_MINOR, GW_VERSION_PATCH};
 }
 
-}  // namespace gw::core
+}  // namespace gw
+}  // namespace core

@@ -2,7 +2,8 @@
 
 #include <cstring>
 
-namespace gw::core {
+namespace gw {
+namespace core {
 
 Utf8String::Utf8String(std::string_view value) {
     static_cast<void>(assign(value));
@@ -63,4 +64,5 @@ bool Utf8String::is_valid_utf8(std::string_view value) noexcept {
     return remaining == 0;
 }
 
-}  // namespace gw::core
+}  // namespace core
+}  // namespace gw

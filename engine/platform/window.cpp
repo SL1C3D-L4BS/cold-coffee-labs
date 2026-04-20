@@ -1,7 +1,8 @@
 #include "engine/platform/window.hpp"
 #include <utility>
 
-namespace gw::platform {
+namespace gw {
+namespace platform {
 
 Window::Window(WindowDesc desc)
     : width_(desc.width),
@@ -48,4 +49,5 @@ void Window::release() noexcept {
     handle_ = nullptr;
 }
 
-}  // namespace gw::platform
+}  // namespace platform
+}  // namespace gw

@@ -5,7 +5,8 @@
 #include <memory>
 #include <vector>
 
-namespace gw::memory {
+namespace gw {
+namespace memory {
 
 class ArenaAllocator final {
 public:
@@ -34,4 +35,5 @@ private:
     std::vector<Block> blocks_{};
 };
 
-}  // namespace gw::memory
+}  // namespace memory
+}  // namespace gw

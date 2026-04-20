@@ -2,7 +2,8 @@
 
 #include <bit>
 
-namespace gw::memory {
+namespace gw {
+namespace memory {
 
 FrameAllocator::FrameAllocator(std::size_t bytes)
     : buffer_(std::make_unique<std::byte[]>(bytes)),
@@ -26,4 +27,5 @@ void FrameAllocator::reset() noexcept {
     offset_ = 0;
 }
 
-}  // namespace gw::memory
+}  // namespace memory
+}  // namespace gw

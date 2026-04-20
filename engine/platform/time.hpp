@@ -3,7 +3,8 @@
 #include <chrono>
 #include <cstdint>
 
-namespace gw::platform {
+namespace gw {
+namespace platform {
 
 class Clock final {
 public:
@@ -13,4 +14,5 @@ public:
     [[nodiscard]] static double now_seconds() noexcept;
 };
 
-}  // namespace gw::platform
+}  // namespace platform
+}  // namespace gw

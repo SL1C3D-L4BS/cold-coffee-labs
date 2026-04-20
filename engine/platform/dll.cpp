@@ -6,7 +6,8 @@
 #include <dlfcn.h>
 #endif
 
-namespace gw::platform {
+namespace gw {
+namespace platform {
 
 DynamicLibrary::DynamicLibrary(const std::string& path) {
     static_cast<void>(open(path));
@@ -68,4 +69,5 @@ void* DynamicLibrary::find_symbol(const char* name) const noexcept {
 #endif
 }
 
-}  // namespace gw::platform
+}  // namespace platform
+}  // namespace gw

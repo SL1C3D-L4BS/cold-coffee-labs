@@ -6,7 +6,8 @@
 #include <string>
 #include <string_view>
 
-namespace gw::core {
+namespace gw {
+namespace core {
 
 class Utf8String final {
 public:
@@ -29,4 +30,5 @@ private:
     bool heap_active_{false};
 };
 
-}  // namespace gw::core
+}  // namespace gw
+}  // namespace core

@@ -2,7 +2,8 @@
 
 #include <cstdint>
 
-namespace gw::platform {
+namespace gw {
+namespace platform {
 
 enum class KeyState : std::uint8_t {
     Released = 0,
@@ -17,4 +18,5 @@ struct MouseState {
     KeyState middle{KeyState::Released};
 };
 
-}  // namespace gw::platform
+}  // namespace platform
+}  // namespace gw

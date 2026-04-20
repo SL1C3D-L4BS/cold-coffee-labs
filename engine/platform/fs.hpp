@@ -5,7 +5,8 @@
 #include <string>
 #include <vector>
 
-namespace gw::platform {
+namespace gw {
+namespace platform {
 
 class FileSystem final {
 public:
@@ -14,4 +15,5 @@ public:
     [[nodiscard]] static bool write_bytes(const std::filesystem::path& path, const std::vector<std::byte>& data);
 };
 
-}  // namespace gw::platform
+}  // namespace platform
+}  // namespace gw

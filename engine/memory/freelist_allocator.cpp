@@ -2,7 +2,8 @@
 
 #include <stdexcept>
 
-namespace gw::memory {
+namespace gw {
+namespace memory {
 
 FreelistAllocator::FreelistAllocator(std::size_t capacity_bytes)
     : storage_(std::make_unique<std::byte[]>(capacity_bytes)),
@@ -43,4 +44,5 @@ void FreelistAllocator::deallocate(void* ptr, std::size_t bytes) noexcept {
     free_blocks_[offset] = bytes;
 }
 
-}  // namespace gw::memory
+}  // namespace memory
+}  // namespace gw

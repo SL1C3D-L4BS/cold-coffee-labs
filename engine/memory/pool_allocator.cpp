@@ -3,7 +3,8 @@
 #include <algorithm>
 #include <stdexcept>
 
-namespace gw::memory {
+namespace gw {
+namespace memory {
 
 PoolAllocator::PoolAllocator(std::size_t element_size, std::size_t element_count)
     : element_size_(element_size < sizeof(void*) ? sizeof(void*) : element_size),
@@ -43,4 +44,5 @@ void PoolAllocator::deallocate(void* ptr) noexcept {
     ++free_count_;
 }
 
-}  // namespace gw::memory
+}  // namespace memory
+}  // namespace gw

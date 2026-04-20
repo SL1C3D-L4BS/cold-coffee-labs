@@ -2,7 +2,8 @@
 
 #include <string_view>
 
-namespace gw::core {
+namespace gw {
+namespace core {
 
 enum class LogLevel {
     Trace = 0,
@@ -13,4 +14,5 @@ enum class LogLevel {
 
 void log_message(LogLevel level, std::string_view category, std::string_view message);
 
-}  // namespace gw::core
+}  // namespace core
+}  // namespace gw
