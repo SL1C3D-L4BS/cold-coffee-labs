@@ -65,15 +65,6 @@ target_sources(greywater_core
         platform/time.cpp
         platform/fs.cpp
         platform/dll.cpp
-        # Render HAL
-        render/hal/vulkan_instance.cpp
-        render/hal/vulkan_device.cpp
-        render/hal/vulkan_queue.cpp
-        render/hal/vulkan_command_buffer.cpp
-        render/hal/vulkan_memory.cpp
-        render/hal/vulkan_buffer.cpp
-        render/hal/vulkan_swapchain.cpp
-        render/hal/vulkan_descriptor.cpp
         memory/frame_allocator.cpp
         memory/arena_allocator.cpp
         memory/pool_allocator.cpp

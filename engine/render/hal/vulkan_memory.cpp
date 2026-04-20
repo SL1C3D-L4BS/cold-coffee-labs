@@ -1,6 +1,6 @@
+#define VMA_IMPLEMENTATION
 #include "vulkan_memory.hpp"
 #include <volk.h>
-#include <vk_mem_alloc.h>
 #include <stdexcept>
 
 namespace gw {

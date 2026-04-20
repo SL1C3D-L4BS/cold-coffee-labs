@@ -1,7 +1,10 @@
 # Render HAL - Hardware Abstraction Layer
 # Implements Vulkan 1.2/1.3 backend with RX 580 baseline support
 
-target_sources(greywater_core
+# Define the engine render target
+add_library(engine_render)
+
+target_sources(engine_render
     PRIVATE
         hal/vulkan_instance.cpp
         hal/vulkan_device.cpp
@@ -9,6 +12,41 @@ target_sources(greywater_core
         hal/vulkan_command_buffer.cpp
         hal/vulkan_memory.cpp
         hal/vulkan_buffer.cpp
-        # hal/vulkan_swapchain.cpp
-        # hal/vulkan_descriptor.cpp
+        hal/vulkan_swapchain.cpp
+        hal/vulkan_descriptor.cpp
+        # Shader system (Week 028)
+        shader/shader_manager.cpp
 )
+
+# Include directories (volk.h lives under CPM build tree; matches greywater_core)
+target_include_directories(engine_render
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../..
+        ${CMAKE_BINARY_DIR}/_deps/volk-src
+)
+
+# Link with required dependencies
+target_link_libraries(engine_render PRIVATE
+    volk
+    Vulkan::Vulkan
+    VulkanMemoryAllocator
+)
+
+# Frame Graph (Week 025-027)
+add_subdirectory(frame_graph)
+
+# Forward+ clustered lighting (Week 029)
+add_subdirectory(forward_plus)
+
+# Cascaded shadow maps (Week 030)
+add_subdirectory(shadows)
+
+# IBL and tonemapping (Week 031)
+add_subdirectory(ibl)
+
+# Milestone validation (Week 032)
+add_subdirectory(validation)
+
+# Add render target to main engine target
+target_link_libraries(greywater_core PRIVATE engine_render)
