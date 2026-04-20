@@ -4,6 +4,11 @@
 
 add_executable(gw_tests
     smoke_test.cpp
+    platform_test.cpp
+    memory_test.cpp
+    core_test.cpp
+    containers_test.cpp
+    string_test.cpp
     test_main.cpp
 )
 target_link_libraries(gw_tests
