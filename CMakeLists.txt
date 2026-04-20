@@ -65,6 +65,7 @@ include(cmake/dependencies.cmake)
 
 # --- Subsystems ---------------------------------------------------------------
 add_subdirectory(engine)
+add_subdirectory(shaders)
 
 # BLD — Rust workspace compiled via Corrosion (docs/00 §2.4, non-negotiable #15).
 corrosion_import_crate(
