@@ -7,21 +7,35 @@
 
 #include "engine/platform/dll.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
 #include <vector>
 
+namespace gw::ecs { class World; }
+
 namespace gw::editor {
 
-// Minimal context passed to gameplay — a narrow POD struct.
+// Minimal context passed to gameplay — a narrow POD struct. Lives on the
+// editor side; we pass `&ctx` across the C-ABI boundary so the `void*` fields
+// carry stable ABI regardless of gameplay-side header drift. The concrete
+// types behind those pointers are:
+//
+//   world       -> gw::ecs::World*          (ADR-0004; live authoring world)
+//   time        -> gw::TimeState*           (engine/core/time.hpp)
+//   asset_db    -> gw::assets::AssetDatabase*
+//   input_state -> gw::input::InputState*   (Phase 10 stub; nullptr today)
+//
 // Every pointer is owned by the engine; gameplay never frees them.
+// Field order is frozen — append new entries at the tail, never reorder.
 struct GameplayContext {
     uint32_t version       = 1;   // bumped on breaking changes
-    void*    world         = nullptr;  // gw::ecs::World* (Phase 8)
-    void*    asset_db      = nullptr;  // gw::assets::AssetDatabase*
-    void*    input_state   = nullptr;  // gw::input::InputState* (Phase 10 stub)
+    void*    world         = nullptr;
+    void*    asset_db      = nullptr;
+    void*    input_state   = nullptr;
+    void*    time          = nullptr;  // gw::TimeState* (Phase 7 week 040)
 };
 
 // C-ABI contract — gameplay module must export these three symbols.
@@ -44,15 +58,21 @@ public:
     void set_lib_path(std::string path) { lib_source_path_ = std::move(path); }
 
     // Transition: Editor → Playing.
-    // Snapshots world, loads dll, calls gw_gameplay_init.
-    // Returns false if the dll cannot be found/loaded.
+    // Snapshots world via ecs::save_world, loads dll (optional — PIE may enter
+    // without a gameplay module when the editor wants to iterate on scene
+    // state in isolation), calls gw_gameplay_init if a dll loaded.
+    // Returns false if ctx.world is null or serialization fails — in those
+    // cases the editor stays in Editor mode so the user isn't stranded in a
+    // PIE state that can't restore.
     [[nodiscard]] bool enter_play(GameplayContext& ctx);
 
     void pause();
     void resume();
 
     // Transition: Playing/Paused → Editor.
-    // Calls gw_gameplay_shutdown, unloads dll, restores world snapshot.
+    // Calls gw_gameplay_shutdown, unloads dll, restores world snapshot via
+    // ecs::load_world. Best-effort: if the restore fails the world is cleared
+    // and we still return to Editor state rather than deadlocking in PIE.
     void stop(GameplayContext& ctx);
 
     // Advance the gameplay simulation one tick.
@@ -64,6 +84,24 @@ public:
     [[nodiscard]] PIEState state() const noexcept { return state_; }
     [[nodiscard]] bool in_play()   const noexcept {
         return state_ != PIEState::Editor;
+    }
+
+    // ----- Snapshot/restore (public for tests and scripted automation) -----
+    // These run independently of the dll load path so unit tests can exercise
+    // the serialization round-trip without a gameplay module on disk.
+
+    // Serialize `world` into the internal snapshot buffer. Returns false if
+    // serialization fails (e.g. non-trivially-copyable component present).
+    [[nodiscard]] bool take_snapshot(gw::ecs::World& world);
+
+    // Deserialize the internal snapshot back into `world`, clearing whatever
+    // was there first. Returns false if the buffer is empty or corrupt; in
+    // that case `world` has been cleared but not repopulated.
+    [[nodiscard]] bool restore_snapshot(gw::ecs::World& world);
+
+    // Size of the last take_snapshot() payload (0 if none).
+    [[nodiscard]] std::size_t snapshot_size() const noexcept {
+        return world_snapshot_.size();
     }
 
 private:

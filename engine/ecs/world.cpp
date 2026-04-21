@@ -5,6 +5,7 @@
 
 #include "hierarchy.hpp"
 
+#include <algorithm>
 #include <cstring>
 #include <stdexcept>
 
@@ -123,6 +124,92 @@ void World::visit_entities(const std::function<void(Entity)>& fn) const {
 const EntitySlot* World::slot_for(Entity e) const noexcept {
     if (!is_alive(e)) return nullptr;
     return &slots_[e.index()];
+}
+
+// ---------------------------------------------------------------------------
+// Serialization helpers (ADR-0006 §2.9)
+// ---------------------------------------------------------------------------
+
+void World::clear() noexcept {
+    // Walk every live entity in every archetype and run destructors on the
+    // non-trivially-destructible components (mirrors ~World); then reset.
+    for (ArchetypeId aid = 0; aid < archetypes_.archetype_count(); ++aid) {
+        auto& arch = archetypes_.archetype(aid);
+        for (std::size_t ci = 0; ci < arch.chunk_count(); ++ci) {
+            auto& chunk = arch.chunk(ci);
+            const auto live = chunk.live_count();
+            for (std::uint16_t s = 0; s < live; ++s) {
+                arch.destruct_components_at(registry_, static_cast<std::uint16_t>(ci), s);
+            }
+        }
+    }
+    // Replace the archetype table wholesale — the registry is preserved so
+    // subsequent id_of<T>() lookups stay stable.
+    archetypes_ = ArchetypeTable{};
+    slots_.clear();
+    free_list_.clear();
+    live_entity_count_ = 0;
+}
+
+Entity World::restore_entity_with_bits(std::uint64_t bits) {
+    const Entity e{bits};
+    if (e.generation() == 0) return Entity::null();
+    const auto idx = e.index();
+    // Grow the slot table if needed; freshly created slots have gen=0.
+    if (idx >= slots_.size()) {
+        slots_.resize(static_cast<std::size_t>(idx) + 1);
+    }
+    auto& slot = slots_[idx];
+    // Must point at an empty slot — anything else would collide with a live
+    // entity and is a caller bug.
+    if (slot.generation != 0) return Entity::null();
+
+    slot.generation   = e.generation();
+    slot.archetype_id = kInvalidArchetypeId;
+    slot.chunk_index  = std::numeric_limits<std::uint16_t>::max();
+    slot.slot_index   = std::numeric_limits<std::uint16_t>::max();
+    ++live_entity_count_;
+
+    // Remove this index from the free list if it happens to be there.
+    auto it = std::find(free_list_.begin(), free_list_.end(), idx);
+    if (it != free_list_.end()) free_list_.erase(it);
+
+    return e;
+}
+
+bool World::add_component_raw(Entity e, ComponentTypeId tid,
+                               const void* src, std::size_t size) {
+    if (!is_alive(e)) return false;
+    if (tid == kInvalidComponentTypeId) return false;
+    if (tid >= registry_.component_count()) return false;
+
+    const auto& info = registry_.info(tid);
+    if (size != info.size) return false;
+    // Non-trivially-copyable types must go through add_component<T>; the
+    // serialization reflection path lands with ADR-0006 §2.5.
+    if (!info.trivially_copyable) return false;
+
+    auto& slot = slots_[e.index()];
+    ComponentMask new_mask;
+    std::vector<ComponentTypeId> new_types;
+    if (slot.archetype_id != kInvalidArchetypeId) {
+        const auto& cur = archetypes_.archetype(slot.archetype_id);
+        new_mask        = cur.mask();
+        new_types       = cur.types();
+    }
+    if (new_mask.test(tid)) {
+        auto* dst = raw_component_(e, tid);
+        if (dst && src) std::memcpy(dst, src, size);
+        return true;
+    }
+    new_mask.set(tid);
+    new_types.push_back(tid);
+    std::sort(new_types.begin(), new_types.end());
+
+    auto* dst_raw = migrate_entity_(e, new_mask, new_types, tid);
+    if (!dst_raw || !src) return false;
+    std::memcpy(dst_raw, src, size);
+    return true;
 }
 
 // ---------------------------------------------------------------------------

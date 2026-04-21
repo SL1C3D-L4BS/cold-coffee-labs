@@ -14,4 +14,5 @@ target_sources(greywater_core
             field_reflection.hpp
             serialization.hpp
             scene_format.hpp
+            time.hpp
 )

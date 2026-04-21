@@ -104,6 +104,27 @@ public:
     // -----------------------------------------------------------------
     [[nodiscard]] const EntitySlot* slot_for(Entity e) const noexcept;
 
+    // -----------------------------------------------------------------
+    // Serialization helpers (ADR-0006). The ComponentRegistry is preserved
+    // across clear() — the registered types outlive the entity data.
+    // -----------------------------------------------------------------
+
+    // Destroy every live entity, empty every archetype chunk, and reset the
+    // entity table. ComponentRegistry is left untouched.
+    void clear() noexcept;
+
+    // Create an entity whose bits exactly match `bits`. Used by load_world to
+    // preserve intra-blob Entity references (Hierarchy components). Returns
+    // Entity::null() when the request conflicts with a live slot or when the
+    // generation in `bits` is 0 (reserved).
+    Entity restore_entity_with_bits(std::uint64_t bits);
+
+    // Add a trivially-copyable component by ComponentTypeId using raw bytes.
+    // Returns true on success; false if `e` is dead, `tid` is invalid, or the
+    // component is non-trivially-copyable. Size must match registry info.
+    bool add_component_raw(Entity e, ComponentTypeId tid,
+                            const void* src, std::size_t size);
+
 private:
     // Low-level: migrate `e` to the archetype identified by (new_mask, new_types_sorted).
     // Returns pointer to the newly-allocated component slot for `added_tid` (or

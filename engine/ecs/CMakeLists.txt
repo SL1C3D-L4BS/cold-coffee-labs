@@ -5,6 +5,7 @@ target_sources(greywater_core
         component_registry.cpp
         archetype.cpp
         world.cpp
+        serialize.cpp
     PUBLIC
         FILE_SET HEADERS
         BASE_DIRS ${CMAKE_SOURCE_DIR}
@@ -14,4 +15,5 @@ target_sources(greywater_core
             archetype.hpp
             hierarchy.hpp
             world.hpp
+            serialize.hpp
 )

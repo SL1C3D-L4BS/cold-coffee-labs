@@ -13,8 +13,13 @@ add_executable(gw_tests
     # Phase 7 fullstack Path-A — Editor CommandStack (docs/adr/0005-editor-command-stack.md)
     unit/editor_undo/command_stack_test.cpp
     "${CMAKE_SOURCE_DIR}/editor/undo/command_stack.cpp"
+    # Phase 7 fullstack Path-A — PIE snapshot/restore (docs/adr/0006 + §12)
+    unit/editor_pie/gameplay_host_test.cpp
+    "${CMAKE_SOURCE_DIR}/editor/pie/gameplay_host.cpp"
     # Phase 7 gap-fill — ECS World (docs/adr/0004-ecs-world.md)
     unit/ecs/world_test.cpp
+    # Phase 7 — ECS serialization (docs/adr/0006-ecs-world-serialization.md)
+    unit/ecs/serialize_test.cpp
     # Phase 6 — Asset Pipeline
     unit/assets/cook_cache_test.cpp
     unit/assets/mesh_cooker_test.cpp

@@ -13,6 +13,7 @@
 #include "editor/selection/selection_context.hpp"
 #include "editor/pie/gameplay_host.hpp"
 #include "editor/undo/command_stack.hpp"
+#include "engine/core/time.hpp"
 #include "engine/ecs/world.hpp"
 
 #include <memory>
@@ -94,6 +95,8 @@ private:
     gw::editor::undo::CommandStack cmd_stack_{};
     PanelRegistry                 panels_;
     GameplayHost           pie_;
+    GameplayContext        pie_ctx_{};     // lives for the session; world/time filled lazily
+    gw::TimeState          pie_time_{};    // handed to gameplay through pie_ctx_.time
     gw::ecs::World         scene_world_;   // authoring world — lives for the editor session
 
     // Layout built flag — persisted via ImGui ini.

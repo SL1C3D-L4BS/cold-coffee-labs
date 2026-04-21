@@ -8,6 +8,8 @@
 
 #include "gameplay_host.hpp"
 
+#include "engine/ecs/serialize.hpp"
+#include "engine/ecs/world.hpp"
 #include "engine/platform/dll.hpp"
 #include "engine/platform/fs.hpp"
 
@@ -76,6 +78,23 @@ void GameplayHost::unload_dll() {
     }
 }
 
+bool GameplayHost::take_snapshot(gw::ecs::World& world) {
+    world_snapshot_ = gw::ecs::save_world(world, gw::ecs::SnapshotMode::PieSnapshot);
+    return !world_snapshot_.empty();
+}
+
+bool GameplayHost::restore_snapshot(gw::ecs::World& world) {
+    if (world_snapshot_.empty()) return false;
+    // load_world clears `world` itself before applying the payload, so we
+    // don't need a separate clear step here. CRC verification is on; if the
+    // snapshot is corrupt the world ends up empty (via the internal clear)
+    // which is safer than a half-populated state.
+    auto r = gw::ecs::load_world(world,
+                                  std::span<const std::uint8_t>(world_snapshot_),
+                                  gw::ecs::LoadOptions{});
+    return r.has_value();
+}
+
 bool GameplayHost::enter_play(GameplayContext& ctx) {
     // Guard: transition is only valid from Editor → Playing. Returns false
     // (recoverable) rather than asserting — editor code must not take the
@@ -84,14 +103,27 @@ bool GameplayHost::enter_play(GameplayContext& ctx) {
     // this branch is a programming error the caller can handle.
     if (state_ != PIEState::Editor) return false;
 
-    // Snapshot the ECS world (Phase 7 stub — empty snapshot; Phase 8 serializes).
-    world_snapshot_.clear();
-    // TODO(Phase 8): serialize world into world_snapshot_
+    // Snapshot first — if we can't round-trip the scene, refuse to enter PIE
+    // rather than let the user stranded with no way back. `ctx.world` is the
+    // authoring world; it must be non-null for a meaningful PIE session.
+    auto* world = static_cast<gw::ecs::World*>(ctx.world);
+    if (!world) return false;
+    if (!take_snapshot(*world)) return false;
 
-    if (!load_dll()) return false;
+    // Loading the gameplay dll is optional: without it, PIE still runs the
+    // simulation loop with whatever systems the editor owns, which is useful
+    // for iterating on scene state before a gameplay module exists.
+    if (!lib_source_path_.empty()) {
+        if (!load_dll()) {
+            // DLL is required when a path was configured — we can't silently
+            // run without it if the user expected gameplay. Roll back cleanly.
+            world_snapshot_.clear();
+            return false;
+        }
+    }
 
     live_ctx_ = &ctx;
-    gameplay_init_(&ctx);
+    if (gameplay_init_) gameplay_init_(&ctx);
     state_ = PIEState::Playing;
     return true;
 }
@@ -112,9 +144,14 @@ void GameplayHost::stop(GameplayContext& ctx) {
     state_     = PIEState::Editor;
     live_ctx_  = nullptr;
 
-    // Restore ECS world (Phase 7 stub; Phase 8 deserializes world_snapshot_).
-    // TODO(Phase 8): deserialize world_snapshot_ back into ctx.world
-    (void)ctx;
+    if (auto* world = static_cast<gw::ecs::World*>(ctx.world)) {
+        // Best-effort restore — if the snapshot is corrupt (shouldn't happen
+        // unless memory was tampered with), world is left cleared rather than
+        // in a partially-overwritten state. The editor surfaces this through
+        // the console panel once logging is wired into gameplay_host.
+        (void)restore_snapshot(*world);
+    }
+    world_snapshot_.clear();
 }
 
 void GameplayHost::tick(GameplayContext& ctx, float dt) {

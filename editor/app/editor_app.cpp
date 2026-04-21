@@ -291,6 +291,26 @@ void EditorApplication::run() {
             continue;  // swapchain out-of-date; retry next iteration
         }
 
+        // Keep the GameplayContext pointing at the live authoring world and
+        // shared TimeState. These pointers are re-bound every frame so the
+        // gameplay module (and enter_play snapshot path) always sees the
+        // current engine-owned state.
+        pie_ctx_.world = &scene_world_;
+        pie_ctx_.time  = &pie_time_;
+
+        if (pie_.in_play()) {
+            const float scaled_dt =
+                (pie_.state() == GameplayHost::PIEState::Paused)
+                    ? 0.f
+                    : dt * pie_time_.time_scale;
+            pie_time_.dt_s    = scaled_dt;
+            pie_time_.total_s += scaled_dt;
+            ++pie_time_.frame;
+            pie_.tick(pie_ctx_, scaled_dt);
+        } else {
+            pie_time_.dt_s = 0.f;
+        }
+
         EditorContext ctx{
             .selection    = selection_,
             .cmd_stack    = cmd_stack_,
@@ -1043,6 +1063,24 @@ void EditorApplication::build_ui() {
                 cmd_stack_.redo();
             ImGui::EndMenu();
         }
+        if (ImGui::BeginMenu("Play")) {
+            const bool in_play    = pie_.in_play();
+            const bool is_paused  = pie_.state() == GameplayHost::PIEState::Paused;
+            if (ImGui::MenuItem("Play", "F5", false, !in_play)) {
+                pie_ctx_.world = &scene_world_;
+                pie_ctx_.time  = &pie_time_;
+                pie_time_      = {};
+                (void)pie_.enter_play(pie_ctx_);
+            }
+            if (ImGui::MenuItem("Pause", "F6", is_paused, in_play)) {
+                if (is_paused) pie_.resume(); else pie_.pause();
+            }
+            if (ImGui::MenuItem("Stop", "Shift+F5", false, in_play)) {
+                pie_.stop(pie_ctx_);
+                pie_time_ = {};
+            }
+            ImGui::EndMenu();
+        }
         if (ImGui::BeginMenu("Window")) {
             for (auto& p : panels_.panels()) {
                 bool vis = p->visible();
@@ -1325,6 +1363,30 @@ void EditorApplication::on_key_callback(GLFWwindow* w, int key,
         }
         if (key == GLFW_KEY_Y) { app->cmd_stack_.redo(); return; }
         if (key == GLFW_KEY_S) { gw_editor_save_scene("content/untitled.gwscene"); return; }
+    }
+
+    if (action == GLFW_PRESS) {
+        if (key == GLFW_KEY_F5) {
+            if (mods & GLFW_MOD_SHIFT) {
+                if (app->pie_.in_play()) {
+                    app->pie_.stop(app->pie_ctx_);
+                    app->pie_time_ = {};
+                }
+            } else if (!app->pie_.in_play()) {
+                app->pie_ctx_.world = &app->scene_world_;
+                app->pie_ctx_.time  = &app->pie_time_;
+                app->pie_time_      = {};
+                (void)app->pie_.enter_play(app->pie_ctx_);
+            }
+            return;
+        }
+        if (key == GLFW_KEY_F6 && app->pie_.in_play()) {
+            if (app->pie_.state() == GameplayHost::PIEState::Paused)
+                app->pie_.resume();
+            else
+                app->pie_.pause();
+            return;
+        }
     }
 
     for (auto& p : app->panels_.panels())
