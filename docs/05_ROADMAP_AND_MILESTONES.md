@@ -28,7 +28,7 @@ Greywater is two products in one build: the engine (`Greywater_Engine`) and the 
 | 7     | Editor Foundation                            | 037–042   | 6w       | *Editor v0.1*                | completed (engineering; demo-recording gate pending per §0) |
 | 8     | Scene Serialization & Visual Scripting       | 043–047   | 5w       | —                            | completed (2026-04-21; ADR-0008 + ADR-0009 landed; `.gwscene` + dvec3 transforms + vscript IR/interpreter/VM + ImNodes panel all green) |
 | 9     | BLD (Brewed Logic Directive, Rust)           | 048–059   | 12w      | *Brewed Logic*               | completed (2026-04-21; ADR-0010 → 0016 + amended ADR-0007 all landed; full six-wave 9A–9F implementation committed; see §Phase-9 amendment) |
-| 10    | Runtime I — Audio & Input                    | 060–065   | 6w       | —                            | planned  |
+| 10    | Runtime I — Audio & Input                    | 060–065   | 6w       | —                            | in-progress (2026-04-21; ADR-0017 → 0022 landed; §Phase-10 kick-off)  |
 | 11    | Runtime II — UI, Events, Config, Console     | 066–071   | 6w       | *Playable Runtime*           | planned  |
 | 12    | Physics                                      | 072–077   | 6w       | —                            | planned  |
 | 13    | Animation & Game AI Framework                | 078–083   | 6w       | *Living Scene*               | planned  |
@@ -161,12 +161,12 @@ Revised 2026-04-21 to reflect the six-wave plan (9A–9F) that was executed in a
 
 | Week | Deliverable                                                                | Tier |
 | ---- | -------------------------------------------------------------------------- | ---- |
-| 060  | `engine/audio/`: miniaudio device + mixer + format decoders                | A    |
-| 061  | `engine/audio/`: Steam Audio spatial integration + HRTF                    | A    |
-| 062  | `engine/audio/`: streaming music, cooked audio format                      | A    |
-| 063  | `engine/input/`: SDL3 device layer (gamepad/HID/haptics)                   | A    |
-| 064  | `engine/input/`: action-map system + rebinding + TOML config               | A    |
-| 065  | Input accessibility defaults (hold-to-toggle, single-switch)               | A    |
+| 060  | `engine/audio/`: Wave 10A — AudioService + VoicePool + MixerGraph + AtmosphereFilter + null backend (ADR-0017) | A    |
+| 061  | `engine/audio/`: Wave 10B — ISpatialBackend (stub + Steam Audio seam) + occlusion provider + vacuum path (ADR-0018) | A    |
+| 062  | `engine/audio/`: Wave 10C — `.kaudio` format + decoder registry + MusicStreamer + ducking (ADR-0019) | A    |
+| 063  | `engine/input/`: Wave 10D — SDL3 device layer (null / trace / SDL backends) + haptics + `.input_trace` (ADR-0020) | A    |
+| 064  | `engine/input/`: Wave 10E.1–E.3 — typed Actions + processors + TOML round-trip + context stack + rebind (ADR-0021) | A    |
+| 065  | `engine/input/`: Wave 10E.4–E.5 — hold-to-toggle, auto-repeat, single-switch scanner, Adaptive auto-profile (ADR-0021/0022) | A    |
 
 ### Phase 11 — Runtime II: UI, Events, Config, Console (weeks 066–071)
 

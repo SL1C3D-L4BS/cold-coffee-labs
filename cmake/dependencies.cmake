@@ -196,10 +196,78 @@ CPMAddPackage(
     DOWNLOAD_ONLY    YES
 )
 
-# --- Phase 7+ deps below are opted in by their owning CMakeLists.txt --------
-#   Phase 10+: SDL3, miniaudio, Steam Audio
+# --- Phase 10 — Runtime I: Audio & Input (optional/gated) -------------------
+# ADR-0022 §1 pins: all four deps are OFF by default so CI and clean checkouts
+# continue to link against the null / stub backends. Flip the corresponding
+# GW_* option ON to pull the vendored source and enable the production path.
+#
+#   GW_ENABLE_MINIAUDIO   — miniaudio device driver (ADR-0017 §2.5)
+#   GW_ENABLE_SDL3        — SDL3 input/gamepad/haptics backend (ADR-0020 §2.2)
+#   GW_ENABLE_STEAM_AUDIO — Steam Audio HRTF + direct/reverb (ADR-0018 §2.3)
+#   GW_ENABLE_LIBOPUS     — libopus music streaming decoder (ADR-0019 §2.4)
+option(GW_ENABLE_MINIAUDIO   "Fetch miniaudio and enable the production audio backend"       OFF)
+option(GW_ENABLE_SDL3        "Fetch SDL3 and enable the production input backend"            OFF)
+option(GW_ENABLE_STEAM_AUDIO "Fetch Steam Audio SDK and enable spatial HRTF / reverb"        OFF)
+option(GW_ENABLE_LIBOPUS     "Fetch libopus (+ opusfile) and enable streaming music decoder" OFF)
+
+if(GW_ENABLE_MINIAUDIO)
+    # miniaudio is a single-file C library; DOWNLOAD_ONLY + tiny interface lib.
+    CPMAddPackage(
+        NAME             miniaudio
+        GITHUB_REPOSITORY mackron/miniaudio
+        GIT_TAG          0.11.21
+        DOWNLOAD_ONLY    YES
+    )
+    if(miniaudio_ADDED)
+        add_library(miniaudio INTERFACE)
+        target_include_directories(miniaudio INTERFACE "${miniaudio_SOURCE_DIR}")
+        add_library(miniaudio::miniaudio ALIAS miniaudio)
+    endif()
+    set(GW_AUDIO_MINIAUDIO ON CACHE BOOL "engine/audio: compile miniaudio backend" FORCE)
+endif()
+
+if(GW_ENABLE_SDL3)
+    # SDL 3.2 — ADR-0020's pinned baseline; ships a first-class CMake target.
+    CPMAddPackage(
+        NAME             SDL3
+        GITHUB_REPOSITORY libsdl-org/SDL
+        GIT_TAG          release-3.2.0
+        OPTIONS
+            "SDL_TEST OFF"
+            "SDL_EXAMPLES OFF"
+            "SDL_SHARED OFF"
+            "SDL_STATIC ON"
+    )
+    set(GW_INPUT_SDL3 ON CACHE BOOL "engine/input: compile SDL3 backend" FORCE)
+endif()
+
+if(GW_ENABLE_STEAM_AUDIO)
+    # Steam Audio 4.5.3 — binary SDK (Valve's redistribution). We keep the pin
+    # here as a manifest entry; the actual integration uses Steam Audio's
+    # pre-built phonon libs discovered from STEAMAUDIO_SDK_ROOT.
+    if(NOT DEFINED STEAMAUDIO_SDK_ROOT)
+        message(WARNING "GW_ENABLE_STEAM_AUDIO=ON but STEAMAUDIO_SDK_ROOT is not set; "
+                        "point it at the unpacked Steam Audio 4.5.3 SDK.")
+    endif()
+    set(GW_AUDIO_STEAM ON CACHE BOOL "engine/audio: compile Steam Audio backend" FORCE)
+endif()
+
+if(GW_ENABLE_LIBOPUS)
+    # xiph/opus 1.5.2 — raw codec. opusfile adds OGG stream framing.
+    CPMAddPackage(
+        NAME             opus
+        GITHUB_REPOSITORY xiph/opus
+        GIT_TAG          v1.5.2
+        OPTIONS
+            "OPUS_BUILD_TESTING OFF"
+            "OPUS_BUILD_SHARED_LIBRARY OFF"
+    )
+    set(GW_AUDIO_OPUS ON CACHE BOOL "engine/audio: compile Opus decoder" FORCE)
+endif()
+
+# --- Phase 11+ deps below are opted in by their owning CMakeLists.txt --------
 #   Phase 11+: RmlUi, HarfBuzz, FreeType
 #   Phase 12+: Jolt Physics
 #   Phase 13+: Ozz-animation, ACL, Recast/Detour
-#   Phase 14+: GameNetworkingSockets, Opus
+#   Phase 14+: GameNetworkingSockets (voice chat uses Opus from Phase 10 pin)
 #   Phase 16+: ICU

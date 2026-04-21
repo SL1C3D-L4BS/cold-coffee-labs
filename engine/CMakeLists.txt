@@ -56,6 +56,10 @@ add_subdirectory(scene)
 # Phase 8 week 045 — Visual Scripting IR + parser + interpreter.
 add_subdirectory(vscript)
 
+# Phase 10 — Runtime I: Audio & Input.
+add_subdirectory(audio)
+add_subdirectory(input)
+
 # Project version plumbed through a generated header so release binaries
 # and diagnostics report the exact build (git SHA landed in Phase 1 CI).
 configure_file(

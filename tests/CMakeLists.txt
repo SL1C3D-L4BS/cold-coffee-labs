@@ -44,6 +44,21 @@ add_executable(gw_tests
     unit/editor/selection_test.cpp
     # Editor implementation units needed by tests (not part of gw_editor binary).
     "${CMAKE_SOURCE_DIR}/editor/selection/selection_context.cpp"
+    # Phase 10 — Runtime I: Audio
+    unit/audio/voice_pool_test.cpp
+    unit/audio/mixer_graph_test.cpp
+    unit/audio/atmosphere_filter_test.cpp
+    unit/audio/spatial_stub_test.cpp
+    unit/audio/kaudio_format_test.cpp
+    unit/audio/decoder_registry_test.cpp
+    unit/audio/audio_service_test.cpp
+    # Phase 10 — Runtime I: Input
+    unit/input/device_test.cpp
+    unit/input/input_trace_test.cpp
+    unit/input/action_map_test.cpp
+    unit/input/scanner_test.cpp
+    unit/input/adaptive_profile_test.cpp
+    unit/input/rebind_test.cpp
     test_main.cpp
 )
 
@@ -51,6 +66,8 @@ target_link_libraries(gw_tests
     PRIVATE
         greywater::core
         greywater::assets
+        greywater::audio
+        greywater::input
         doctest::doctest
         volk
         xxhash
