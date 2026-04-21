@@ -16,6 +16,9 @@ add_executable(gw_tests
     # Phase 7 fullstack Path-A — PIE snapshot/restore (docs/adr/0006 + §12)
     unit/editor_pie/gameplay_host_test.cpp
     "${CMAKE_SOURCE_DIR}/editor/pie/gameplay_host.cpp"
+    # Phase 7 week 042 — BLD C-ABI v1 freeze smoke (docs/adr/0007)
+    smoke/bld_abi_v1/bld_abi_smoke_test.cpp
+    "${CMAKE_SOURCE_DIR}/editor/bld_api/editor_bld_api.cpp"
     # Phase 7 gap-fill — ECS World (docs/adr/0004-ecs-world.md)
     unit/ecs/world_test.cpp
     # Phase 7 — ECS serialization (docs/adr/0006-ecs-world-serialization.md)
