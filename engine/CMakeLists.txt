@@ -68,6 +68,10 @@ add_subdirectory(ui)
 # Phase 12 — Physics (ADR-0031..0038).
 add_subdirectory(physics)
 
+# Phase 13 — Animation & Game AI (ADR-0039..0046).
+add_subdirectory(anim)
+add_subdirectory(gameai)
+
 # Project version plumbed through a generated header so release binaries
 # and diagnostics report the exact build (git SHA landed in Phase 1 CI).
 configure_file(

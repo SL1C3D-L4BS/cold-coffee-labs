@@ -89,6 +89,10 @@ add_executable(gw_tests
     unit/physics/events_test.cpp
     unit/physics/ecs_bridge_test.cpp
     integration/physics/phase12_exit_gate_test.cpp
+    # Phase 13 — Animation & Game AI (ADR-0039..0046)
+    unit/anim/world_lifecycle_test.cpp
+    unit/anim/pose_and_hash_test.cpp
+    unit/gameai/gameai_world_test.cpp
     test_main.cpp
 )
 
@@ -101,6 +105,8 @@ target_link_libraries(gw_tests
         greywater::ui
         greywater::console
         greywater::physics
+        greywater::anim
+        greywater::gameai
         greywater::runtime
         doctest::doctest
         volk

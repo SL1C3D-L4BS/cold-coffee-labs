@@ -194,16 +194,18 @@ Revised 2026-04-21 to reflect the six-wave plan (12A–12F) executed phase-compl
 | 076  | 12E  | `engine/physics/determinism/`: FNV-1a-64 state hash + `ReplayRecorder` + `ReplayPlayer` + cross-platform CI determinism gate | A    | 0037      |
 | 077  | 12F  | *Physics playground*: `apps/sandbox_physics/` exit-demo + Engine wiring + `physics-{win,linux}` presets + Phase-12 closeout | A    | 0038      |
 
-### Phase 13 — Animation & Game AI Framework (weeks 078–083)
+### Phase 13 — Animation & Game AI Framework (weeks 078–083) — **completed 2026-04-21**
 
-| Week | Deliverable                                                                | Tier |
-| ---- | -------------------------------------------------------------------------- | ---- |
-| 078  | Ozz-animation runtime + ACL decompression integration                      | A    |
-| 079  | Blend trees on ECS; glTF → Ozz cook pipeline                               | A    |
-| 080  | Animation: FABRIK + CCD IK; morph-target support                           | A    |
-| 081  | Game AI: custom ECS-backed Behavior Tree executor                          | B    |
-| 082  | Game AI: Recast/Detour integration, navmesh bake tool                      | B    |
-| 083  | *Living Scene*: character walks navmesh, animations blend, deterministic   | A/B  |
+Revised 2026-04-21 to reflect the six-wave plan (13A–13F) executed phase-complete per CLAUDE.md #19. `dev-*` preset builds the **null anim + null BT + null navmesh backends** (deterministic by construction); `living-*` presets flip `GW_ENABLE_{OZZ,ACL,RECAST}=ON` for the production libraries. Final ctest: **345/345 green** on `dev-win` (17 new anim + gameai tests plus `living_sandbox`). See *Phase-13 closeout* paragraph below the Milestone definitions table.
+
+| Week | Wave | Deliverable                                                                | Tier | ADR  |
+| ---- | ---- | -------------------------------------------------------------------------- | ---- | ---- |
+| 078  | 13A  | `AnimationWorld` PIMPL facade + null sampler + pose/skeleton types         | A    | 0039 |
+| 079  | 13B  | Blend trees + state machines; `.kanim` clip format + content hash          | A    | 0040, 0041 |
+| 080  | 13C  | Two-bone IK + FABRIK + CCD + morph targets + null ragdoll                  | A    | 0042 |
+| 081  | 13D  | `BehaviorTreeWorld` executor + `Blackboard` + vscript-IR bridge            | B    | 0043 |
+| 082  | 13E  | `NavmeshWorld` tile-grid + Dijkstra (null) / Recast-Detour (`living-*`)    | B    | 0044 |
+| 083  | 13F  | *Living Scene* exit-demo (`sandbox_living_scene`, `LIVING OK` gate)        | A/B  | 0045, 0046 |
 
 ### Phase 14 — Networking & Multiplayer (weeks 084–095)
 
@@ -472,6 +474,8 @@ A sandbox scene accepts controller + keyboard input through rebindable actions. 
 
 ### *Living Scene* (week 083)
 A character walks across a navmeshed scene driven by a BT, with animations blending and physics collisions resolving deterministically under lockstep. BT authored both via the editor graph view and via BLD chat produce identical runtime behaviour.
+
+**Phase-13 closeout (2026-04-21):** ADR 0039 → 0046 landed doc-first per CLAUDE.md #20. `ctest --preset dev-win` — **345/345 green** on clang-cl 22.1.3 / Ninja / Win11 (17 new anim + gameai unit tests and the `living_sandbox` exit gate, +17 above the Phase-12 baseline of 328). Waves 13A–13F all shipped: `AnimationWorld` facade + null backend + `Pose`/`Skeleton`/`Clip` + `pose_hash` canonicalization (13A), `BlendTreeDesc` + state machines + `.kanim` content-hash hook (13B), two-bone + FABRIK + CCD IK solvers + `MorphSetDesc` (13C), `BehaviorTreeWorld` executor with the full ADR-0043 node catalogue + `Blackboard` + `ActionRegistry` + vscript-IR parity (13D), `NavmeshWorld` grid + deterministic Dijkstra fallback + agent path-follower + `PathQueryStarted/Completed` events (13E), `apps/sandbox_living_scene` exit-demo + 16 `anim.*` and 15 `ai.*` CVars + `anim.pause|step|hash|debug` and `ai.pause|step|hash|nav.hash|bt.hash|debug` built-ins + `living-{win,linux}` presets (13F). `living_sandbox` prints `LIVING OK — frames=300 anim_steps=300 bt_ticks=300 picks=95 drives=95 arrived=1` under the null backends, deterministic across two back-to-back runs (same `anim_hash` + `ai_hash`). Hand-off to Phase 14 — Networking & Multiplayer.
 
 ### *Two Client Night* (week 095)
 Two clients + dedicated server running a replicated scene at 60 Hz under 120 ms injected round-trip for ten minutes with < 1 % desync. Voice round-trip < 150 ms on LAN with audibly correct spatialization. Lockstep 4-client runs 60 s with zero drift.

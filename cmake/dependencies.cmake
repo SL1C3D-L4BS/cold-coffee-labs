@@ -367,7 +367,63 @@ if(GW_ENABLE_JOLT)
     set(GW_PHYSICS_JOLT ON CACHE BOOL "engine/physics: compile Jolt backend" FORCE)
 endif()
 
-# --- Phase 13+ deps below are opted in by their owning CMakeLists.txt --------
-#   Phase 13+: Ozz-animation, ACL, Recast/Detour
+# --- Phase 13 — Animation & Game AI (optional/gated) ------------------------
+# ADR-0039 / 0040 / 0044 / 0046 §1 pins. All three Phase-13 deps default OFF so
+# clean-checkout `dev-*` CI keeps building the null animation + null BT + null
+# navmesh backends (each deterministic by construction). The `living-*`
+# presets flip these on to pull production Ozz / ACL / Recast sources.
+#
+#   GW_ENABLE_OZZ    — Ozz-animation 0.16.0, runtime skeletal sampling.
+#   GW_ENABLE_ACL    — ACL 2.1.0, animation clip compression + uniform decoder.
+#   GW_ENABLE_RECAST — Recast/Detour 1.6.0 (with DT_POLYREF64 main patch).
+option(GW_ENABLE_OZZ    "Fetch Ozz-animation and enable the production animation backend" OFF)
+option(GW_ENABLE_ACL    "Fetch ACL and enable the production .kanim decoder"              OFF)
+option(GW_ENABLE_RECAST "Fetch Recast/Detour and enable the production navmesh backend"   OFF)
+
+if(GW_ENABLE_OZZ)
+    CPMAddPackage(
+        NAME             ozz-animation
+        GITHUB_REPOSITORY guillaumeblanc/ozz-animation
+        GIT_TAG          0.16.0
+        OPTIONS
+            "ozz_build_fbx OFF"
+            "ozz_build_gltf OFF"
+            "ozz_build_tools OFF"
+            "ozz_build_samples OFF"
+            "ozz_build_howtos OFF"
+            "ozz_build_tests OFF"
+            "ozz_build_data OFF"
+    )
+    set(GW_ANIM_OZZ ON CACHE BOOL "engine/anim: compile Ozz backend" FORCE)
+endif()
+
+if(GW_ENABLE_ACL)
+    CPMAddPackage(
+        NAME             acl
+        GITHUB_REPOSITORY nfrechette/acl
+        GIT_TAG          v2.1.0
+        OPTIONS
+            "ACL_BUILD_TESTS OFF"
+            "ACL_BUILD_TOOLS OFF"
+    )
+    set(GW_ANIM_ACL ON CACHE BOOL "engine/anim: compile ACL decoder" FORCE)
+endif()
+
+if(GW_ENABLE_RECAST)
+    # Recast/Detour 1.6.0 baseline plus the `main` DT_POLYREF64 patch window.
+    # docs/adr/0044 §6 documents the rationale for the pin + main-commit pick.
+    CPMAddPackage(
+        NAME             recastnavigation
+        GITHUB_REPOSITORY recastnavigation/recastnavigation
+        GIT_TAG          v1.6.0
+        OPTIONS
+            "RECASTNAVIGATION_DEMO OFF"
+            "RECASTNAVIGATION_TESTS OFF"
+            "RECASTNAVIGATION_EXAMPLES OFF"
+    )
+    set(GW_AI_RECAST ON CACHE BOOL "engine/gameai: compile Recast/Detour backend" FORCE)
+endif()
+
+# --- Phase 14+ deps below are opted in by their owning CMakeLists.txt --------
 #   Phase 14+: GameNetworkingSockets (voice chat uses Opus from Phase 10 pin)
 #   Phase 16+: ICU

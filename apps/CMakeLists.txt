@@ -6,3 +6,4 @@
 
 add_subdirectory(sandbox_playable)
 add_subdirectory(sandbox_physics)
+add_subdirectory(sandbox_living_scene)

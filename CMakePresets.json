@@ -110,6 +110,28 @@
             "cacheVariables": {
                 "GW_ENABLE_JOLT": "ON"
             }
+        },
+        {
+            "name": "living-linux",
+            "inherits": "physics-linux",
+            "displayName": "Living Scene Linux (Phase 13 Ozz/ACL/Recast ON)",
+            "description": "ADR-0046 §1: inherits physics-linux and enables every Phase-13 dep for the living-* milestone.",
+            "cacheVariables": {
+                "GW_ENABLE_OZZ":    "ON",
+                "GW_ENABLE_ACL":    "ON",
+                "GW_ENABLE_RECAST": "ON"
+            }
+        },
+        {
+            "name": "living-win",
+            "inherits": "physics-win",
+            "displayName": "Living Scene Windows (Phase 13 Ozz/ACL/Recast ON)",
+            "description": "ADR-0046 §1: inherits physics-win and enables every Phase-13 dep for the living-* milestone.",
+            "cacheVariables": {
+                "GW_ENABLE_OZZ":    "ON",
+                "GW_ENABLE_ACL":    "ON",
+                "GW_ENABLE_RECAST": "ON"
+            }
         }
     ],
     "buildPresets": [
@@ -123,7 +145,9 @@
         { "name": "playable-linux","configurePreset": "playable-linux" },
         { "name": "playable-win",  "configurePreset": "playable-win" },
         { "name": "physics-linux", "configurePreset": "physics-linux" },
-        { "name": "physics-win",   "configurePreset": "physics-win" }
+        { "name": "physics-win",   "configurePreset": "physics-win" },
+        { "name": "living-linux",  "configurePreset": "living-linux" },
+        { "name": "living-win",    "configurePreset": "living-win" }
     ],
     "testPresets": [
         {
@@ -159,6 +183,18 @@
         {
             "name": "physics-win",
             "configurePreset": "physics-win",
+            "output": { "outputOnFailure": true },
+            "execution": { "noTestsAction": "error", "stopOnFailure": false }
+        },
+        {
+            "name": "living-linux",
+            "configurePreset": "living-linux",
+            "output": { "outputOnFailure": true },
+            "execution": { "noTestsAction": "error", "stopOnFailure": false }
+        },
+        {
+            "name": "living-win",
+            "configurePreset": "living-win",
             "output": { "outputOnFailure": true },
             "execution": { "noTestsAction": "error", "stopOnFailure": false }
         }
@@ -210,6 +246,22 @@
                 { "type": "configure", "name": "physics-win" },
                 { "type": "build",     "name": "physics-win" },
                 { "type": "test",      "name": "physics-win" }
+            ]
+        },
+        {
+            "name": "living-linux",
+            "steps": [
+                { "type": "configure", "name": "living-linux" },
+                { "type": "build",     "name": "living-linux" },
+                { "type": "test",      "name": "living-linux" }
+            ]
+        },
+        {
+            "name": "living-win",
+            "steps": [
+                { "type": "configure", "name": "living-win" },
+                { "type": "build",     "name": "living-win" },
+                { "type": "test",      "name": "living-win" }
             ]
         }
     ]
