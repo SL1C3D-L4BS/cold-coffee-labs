@@ -10,6 +10,8 @@ add_executable(gw_tests
     containers_test.cpp
     string_test.cpp
     unit/render/frame_graph_test.cpp
+    # Phase 3 — Core systems (command stack fixed in Phase 7 gap-fill)
+    unit/core/command_stack_test.cpp
     # Phase 6 — Asset Pipeline
     unit/assets/cook_cache_test.cpp
     unit/assets/mesh_cooker_test.cpp
@@ -17,6 +19,11 @@ add_executable(gw_tests
     unit/assets/vfs_test.cpp
     # Phase 6 — Integration
     integration/cook_pipeline_test.cpp
+    # Phase 7 — Editor Foundation
+    unit/editor/reflect_macro_test.cpp
+    unit/editor/selection_test.cpp
+    # Editor implementation units needed by tests (not part of gw_editor binary).
+    "${CMAKE_SOURCE_DIR}/editor/selection/selection_context.cpp"
     test_main.cpp
 )
 
@@ -35,6 +42,12 @@ target_include_directories(gw_tests PRIVATE
     "${CMAKE_BINARY_DIR}/_deps/volk-src"
     "${CMAKE_SOURCE_DIR}"
 )
+
+# Phase 7: GLM is needed for reflect macro tests (widget_drawer.hpp pulls glm).
+# Use the CPM-fetched glm target if available.
+if(TARGET glm::glm)
+    target_link_libraries(gw_tests PRIVATE glm::glm)
+endif()
 
 set_target_properties(gw_tests PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"

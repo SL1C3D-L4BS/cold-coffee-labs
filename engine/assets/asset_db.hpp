@@ -10,9 +10,9 @@
 #include "mesh_asset.hpp"
 #include "texture_asset.hpp"
 #include "vfs/virtual_fs.hpp"
+#include <atomic>
 #include <cstdint>
 #include <functional>
-#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -25,10 +25,10 @@ namespace gw::assets {
 
 enum class AssetState : uint8_t {
     Unloaded,
-    Pending,     // IO + decode in flight
-    Uploading,   // GPU transfer in flight
-    Ready,       // fully GPU-resident and safe to use
-    Evicted,     // was resident; VMA memory returned
+    Pending,
+    Uploading,
+    Ready,
+    Evicted,
     Error,
 };
 
@@ -52,89 +52,72 @@ public:
     AssetDatabase(const AssetDatabase&)            = delete;
     AssetDatabase& operator=(const AssetDatabase&) = delete;
 
-    // -----------------------------------------------------------------------
-    // Synchronous load — blocks the calling thread.  Editor / tool use only.
-    // -----------------------------------------------------------------------
+    // Synchronous load — blocks the calling thread (editor / tool only).
     template<typename T>
     [[nodiscard]] AssetResult<TypedHandle<T>>
     load_sync(const AssetPath& cooked_path);
 
-    // -----------------------------------------------------------------------
-    // Async load — returns immediately.  The handle is valid but state is
-    // Pending until tick() drives it to Ready.
-    // -----------------------------------------------------------------------
+    // Async load — returns immediately; state is Pending until tick().
     template<typename T>
     [[nodiscard]] TypedHandle<T> load_async(const AssetPath& cooked_path);
 
-    // -----------------------------------------------------------------------
-    // Access resident data — returns nullptr if not Ready.
-    // -----------------------------------------------------------------------
+    // Access resident data — nullptr if not Ready.
     template<typename T>
     [[nodiscard]] const T* get(TypedHandle<T> handle) const noexcept;
 
-    // Ref-counting (optional; use for streaming/eviction in Phases 19+).
     void retain(AssetHandle h);
     void release(AssetHandle h);
 
-    // Invalidate all handles to a cooked path and re-queue a load.
-    // Called by FSWatcher on hot-reload events.
+    // Invalidate handle + re-queue load (called by FSWatcher on hot-reload).
     void invalidate(const AssetPath& cooked_path);
 
-    // Register an event callback fired when an asset transitions to Ready.
     using ReadyCallback = std::function<void(AssetHandle)>;
     void on_ready(ReadyCallback cb) { ready_cb_ = std::move(cb); }
 
-    // Process completed async IO; fire ReadyCallbacks.
-    // Call once per frame from the main thread.
+    // Drive completed async IO; fire ReadyCallbacks. Call once per frame.
     void tick();
 
-    // Build the default loader registry.
     static AssetLoaderRegistry make_default_registry();
 
 private:
     struct Slot {
         AssetMetadata meta;
-        void*         data_ptr = nullptr;
+        LoadedAsset   asset;   // RAII-owning; destroy called automatically
     };
 
-    uint32_t alloc_slot();
-    void     free_slot(uint32_t idx);
-
+    uint32_t    alloc_slot();
+    void        free_slot(uint32_t idx);
     AssetHandle register_or_find(const AssetPath& cooked_path, AssetType type);
     void        enqueue_load(AssetHandle h);
     void        loader_thread_fn();
 
-    render::hal::VulkanDevice&         device_;
-    vfs::VirtualFilesystem&            vfs_;
-    AssetLoaderRegistry                loaders_;
+    render::hal::VulkanDevice&              device_;
+    vfs::VirtualFilesystem&                 vfs_;
+    AssetLoaderRegistry                     loaders_;
 
-    mutable std::mutex                 mutex_;
-    std::vector<Slot>                  slots_;
-    std::vector<uint32_t>              free_list_;
+    mutable std::mutex                      mutex_;
+    std::vector<Slot>                       slots_;
+    std::vector<uint32_t>                   free_list_;
     std::unordered_map<AssetPath, uint32_t> path_to_index_;
 
-    // Async loader thread state.
-    struct LoadRequest {
-        AssetHandle handle;
-        AssetPath   cooked_path;
-    };
-    std::vector<LoadRequest>    pending_queue_;
-    std::vector<LoadRequest>    completed_queue_;
-    mutable std::mutex          queue_mutex_;
+    struct LoadRequest { AssetHandle handle; AssetPath cooked_path; };
+    std::vector<LoadRequest> pending_queue_;
+    std::vector<LoadRequest> completed_queue_;
+    mutable std::mutex       queue_mutex_;
 
-    std::thread                 loader_thread_;
-    std::atomic<bool>           stop_loader_{false};
+    // TODO(Phase 10): replace std::thread with engine/jobs/ scheduler.
+    std::thread              loader_thread_;
+    std::atomic<bool>        stop_loader_{false};
 
-    ReadyCallback               ready_cb_;
+    ReadyCallback            ready_cb_;
 };
 
 // ---------------------------------------------------------------------------
-// Template implementations
-// ---------------------------------------------------------------------------
-
 template<typename T>
-AssetResult<TypedHandle<T>> AssetDatabase::load_sync(const AssetPath& cooked_path) {
-    AssetHandle h = register_or_find(cooked_path, static_cast<AssetType>(T::kAssetTypeTag));
+AssetResult<TypedHandle<T>>
+AssetDatabase::load_sync(const AssetPath& cooked_path) {
+    AssetHandle h = register_or_find(cooked_path,
+                                      static_cast<AssetType>(T::kAssetTypeTag));
 
     std::vector<uint8_t> raw;
     auto read_res = vfs_.read(cooked_path, raw);
@@ -145,10 +128,9 @@ AssetResult<TypedHandle<T>> AssetDatabase::load_sync(const AssetPath& cooked_pat
     }
 
     const auto* loader = loaders_.find(static_cast<AssetType>(T::kAssetTypeTag));
-    if (!loader) {
+    if (!loader)
         return std::unexpected(AssetError{AssetErrorCode::InvalidArgument,
                                           "no loader for asset type"});
-    }
 
     auto result = loader->load(device_, raw);
     if (!result) {
@@ -159,9 +141,9 @@ AssetResult<TypedHandle<T>> AssetDatabase::load_sync(const AssetPath& cooked_pat
 
     {
         std::lock_guard lock{mutex_};
-        auto& slot     = slots_[h.index()];
-        slot.data_ptr  = *result;
-        slot.meta.state= AssetState::Ready;
+        auto& slot       = slots_[h.index()];
+        slot.asset       = std::move(*result);
+        slot.meta.state  = AssetState::Ready;
     }
 
     if (ready_cb_) ready_cb_(h);
@@ -170,7 +152,8 @@ AssetResult<TypedHandle<T>> AssetDatabase::load_sync(const AssetPath& cooked_pat
 
 template<typename T>
 TypedHandle<T> AssetDatabase::load_async(const AssetPath& cooked_path) {
-    AssetHandle h = register_or_find(cooked_path, static_cast<AssetType>(T::kAssetTypeTag));
+    AssetHandle h = register_or_find(cooked_path,
+                                      static_cast<AssetType>(T::kAssetTypeTag));
     enqueue_load(h);
     return TypedHandle<T>{h};
 }
@@ -183,7 +166,7 @@ const T* AssetDatabase::get(TypedHandle<T> handle) const noexcept {
     const auto& slot = slots_[handle.index()];
     if (slot.meta.generation != handle.generation()) return nullptr;
     if (slot.meta.state != AssetState::Ready) return nullptr;
-    return static_cast<const T*>(slot.data_ptr);
+    return static_cast<const T*>(slot.asset.data);
 }
 
-} // namespace gw::assets
+}  // namespace gw::assets

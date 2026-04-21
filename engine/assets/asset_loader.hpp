@@ -1,6 +1,8 @@
 #pragma once
 // engine/assets/asset_loader.hpp
 // IAssetLoader interface + typed loader registry.
+// No raw new/delete — assets are owned by unique_ptr; ownership is transferred
+// to the AssetDatabase slot via a type-erased deleter stored alongside data_ptr.
 
 #include "asset_handle.hpp"
 #include "asset_error.hpp"
@@ -13,21 +15,51 @@ namespace gw::render::hal { class VulkanDevice; }
 
 namespace gw::assets {
 
-// Called once the raw cooked bytes have been read from disk.
-// The loader is responsible for parsing and uploading to GPU.
-// Returns an owning void* that the AssetDatabase stores in the slot.
-using AssetLoadFn = std::function<AssetResult<void*>(
-    render::hal::VulkanDevice& device,
-    std::span<const uint8_t> raw)>;
+// LoadResult carries an owning void* together with a matching destroy callback.
+struct LoadedAsset {
+    void*                     data    = nullptr;
+    std::function<void(void*)> destroy;
 
-using AssetDestroyFn = std::function<void(void* data)>;
+    LoadedAsset() = default;
+    LoadedAsset(void* d, std::function<void(void*)> fn) noexcept
+        : data(d), destroy(std::move(fn)) {}
 
-struct AssetLoaderEntry {
-    AssetLoadFn    load;
-    AssetDestroyFn destroy;
+    LoadedAsset(const LoadedAsset&)            = delete;
+    LoadedAsset& operator=(const LoadedAsset&) = delete;
+
+    LoadedAsset(LoadedAsset&& o) noexcept
+        : data(o.data), destroy(std::move(o.destroy)) { o.data = nullptr; }
+    LoadedAsset& operator=(LoadedAsset&& o) noexcept {
+        if (this != &o) {
+            release();
+            data    = o.data;
+            destroy = std::move(o.destroy);
+            o.data  = nullptr;
+        }
+        return *this;
+    }
+
+    ~LoadedAsset() { release(); }
+
+    void release() noexcept {
+        if (data && destroy) {
+            destroy(data);
+            data = nullptr;
+        }
+    }
+
+    [[nodiscard]] explicit operator bool() const noexcept { return data != nullptr; }
 };
 
-// Registry that maps AssetType → loader/destroy pairs.
+using AssetLoadFn = std::function<AssetResult<LoadedAsset>(
+    render::hal::VulkanDevice& device,
+    std::span<const uint8_t>   raw)>;
+
+struct AssetLoaderEntry {
+    AssetLoadFn load;
+};
+
+// Registry that maps AssetType → loader.
 class AssetLoaderRegistry {
 public:
     template<typename T>
@@ -40,28 +72,30 @@ private:
 };
 
 // ---------------------------------------------------------------------------
-// Template implementation (header-only — instantiated per asset type)
+// Template implementation — instantiated per asset type T.
+// T must provide:
+//   static constexpr uint16_t kAssetTypeTag;
+//   AssetResult<void> upload(VulkanDevice&, std::span<const uint8_t>);
 // ---------------------------------------------------------------------------
 template<typename T>
 void AssetLoaderRegistry::register_loader() {
     AssetLoaderEntry entry;
 
     entry.load = [](render::hal::VulkanDevice& device,
-                    std::span<const uint8_t> raw) -> AssetResult<void*> {
-        auto* asset = new T(); // deleted by entry.destroy
+                    std::span<const uint8_t>   raw) -> AssetResult<LoadedAsset> {
+        auto asset = std::make_unique<T>();
         auto result = asset->upload(device, raw);
-        if (!result) {
-            delete asset;
-            return std::unexpected(result.error());
-        }
-        return static_cast<void*>(asset);
-    };
+        if (!result) return std::unexpected(result.error());
 
-    entry.destroy = [](void* data) {
-        delete static_cast<T*>(data);
+        // Transfer ownership via a typed deleter — no raw delete.
+        T* raw_ptr = asset.release();
+        return LoadedAsset{
+            static_cast<void*>(raw_ptr),
+            [](void* p) noexcept { delete static_cast<T*>(p); }
+        };
     };
 
     map_[T::kAssetTypeTag] = std::move(entry);
 }
 
-} // namespace gw::assets
+}  // namespace gw::assets

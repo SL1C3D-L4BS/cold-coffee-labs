@@ -1,7 +1,10 @@
+// engine/assets/asset_db.cpp
 #include "asset_db.hpp"
 #include "mesh_asset.hpp"
 #include "texture_asset.hpp"
+
 #include <algorithm>
+#include <chrono>
 
 namespace gw::assets {
 
@@ -12,23 +15,14 @@ AssetDatabase::AssetDatabase(render::hal::VulkanDevice& device,
 {
     slots_.reserve(4096);
     loaders_ = make_default_registry();
-
-    // Start background loader thread.
+    // TODO(Phase 10): replace std::thread with engine/jobs/ scheduler.
     loader_thread_ = std::thread(&AssetDatabase::loader_thread_fn, this);
 }
 
 AssetDatabase::~AssetDatabase() {
     stop_loader_ = true;
     loader_thread_.join();
-
-    // Destroy all resident assets.
-    for (auto& slot : slots_) {
-        if (slot.data_ptr && slot.meta.state == AssetState::Ready) {
-            const auto* entry = loaders_.find(slot.meta.type);
-            if (entry) entry->destroy(slot.data_ptr);
-            slot.data_ptr = nullptr;
-        }
-    }
+    // Slot RAII (LoadedAsset) destroys all GPU-side assets automatically.
 }
 
 AssetLoaderRegistry AssetDatabase::make_default_registry() {
@@ -50,7 +44,7 @@ uint32_t AssetDatabase::alloc_slot() {
 
 void AssetDatabase::free_slot(uint32_t idx) {
     auto& slot     = slots_[idx];
-    slot.data_ptr  = nullptr;
+    slot.asset     = LoadedAsset{};          // RAII destroy
     slot.meta.state= AssetState::Unloaded;
     ++slot.meta.generation;
     free_list_.push_back(idx);
@@ -91,6 +85,9 @@ void AssetDatabase::loader_thread_fn() {
         {
             std::lock_guard ql{queue_mutex_};
             if (pending_queue_.empty()) {
+                // Yield briefly to avoid a busy spin.
+                // TODO(Phase 10): replace with a wait/notify mechanism once
+                // the jobs scheduler provides a proper semaphore primitive.
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 continue;
             }
@@ -98,7 +95,6 @@ void AssetDatabase::loader_thread_fn() {
             pending_queue_.erase(pending_queue_.begin());
         }
 
-        // Read from VFS.
         std::vector<uint8_t> raw;
         auto read_res = vfs_.read(req.cooked_path, raw);
 
@@ -126,15 +122,17 @@ void AssetDatabase::loader_thread_fn() {
             std::lock_guard lock{mutex_};
             auto& slot = slots_[req.handle.index()];
             if (result) {
-                slot.data_ptr  = *result;
-                slot.meta.state= AssetState::Ready;
+                slot.asset       = std::move(*result);
+                slot.meta.state  = AssetState::Ready;
             } else {
-                slot.meta.state= AssetState::Error;
+                slot.meta.state  = AssetState::Error;
             }
         }
 
-        std::lock_guard ql{queue_mutex_};
-        completed_queue_.push_back(req);
+        {
+            std::lock_guard ql{queue_mutex_};
+            completed_queue_.push_back(req);
+        }
     }
 }
 
@@ -151,9 +149,8 @@ void AssetDatabase::tick() {
                 std::lock_guard lock{mutex_};
                 state = slots_[req.handle.index()].meta.state;
             }
-            if (state == AssetState::Ready) {
+            if (state == AssetState::Ready)
                 ready_cb_(req.handle);
-            }
         }
     }
 }
@@ -178,17 +175,15 @@ void AssetDatabase::invalidate(const AssetPath& cooked_path) {
         if (it == path_to_index_.end()) return;
         idx = it->second;
         auto& slot = slots_[idx];
-        if (slot.data_ptr) {
-            const auto* entry = loaders_.find(slot.meta.type);
-            if (entry) entry->destroy(slot.data_ptr);
-            slot.data_ptr = nullptr;
-        }
+        slot.asset = LoadedAsset{};       // RAII destroy
         slot.meta.state = AssetState::Pending;
     }
+    if (idx == UINT32_MAX) return;
     std::lock_guard ql{queue_mutex_};
-    pending_queue_.push_back({AssetHandle::make(idx, slots_[idx].meta.generation,
-                              static_cast<uint16_t>(slots_[idx].meta.type)),
-                              cooked_path});
+    pending_queue_.push_back({
+        AssetHandle::make(idx, slots_[idx].meta.generation,
+                          static_cast<uint16_t>(slots_[idx].meta.type)),
+        cooked_path});
 }
 
-} // namespace gw::assets
+}  // namespace gw::assets

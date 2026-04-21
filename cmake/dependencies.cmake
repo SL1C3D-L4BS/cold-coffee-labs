@@ -156,8 +156,46 @@ CPMAddPackage(
         "SQLITECPP_BUILD_EXAMPLES OFF"
 )
 
-# --- Phase 7+ deps are opted in by their owning CMakeLists.txt --------------
-#   Phase 7+ : imgui (docking), imnodes, imguizmo, imgui_md
+# --- GLM (Phase 7+ — math library for editor camera, gizmos, debug draw) ----
+# Header-only; no tests/extras.
+CPMAddPackage(
+    NAME glm
+    GITHUB_REPOSITORY g-truc/glm
+    GIT_TAG          1.0.1
+    OPTIONS
+        "GLM_TEST_ENABLE OFF"
+        "GLM_ENABLE_CXX_20 ON"
+)
+
+# --- Phase 7 — Editor (imgui docking, ImGuizmo, imnodes) --------------------
+
+# Dear ImGui — docking branch (enables DockSpace + multi-viewport).
+# DOWNLOAD_ONLY: we build a custom static target with GLFW + Vulkan backends.
+CPMAddPackage(
+    NAME imgui
+    GITHUB_REPOSITORY ocornut/imgui
+    GIT_TAG          9aae45eb4a05a5a1f96be1ef37eb503a12ceb889  # docking branch 2025-12
+    DOWNLOAD_ONLY    YES
+)
+
+# ImGuizmo 1.83 — 3D gizmo overlay built on imgui draw lists.
+CPMAddPackage(
+    NAME ImGuizmo
+    GITHUB_REPOSITORY CedricGuillemet/ImGuizmo
+    GIT_TAG          1.83
+    DOWNLOAD_ONLY    YES
+)
+
+# imnodes 0.5 — node graph editor widget for visual scripting (Phase 8+).
+# Included now so the CMake target is available without a re-configure.
+CPMAddPackage(
+    NAME imnodes
+    GITHUB_REPOSITORY Nelarius/imnodes
+    GIT_TAG          v0.5
+    DOWNLOAD_ONLY    YES
+)
+
+# --- Phase 7+ deps below are opted in by their owning CMakeLists.txt --------
 #   Phase 10+: SDL3, miniaudio, Steam Audio
 #   Phase 11+: RmlUi, HarfBuzz, FreeType
 #   Phase 12+: Jolt Physics

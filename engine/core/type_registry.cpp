@@ -1,10 +1,4 @@
+// engine/core/type_registry.cpp
+// TypeRegistry is fully header-only after the Phase 7 rewrite.
+// This file is intentionally empty; kept to avoid CMake source-list churn.
 #include "type_registry.hpp"
-
-namespace gw {
-namespace core {
-
-// Type registry implementation would go here
-// Type registry functionality is primarily defined in the header
-
-}  // namespace core
-}  // namespace gw
