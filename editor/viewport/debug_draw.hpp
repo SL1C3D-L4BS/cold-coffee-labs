@@ -47,4 +47,16 @@ struct LineVertex {
 [[nodiscard]] const std::vector<LineVertex>& get_pending() noexcept;
 void clear() noexcept;
 
+// Flush all accumulated lines into the ImGui window draw list, projecting
+// each world-space segment through view/proj and clipping against the
+// viewport rect. Near-plane clipping is done per-segment so lines straddling
+// the camera plane are trimmed rather than snapping across the screen.
+// Clears the pending buffer after flushing.
+void flush_to_imgui(const glm::mat4& view,
+                    const glm::mat4& proj,
+                    float            vp_x,
+                    float            vp_y,
+                    float            vp_w,
+                    float            vp_h);
+
 }  // namespace gw::editor::debug_draw

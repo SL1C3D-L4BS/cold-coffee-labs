@@ -34,11 +34,13 @@ private:
 
     struct DirEntry {
         std::string name;
+        std::string ext;          // cached extension for type-aware thumbnails
         bool        is_dir = false;
     };
     std::vector<DirEntry> dir_entries_;
 
-    float icon_size_ = 72.f;
+    float icon_size_    = 72.f;
+    bool  scanned_once_ = false;
 };
 
 }  // namespace gw::editor

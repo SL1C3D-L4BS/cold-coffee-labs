@@ -3,6 +3,8 @@
 // Spec ref: Phase 7 §8.
 #include "debug_draw.hpp"
 
+#include <imgui.h>
+
 #include <cmath>
 #include <numbers>
 
@@ -108,6 +110,77 @@ void grid(float size, float step, uint32_t rgba) {
         uint32_t col = (std::abs(z) < 0.001f) ? 0xFF606060 : rgba;
         line({-size, 0.f, z}, {size, 0.f, z}, col);
     }
+}
+
+// ---------------------------------------------------------------------------
+// ImGui flush — projects accumulated world-space segments to screen and
+// emits them as foreground lines on the current ImGui window's draw list.
+// Segments are clipped against the near plane (view-space z >= -epsilon) so
+// lines straddling the camera don't snap. Segments fully behind or fully
+// outside the viewport rect are dropped. The buffer is cleared after flush.
+// ---------------------------------------------------------------------------
+namespace {
+
+// Project a view-space point to screen; returns false when z >= near clip.
+bool project_view(const glm::vec4& v_view,
+                  const glm::mat4& proj,
+                  float vp_x, float vp_y, float vp_w, float vp_h,
+                  ImVec2& out) {
+    constexpr float kNearEps = -1e-4f;
+    if (v_view.z >= kNearEps) return false;  // behind near plane
+    glm::vec4 clip = proj * v_view;
+    if (clip.w <= 0.f) return false;
+    glm::vec3 ndc{clip.x / clip.w, clip.y / clip.w, clip.z / clip.w};
+    // Vulkan-style NDC: x in [-1,1], y in [-1,1] (flipped for screen).
+    out.x = vp_x + (ndc.x * 0.5f + 0.5f) * vp_w;
+    out.y = vp_y + (1.f - (ndc.y * 0.5f + 0.5f)) * vp_h;
+    return true;
+}
+
+}  // namespace
+
+void flush_to_imgui(const glm::mat4& view,
+                    const glm::mat4& proj,
+                    float vp_x, float vp_y, float vp_w, float vp_h) {
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    if (!dl || vp_w <= 0.f || vp_h <= 0.f) {
+        g_vertices.clear();
+        return;
+    }
+
+    const ImVec2 clip_min{vp_x, vp_y};
+    const ImVec2 clip_max{vp_x + vp_w, vp_y + vp_h};
+    dl->PushClipRect(clip_min, clip_max, true);
+
+    const size_t n = g_vertices.size() & ~size_t{1};
+    for (size_t i = 0; i + 1 < n; i += 2) {
+        const LineVertex& a = g_vertices[i];
+        const LineVertex& b = g_vertices[i + 1];
+
+        glm::vec4 va = view * glm::vec4{a.x, a.y, a.z, 1.f};
+        glm::vec4 vb = view * glm::vec4{b.x, b.y, b.z, 1.f};
+
+        // Near-plane clip in view space (camera looks down -Z).
+        constexpr float kNear = -1e-3f;
+        bool a_behind = va.z > kNear;
+        bool b_behind = vb.z > kNear;
+        if (a_behind && b_behind) continue;
+        if (a_behind != b_behind) {
+            // Clip the behind endpoint to the near plane.
+            float t = (kNear - va.z) / (vb.z - va.z);
+            glm::vec4 hit = va + (vb - va) * t;
+            if (a_behind) va = hit; else vb = hit;
+        }
+
+        ImVec2 sa, sb;
+        if (!project_view(va, proj, vp_x, vp_y, vp_w, vp_h, sa)) continue;
+        if (!project_view(vb, proj, vp_x, vp_y, vp_w, vp_h, sb)) continue;
+
+        dl->AddLine(sa, sb, a.rgba, 1.0f);
+    }
+
+    dl->PopClipRect();
+    g_vertices.clear();
 }
 
 }  // namespace gw::editor::debug_draw

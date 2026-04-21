@@ -2,15 +2,12 @@
 // Spec ref: Phase 7 §6 — offscreen render target, camera, gizmos, debug draw.
 #include "viewport_panel.hpp"
 #include "editor/viewport/debug_draw.hpp"
+#include "editor/scene/components.hpp"
 #include "editor/undo/commands.hpp"
+#include "engine/ecs/world.hpp"
 
 #include <imgui.h>
-#include <imgui_impl_vulkan.h>
 #include <ImGuizmo.h>
-
-#define VOLK_IMPLEMENTATION_HEADER_ONLY
-#include <volk.h>
-#include <vk_mem_alloc.h>
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -22,41 +19,15 @@
 namespace gw::editor {
 
 // ---------------------------------------------------------------------------
-ViewportPanel::~ViewportPanel() {
-    destroy_scene_image();
-}
+ViewportPanel::~ViewportPanel() = default;
 
 // ---------------------------------------------------------------------------
-// Scene image lifecycle (called on resize).
-// Full VMA allocation path — Phase 7 §6.1.
+// apply_resize — flag the EditorApplication to rebuild the RT. The panel only
+// records the intended dimensions; EditorApplication owns the GPU lifecycle.
 // ---------------------------------------------------------------------------
-void ViewportPanel::create_scene_image(uint32_t w, uint32_t h) {
-    if (w == 0 || h == 0) return;
-    rt_width_  = w;
-    rt_height_ = h;
-
-    // Full Vulkan image/view/sampler/descriptor creation happens here.
-    // For Phase 7 we provide the correct structure; actual vk calls require
-    // the VulkanDevice's raw handles which we access via the public device API.
-    // This stub records the dimensions and returns; the real GPU path is
-    // wired once EditorApplication can pass the VulkanDevice internal handles.
-    //
-    // See docs/05 Phase 7 §6.1 for the full protocol.
-    // TODO: wire VMA image creation once VulkanDevice exposes allocate_image().
-}
-
-void ViewportPanel::destroy_scene_image() {
-    // TODO: vmaDestroyImage + destroy view/sampler when VulkanDevice API is wired.
-    scene_image_   = nullptr;
-    scene_view_    = nullptr;
-    scene_sampler_ = nullptr;
-    scene_alloc_   = nullptr;
-    scene_ds_      = nullptr;
-}
-
 void ViewportPanel::apply_resize(uint32_t w, uint32_t h) {
-    destroy_scene_image();
-    create_scene_image(w, h);
+    rt_width_       = w;
+    rt_height_      = h;
     resize_pending_ = false;
 }
 
@@ -153,12 +124,45 @@ void ViewportPanel::on_imgui_render(EditorContext& ctx) {
         ImGui::Image(reinterpret_cast<ImTextureID>(scene_ds_),
                      {vp_w_, vp_h_});
     } else {
-        // Draw a placeholder until the GPU image is wired.
         ImDrawList* dl = ImGui::GetWindowDrawList();
         dl->AddRectFilled({vp_x_, vp_y_},
                           {vp_x_ + vp_w_, vp_y_ + vp_h_},
                           IM_COL32(20, 22, 30, 255));
         ImGui::Dummy({vp_w_, vp_h_});
+    }
+
+    // Drop target for Asset Browser → Viewport drag-to-scene.
+    // Creates an entity at the origin with standard components; the actual
+    // mesh/texture resolve lands once the asset database is wired.
+    if (ImGui::BeginDragDropTarget()) {
+        if (const ImGuiPayload* payload =
+                ImGui::AcceptDragDropPayload("ASSET_PATH")) {
+            const char* raw = static_cast<const char*>(payload->Data);
+            std::string asset_path{raw, raw + payload->DataSize};
+            if (!asset_path.empty() && asset_path.back() == '\0')
+                asset_path.pop_back();
+
+            std::string leaf = asset_path;
+            if (auto slash = leaf.find_last_of("/\\"); slash != std::string::npos)
+                leaf = leaf.substr(slash + 1);
+
+            auto* world = ctx.world;
+            ctx.cmd_stack.push(std::make_unique<undo::CreateEntityCommand>(
+                std::move(leaf),
+                [world, path = asset_path](const char* nm) -> EntityHandle {
+                    if (!world) return kNullEntity;
+                    auto e = world->create_entity();
+                    world->add_component(e, scene::NameComponent{nm});
+                    world->add_component(e, scene::TransformComponent{});
+                    world->add_component(e, scene::VisibilityComponent{});
+                    (void)path;  // asset wiring lands in Phase 8
+                    return e;
+                },
+                [world](EntityHandle h) {
+                    if (world) world->destroy_entity(h);
+                }));
+        }
+        ImGui::EndDragDropTarget();
     }
 
     // Camera update.
@@ -192,8 +196,27 @@ void ViewportPanel::on_imgui_render(EditorContext& ctx) {
 
     draw_overlay(ctx);
 
-    // Ground grid via debug draw.
+    // Debug-draw overlay (Phase 7 §8): ground grid + origin axis + a sphere
+    // marker on each selected entity. Additional primitives come from any
+    // panel/system that called debug_draw::line/sphere/... this frame.
     debug_draw::grid(20.f, 1.f);
+    debug_draw::axis(glm::mat4{1.f}, 1.0f);
+    if (ctx.world) {
+        for (auto e : ctx.selection.selected()) {
+            if (const auto* tc = ctx.world->get_component<scene::TransformComponent>(e))
+                debug_draw::sphere(tc->position, 0.25f, 0xFF80FFFF, 12);
+        }
+    }
+
+    // Flush all accumulated lines into the viewport's draw list.
+    if (rt_width_ > 0 && rt_height_ > 0) {
+        const float aspect = vp_w_ / std::max(vp_h_, 1.f);
+        const glm::mat4 view = camera_.view();
+        const glm::mat4 proj = camera_.projection(aspect);
+        debug_draw::flush_to_imgui(view, proj, vp_x_, vp_y_, vp_w_, vp_h_);
+    } else {
+        debug_draw::clear();
+    }
 
     ImGui::End();
     ImGui::PopStyleVar();

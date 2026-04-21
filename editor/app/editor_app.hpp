@@ -58,6 +58,11 @@ private:
     // Swapchain lifecycle.
     void recreate_swapchain();
 
+    // Offscreen scene render target — Phase 7 §6.1. Allocated via VMA, sampled
+    // by ImGui in the Viewport panel, cleared/rendered by begin_frame().
+    void create_scene_rt(uint32_t w, uint32_t h);
+    void destroy_scene_rt();
+
     // -----------------------------------------------------------------------
     // Docking layout — built once on first launch.
     // -----------------------------------------------------------------------

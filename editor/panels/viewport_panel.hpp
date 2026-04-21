@@ -10,11 +10,7 @@
 // Vulkan forward declares — avoids pulling in volk in the header.
 #include <cstdint>
 
-struct VkImage_T;     using VkImage      = VkImage_T*;
-struct VkImageView_T; using VkImageView  = VkImageView_T*;
-struct VkSampler_T;   using VkSampler    = VkSampler_T*;
 struct VkDescriptorSet_T; using VkDescriptorSet = VkDescriptorSet_T*;
-struct VmaAllocation_T;   using VmaAllocation   = VmaAllocation_T*;
 
 namespace gw::editor {
 
@@ -34,6 +30,15 @@ public:
     // Called by EditorApplication when a resize is safe (after wait_idle).
     void apply_resize(uint32_t w, uint32_t h);
 
+    // EditorApplication owns the Vulkan scene image; it hands the panel the
+    // ImGui-compatible descriptor set (and its size) whenever the RT is
+    // (re-)created. The panel only displays — it does not own GPU state.
+    void set_scene_texture(VkDescriptorSet ds, uint32_t w, uint32_t h) noexcept {
+        scene_ds_  = ds;
+        rt_width_  = w;
+        rt_height_ = h;
+    }
+
     [[nodiscard]] const EditorCamera& camera() const noexcept { return camera_; }
     [[nodiscard]] EditorCamera& camera() noexcept { return camera_; }
 
@@ -41,16 +46,11 @@ public:
     void inject_scroll(float delta) noexcept { scroll_accumulator_ += delta; }
 
 private:
-    void create_scene_image(uint32_t w, uint32_t h);
-    void destroy_scene_image();
     void draw_toolbar(EditorContext& ctx);
     void draw_overlay(EditorContext& ctx);
 
-    // Offscreen scene image — displayed via ImGui::Image.
-    VkImage           scene_image_  = nullptr;
-    VkImageView       scene_view_   = nullptr;
-    VkSampler         scene_sampler_= nullptr;
-    VmaAllocation     scene_alloc_  = nullptr;
+    // EditorApplication owns the Vulkan image and passes us the sampled
+    // descriptor set via set_scene_texture(). We never vkCreate / vkDestroy.
     VkDescriptorSet   scene_ds_     = nullptr;  // ImGui ImTextureID
 
     uint32_t          rt_width_       = 0;

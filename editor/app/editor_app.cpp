@@ -32,6 +32,7 @@
 // picks up volk's dispatch tables (IMGUI_IMPL_VULKAN_USE_VOLK is set by the
 // editor CMakeLists).
 #include <volk.h>
+#include <vk_mem_alloc.h>
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -178,6 +179,20 @@ struct EditorVulkanBackend {
     uint32_t                 frame_index       = 0;
     uint32_t                 acquired_image    = 0;
     bool                     imgui_initialised = false;
+
+    // ----- VMA allocator (shared with engine_render's vmaCreateAllocator impl) -----
+    VmaAllocator             allocator         = VK_NULL_HANDLE;
+
+    // ----- Offscreen scene render target (Phase 7 §6.1) -----
+    // Sized to the Viewport panel's content area; resized on demand from run().
+    // Color-only RGBA8 for now; depth + gbuffers will accrete in Phase 8.
+    VkImage                  scene_image       = VK_NULL_HANDLE;
+    VmaAllocation            scene_alloc       = VK_NULL_HANDLE;
+    VkImageView              scene_view        = VK_NULL_HANDLE;
+    VkSampler                scene_sampler     = VK_NULL_HANDLE;
+    VkDescriptorSet          scene_imgui_ds    = VK_NULL_HANDLE;
+    VkExtent2D               scene_extent      = {};
+    VkFormat                 scene_format      = VK_FORMAT_R8G8B8A8_UNORM;
 };
 
 // ---------------------------------------------------------------------------
@@ -263,7 +278,12 @@ void EditorApplication::run() {
         if (auto* vpp = dynamic_cast<ViewportPanel*>(panels_.find("Viewport"))) {
             if (vpp->resize_pending_) {
                 vkDeviceWaitIdle(vk_->device);
-                vpp->apply_resize(vpp->pending_w_, vpp->pending_h_);
+                const uint32_t w = vpp->pending_w_;
+                const uint32_t h = vpp->pending_h_;
+                destroy_scene_rt();
+                create_scene_rt(w, h);
+                vpp->set_scene_texture(vk_->scene_imgui_ds, w, h);
+                vpp->apply_resize(w, h);
             }
         }
 
@@ -461,6 +481,102 @@ void EditorApplication::init_vulkan() {
     dpi.poolSizeCount = static_cast<uint32_t>(std::size(pool_sizes));
     dpi.pPoolSizes    = pool_sizes;
     GW_VKCHECK(vkCreateDescriptorPool(vk_->device, &dpi, nullptr, &vk_->imgui_descriptor_pool));
+
+    // --- VMA allocator (shared with engine_render's VMA_IMPLEMENTATION) ---
+    VmaVulkanFunctions vma_fns{};
+    vma_fns.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
+    vma_fns.vkGetDeviceProcAddr   = vkGetDeviceProcAddr;
+
+    VmaAllocatorCreateInfo ai{};
+    ai.vulkanApiVersion = VK_API_VERSION_1_3;
+    ai.physicalDevice   = vk_->physical_device;
+    ai.device           = vk_->device;
+    ai.instance         = vk_->instance;
+    ai.pVulkanFunctions = &vma_fns;
+    GW_VKCHECK(vmaCreateAllocator(&ai, &vk_->allocator));
+}
+
+// ---------------------------------------------------------------------------
+// Scene render target (Phase 7 §6.1)
+// ---------------------------------------------------------------------------
+void EditorApplication::create_scene_rt(uint32_t w, uint32_t h) {
+    if (w == 0 || h == 0) return;
+    if (!vk_ || !vk_->device || !vk_->allocator) return;
+
+    // Image: RGBA8, COLOR_ATTACHMENT + SAMPLED so ImGui can read it.
+    VkImageCreateInfo ici{};
+    ici.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    ici.imageType     = VK_IMAGE_TYPE_2D;
+    ici.format        = vk_->scene_format;
+    ici.extent        = {w, h, 1};
+    ici.mipLevels     = 1;
+    ici.arrayLayers   = 1;
+    ici.samples       = VK_SAMPLE_COUNT_1_BIT;
+    ici.tiling        = VK_IMAGE_TILING_OPTIMAL;
+    ici.usage         = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                        VK_IMAGE_USAGE_SAMPLED_BIT;
+    ici.sharingMode   = VK_SHARING_MODE_EXCLUSIVE;
+    ici.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    VmaAllocationCreateInfo aci{};
+    aci.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+    GW_VKCHECK(vmaCreateImage(vk_->allocator, &ici, &aci,
+                               &vk_->scene_image, &vk_->scene_alloc, nullptr));
+
+    // View.
+    VkImageViewCreateInfo ivi{};
+    ivi.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    ivi.image                           = vk_->scene_image;
+    ivi.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
+    ivi.format                          = vk_->scene_format;
+    ivi.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+    ivi.subresourceRange.levelCount     = 1;
+    ivi.subresourceRange.layerCount     = 1;
+    GW_VKCHECK(vkCreateImageView(vk_->device, &ivi, nullptr, &vk_->scene_view));
+
+    // Sampler (linear, clamp-to-edge — safe defaults for editor readback).
+    VkSamplerCreateInfo sci{};
+    sci.sType        = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    sci.magFilter    = VK_FILTER_LINEAR;
+    sci.minFilter    = VK_FILTER_LINEAR;
+    sci.mipmapMode   = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    sci.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    sci.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    sci.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    sci.minLod       = 0.f;
+    sci.maxLod       = 1.f;
+    sci.borderColor  = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
+    GW_VKCHECK(vkCreateSampler(vk_->device, &sci, nullptr, &vk_->scene_sampler));
+
+    // ImGui descriptor set — persistent until RemoveTexture.
+    vk_->scene_imgui_ds = ImGui_ImplVulkan_AddTexture(
+        vk_->scene_sampler, vk_->scene_view,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    vk_->scene_extent = {w, h};
+}
+
+void EditorApplication::destroy_scene_rt() {
+    if (!vk_ || !vk_->device) return;
+
+    if (vk_->scene_imgui_ds) {
+        ImGui_ImplVulkan_RemoveTexture(vk_->scene_imgui_ds);
+        vk_->scene_imgui_ds = VK_NULL_HANDLE;
+    }
+    if (vk_->scene_sampler) {
+        vkDestroySampler(vk_->device, vk_->scene_sampler, nullptr);
+        vk_->scene_sampler = VK_NULL_HANDLE;
+    }
+    if (vk_->scene_view) {
+        vkDestroyImageView(vk_->device, vk_->scene_view, nullptr);
+        vk_->scene_view = VK_NULL_HANDLE;
+    }
+    if (vk_->scene_image && vk_->scene_alloc) {
+        vmaDestroyImage(vk_->allocator, vk_->scene_image, vk_->scene_alloc);
+        vk_->scene_image = VK_NULL_HANDLE;
+        vk_->scene_alloc = VK_NULL_HANDLE;
+    }
+    vk_->scene_extent = {};
 }
 
 void EditorApplication::recreate_swapchain() {
@@ -706,6 +822,9 @@ void EditorApplication::shutdown_imgui() {
         f.write(data, static_cast<std::streamsize>(sz));
     }
 
+    // Scene RT bindings reference the ImGui Vulkan backend; drop them first.
+    destroy_scene_rt();
+
     if (vk_->imgui_initialised) {
         ImGui_ImplVulkan_Shutdown();
         vk_->imgui_initialised = false;
@@ -746,6 +865,11 @@ void EditorApplication::shutdown_vulkan() {
         if (vk_->swapchain) {
             vkDestroySwapchainKHR(vk_->device, vk_->swapchain, nullptr);
             vk_->swapchain = VK_NULL_HANDLE;
+        }
+
+        if (vk_->allocator) {
+            vmaDestroyAllocator(vk_->allocator);
+            vk_->allocator = VK_NULL_HANDLE;
         }
 
         vkDestroyDevice(vk_->device, nullptr);
@@ -815,6 +939,70 @@ bool EditorApplication::begin_frame() {
     bi.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     bi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     GW_VKCHECK(vkBeginCommandBuffer(cmd, &bi));
+
+    // --- Offscreen scene render (Phase 7 §6.1) ---------------------------
+    // Transition UNDEFINED → COLOR_ATTACHMENT_OPTIMAL, clear to a distinctive
+    // editor blue, then transition → SHADER_READ_ONLY_OPTIMAL so the Viewport
+    // panel's ImGui::Image samples a ready texture in end_frame. Real scene
+    // rendering (meshes, debug-draw) lands in later gates; until then a clear
+    // proves the VMA RT + ImGui binding end-to-end.
+    if (vk_->scene_image) {
+        // -> COLOR_ATTACHMENT_OPTIMAL
+        VkImageMemoryBarrier2 to_color{};
+        to_color.sType                       = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+        to_color.srcStageMask                = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+        to_color.srcAccessMask               = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+        to_color.dstStageMask                = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+        to_color.dstAccessMask               = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+        to_color.oldLayout                   = VK_IMAGE_LAYOUT_UNDEFINED;
+        to_color.newLayout                   = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        to_color.image                       = vk_->scene_image;
+        to_color.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        to_color.subresourceRange.levelCount = 1;
+        to_color.subresourceRange.layerCount = 1;
+
+        VkDependencyInfo dep{};
+        dep.sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+        dep.imageMemoryBarrierCount = 1;
+        dep.pImageMemoryBarriers    = &to_color;
+        vkCmdPipelineBarrier2(cmd, &dep);
+
+        VkRenderingAttachmentInfo scene_att{};
+        scene_att.sType            = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        scene_att.imageView        = vk_->scene_view;
+        scene_att.imageLayout      = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        scene_att.loadOp           = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        scene_att.storeOp          = VK_ATTACHMENT_STORE_OP_STORE;
+        scene_att.clearValue.color = {{0.10f, 0.13f, 0.18f, 1.0f}};
+
+        VkRenderingInfo rinfo{};
+        rinfo.sType                = VK_STRUCTURE_TYPE_RENDERING_INFO;
+        rinfo.renderArea.extent    = vk_->scene_extent;
+        rinfo.layerCount           = 1;
+        rinfo.colorAttachmentCount = 1;
+        rinfo.pColorAttachments    = &scene_att;
+        vkCmdBeginRendering(cmd, &rinfo);
+        // (Phase 8 will record mesh draws here.)
+        vkCmdEndRendering(cmd);
+
+        // -> SHADER_READ_ONLY_OPTIMAL for ImGui sampling.
+        VkImageMemoryBarrier2 to_sampled{};
+        to_sampled.sType                       = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+        to_sampled.srcStageMask                = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+        to_sampled.srcAccessMask               = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+        to_sampled.dstStageMask                = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+        to_sampled.dstAccessMask               = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+        to_sampled.oldLayout                   = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        to_sampled.newLayout                   = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        to_sampled.image                       = vk_->scene_image;
+        to_sampled.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        to_sampled.subresourceRange.levelCount = 1;
+        to_sampled.subresourceRange.layerCount = 1;
+
+        dep.imageMemoryBarrierCount = 1;
+        dep.pImageMemoryBarriers    = &to_sampled;
+        vkCmdPipelineBarrier2(cmd, &dep);
+    }
 
     return true;
 }

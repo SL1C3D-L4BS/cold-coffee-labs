@@ -21,6 +21,7 @@ void AssetBrowserPanel::navigate_to(const fs::path& dir) {
         DirEntry de;
         de.name   = entry.path().filename().string();
         de.is_dir = entry.is_directory(ec);
+        if (!de.is_dir) de.ext = entry.path().extension().string();
         dir_entries_.push_back(de);
     }
 
@@ -59,26 +60,48 @@ void AssetBrowserPanel::draw_content_grid() {
         ImGui::PushID(de.name.c_str());
         ImVec2 item_size{icon_size_, icon_size_ + 16.f};
 
-        // Generic icon — coloured by type.
-        ImU32 icon_col = de.is_dir
-            ? IM_COL32(240, 190,  80, 200)   // amber directory
-            : IM_COL32( 80, 160, 240, 200);  // blue file
+        // Type-aware thumbnail. Phase 7 renders colored badges keyed by
+        // extension; a real texture/mesh thumbnail cache lands in Phase 8
+        // once the asset database can hand back a sampled image DS.
+        ImU32 icon_col = IM_COL32(80, 160, 240, 200); // default: blue file
+        const char* badge = "FILE";
+        if (de.is_dir)                     { icon_col = IM_COL32(240, 190,  80, 210); badge = "DIR"; }
+        else if (de.ext == ".gltf" ||
+                 de.ext == ".glb"  ||
+                 de.ext == ".obj")         { icon_col = IM_COL32(120, 220, 150, 220); badge = "MESH"; }
+        else if (de.ext == ".png"  ||
+                 de.ext == ".jpg"  ||
+                 de.ext == ".jpeg" ||
+                 de.ext == ".tga"  ||
+                 de.ext == ".ktx2" ||
+                 de.ext == ".basis")       { icon_col = IM_COL32(220, 140, 220, 220); badge = "TEX"; }
+        else if (de.ext == ".gwscene" ||
+                 de.ext == ".scene" ||
+                 de.ext == ".json")        { icon_col = IM_COL32(240, 200, 120, 220); badge = "SCENE"; }
+        else if (de.ext == ".lua"  ||
+                 de.ext == ".bld"  ||
+                 de.ext == ".gsl")         { icon_col = IM_COL32(180, 220, 120, 220); badge = "SCRIPT"; }
 
         ImDrawList* dl = ImGui::GetWindowDrawList();
         ImVec2 p = ImGui::GetCursorScreenPos();
         dl->AddRectFilled(p, {p.x + icon_size_, p.y + icon_size_},
-                          icon_col, 4.f);
+                          icon_col, 6.f);
+        dl->AddRect(p, {p.x + icon_size_, p.y + icon_size_},
+                    IM_COL32(0, 0, 0, 90), 6.f, 0, 1.f);
+        // Type badge in the corner for quick at-a-glance identification.
+        ImVec2 badge_pos{p.x + 6.f, p.y + 6.f};
+        dl->AddText(badge_pos, IM_COL32(10, 12, 20, 230), badge);
 
         if (ImGui::Selectable("##item", false, 0, item_size)) {
             if (de.is_dir) navigate_to(current_dir_ / de.name);
         }
 
-        // Drag source for asset drop onto inspector fields.
+        // Drag source — the viewport and inspector listen for ASSET_PATH.
         if (!de.is_dir && ImGui::BeginDragDropSource()) {
             std::string path_str = (current_dir_ / de.name).string();
             ImGui::SetDragDropPayload("ASSET_PATH",
                 path_str.c_str(), path_str.size() + 1);
-            ImGui::Text("Asset: %s", de.name.c_str());
+            ImGui::Text("%s  %s", badge, de.name.c_str());
             ImGui::EndDragDropSource();
         }
 
@@ -98,7 +121,13 @@ void AssetBrowserPanel::draw_content_grid() {
 void AssetBrowserPanel::on_imgui_render(EditorContext& /*ctx*/) {
     ImGui::Begin(name(), &visible_);
 
-    // Breadcrumb + filter.
+    // First-frame scan of the default directory so the grid isn't empty
+    // before the user clicks a tree node.
+    if (dir_entries_.empty() && !scanned_once_) {
+        navigate_to(current_dir_);
+        scanned_once_ = true;
+    }
+
     ImGui::TextDisabled("%s", current_dir_.string().c_str());
     ImGui::SameLine();
     ImGui::SetNextItemWidth(200.f);
@@ -107,6 +136,8 @@ void AssetBrowserPanel::on_imgui_render(EditorContext& /*ctx*/) {
     if (ImGui::SmallButton("Grid")) view_mode_ = ViewMode::Grid;
     ImGui::SameLine();
     if (ImGui::SmallButton("List")) view_mode_ = ViewMode::List;
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Rescan")) navigate_to(current_dir_);
     ImGui::Separator();
 
     draw_directory_tree();
