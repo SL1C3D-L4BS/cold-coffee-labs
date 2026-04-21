@@ -93,6 +93,20 @@ add_executable(gw_tests
     unit/anim/world_lifecycle_test.cpp
     unit/anim/pose_and_hash_test.cpp
     unit/gameai/gameai_world_test.cpp
+    # Phase 14 — Networking & Multiplayer (ADR-0047..0055)
+    unit/net/network_world_lifecycle_test.cpp
+    unit/net/transport_null_test.cpp
+    unit/net/link_sim_test.cpp
+    unit/net/snapshot_test.cpp
+    unit/net/replication_test.cpp
+    unit/net/reliability_test.cpp
+    unit/net/lag_comp_test.cpp
+    unit/net/desync_detector_test.cpp
+    unit/net/lockstep_test.cpp
+    unit/net/voice_test.cpp
+    unit/net/session_test.cpp
+    unit/net/cvars_console_test.cpp
+    integration/net/two_client_night_test.cpp
     test_main.cpp
 )
 
@@ -107,6 +121,7 @@ target_link_libraries(gw_tests
         greywater::physics
         greywater::anim
         greywater::gameai
+        greywater::net
         greywater::runtime
         doctest::doctest
         volk

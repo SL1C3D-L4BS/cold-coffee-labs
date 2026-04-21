@@ -132,6 +132,26 @@
                 "GW_ENABLE_ACL":    "ON",
                 "GW_ENABLE_RECAST": "ON"
             }
+        },
+        {
+            "name": "netplay-linux",
+            "inherits": "living-linux",
+            "displayName": "Netplay Linux (Phase 14 GNS/Opus ON)",
+            "description": "ADR-0055 §1: inherits living-linux and flips Phase-14 deps ON for the netplay-* milestone.",
+            "cacheVariables": {
+                "GW_ENABLE_GNS":  "ON",
+                "GW_ENABLE_OPUS": "ON"
+            }
+        },
+        {
+            "name": "netplay-win",
+            "inherits": "living-win",
+            "displayName": "Netplay Windows (Phase 14 GNS/Opus ON)",
+            "description": "ADR-0055 §1: inherits living-win and flips Phase-14 deps ON for the netplay-* milestone.",
+            "cacheVariables": {
+                "GW_ENABLE_GNS":  "ON",
+                "GW_ENABLE_OPUS": "ON"
+            }
         }
     ],
     "buildPresets": [
@@ -147,7 +167,9 @@
         { "name": "physics-linux", "configurePreset": "physics-linux" },
         { "name": "physics-win",   "configurePreset": "physics-win" },
         { "name": "living-linux",  "configurePreset": "living-linux" },
-        { "name": "living-win",    "configurePreset": "living-win" }
+        { "name": "living-win",    "configurePreset": "living-win" },
+        { "name": "netplay-linux", "configurePreset": "netplay-linux" },
+        { "name": "netplay-win",   "configurePreset": "netplay-win" }
     ],
     "testPresets": [
         {
