@@ -28,8 +28,8 @@ Greywater is two products in one build: the engine (`Greywater_Engine`) and the 
 | 7     | Editor Foundation                            | 037–042   | 6w       | *Editor v0.1*                | completed (engineering; demo-recording gate pending per §0) |
 | 8     | Scene Serialization & Visual Scripting       | 043–047   | 5w       | —                            | completed (2026-04-21; ADR-0008 + ADR-0009 landed; `.gwscene` + dvec3 transforms + vscript IR/interpreter/VM + ImNodes panel all green) |
 | 9     | BLD (Brewed Logic Directive, Rust)           | 048–059   | 12w      | *Brewed Logic*               | completed (2026-04-21; ADR-0010 → 0016 + amended ADR-0007 all landed; full six-wave 9A–9F implementation committed; see §Phase-9 amendment) |
-| 10    | Runtime I — Audio & Input                    | 060–065   | 6w       | —                            | in-progress (2026-04-21; ADR-0017 → 0022 landed; §Phase-10 kick-off)  |
-| 11    | Runtime II — UI, Events, Config, Console     | 066–071   | 6w       | *Playable Runtime*           | planned  |
+| 10    | Runtime I — Audio & Input                    | 060–065   | 6w       | —                            | completed (2026-04-21; ADR-0017 → 0022 landed; handoff to Phase 11) |
+| 11    | Runtime II — UI, Events, Config, Console     | 066–071   | 6w       | *Playable Runtime*           | completed (2026-04-21; ADR-0023 → 0030 landed; all six waves 11A–11F green on dev-win with 271/271 tests, runtime_self_test + playable_sandbox exit gates passing; see §Phase-11 closeout) |
 | 12    | Physics                                      | 072–077   | 6w       | —                            | planned  |
 | 13    | Animation & Game AI Framework                | 078–083   | 6w       | *Living Scene*               | planned  |
 | 14    | Networking & Multiplayer                     | 084–095   | 12w      | *Two Client Night*           | planned  |
@@ -170,14 +170,16 @@ Revised 2026-04-21 to reflect the six-wave plan (9A–9F) that was executed in a
 
 ### Phase 11 — Runtime II: UI, Events, Config, Console (weeks 066–071)
 
-| Week | Deliverable                                                                | Tier |
-| ---- | -------------------------------------------------------------------------- | ---- |
-| 066  | `engine/core/events/`: type-safe pub/sub + zero-alloc in-frame bus         | A    |
-| 067  | `engine/core/config/`: typed CVar registry + TOML persistence              | A/B  |
-| 068  | `engine/console/`: in-game dev console overlay (debug builds only)         | B    |
-| 069  | `engine/ui/`: RmlUi integration; HarfBuzz + FreeType text shaping          | B    |
-| 070  | `engine/ui/`: Vulkan-HAL backend for RmlUi; basic HUD + menu templates     | B    |
-| 071  | *Playable Runtime*: sandbox with input, audio, HUD, all subsystems live    | A/B  |
+Revised 2026-04-21 to reflect the six-wave plan (11A–11F) executed phase-complete per CLAUDE.md #19. Weeks remain pacing indicators; the wave is the unit of closure.
+
+| Week | Wave | Deliverable                                                                                                         | Tier | ADR       |
+| ---- | ---- | ------------------------------------------------------------------------------------------------------------------- | ---- | --------- |
+| 066  | 11A  | `engine/core/events/`: `EventBus<T>` + `InFrameQueue<T>` + `CrossSubsystemBus`; `events_core.hpp` catalogue; trace sink | A    | 0023      |
+| 067  | 11B  | `engine/core/config/`: typed `CVar<T>` registry + `CVarFlags` + toml++ persistence + `StandardCVars`; Phase-10 TOML migration | A/B  | 0024      |
+| 068  | 11C  | `engine/console/`: `ConsoleService` + `ICommand` + history + autocomplete + built-in command table; release gate | B    | 0025      |
+| 069  | 11D  | `engine/ui/`: `UIService` + `FontLibrary` + `TextShaper` + `GlyphAtlas` + `LocaleBridge`; RmlUi system/file interfaces; FreeType 2.14.3 + HarfBuzz 14.1.0 wired | B    | 0026/0028 |
+| 070  | 11E  | `engine/ui/backends/rml_render_hal`: RmlUi Vulkan HAL backend + frame-graph `ui_pass`; HUD + menu + rebind + settings `.rml`/`.rcss` templates; settings binder | B    | 0027      |
+| 071  | 11F  | *Playable Runtime*: `Engine::Impl` boot order, `runtime/main.cpp` rewrite, `apps/sandbox_playable/`, `playable-*` CI self-test | A/B  | 0029/0030 |
 
 ### Phase 12 — Physics (weeks 072–077)
 
@@ -450,8 +452,19 @@ Execution sequenced per the §2 plan:
 
 Three docs were corrected from their 2026-04-19 shape to reflect the 2026-04 research deltas: `docs/02 §13` (sqlite-vss → sqlite-vec; dual-path embeddings; mistral.rs primary + llama-cpp-2 fallback), `docs/04 §3.4`/§3.5 (Rig as ILLMProvider carrier; structured output contract; RAG pipeline summary), and this row. Corrections were committed **before** any Phase-9 Rust code landed per non-negotiable #20.
 
-### *Playable Runtime* (week 071)
-A sandbox scene accepts controller + keyboard input through rebindable actions. 3D spatial audio plays on both platforms. HUD renders through RmlUi with localized strings. Dev console toggles (debug only).
+### *Playable Runtime* (week 071) — **completed 2026-04-21**
+A sandbox scene accepts controller + keyboard input through rebindable actions. 3D spatial audio plays on both platforms. HUD renders through RmlUi with localized strings. Dev console toggles (debug only). The full Phase-11 wave breakdown lives at the top of §Phase 11; the exit-demo script lives at `docs/adr/0029-playable-runtime-wiring.md` §CI-self-test.
+
+| Wave | Weeks     | Theme                                                                  | Primary ADRs                | Status |
+|------|-----------|------------------------------------------------------------------------|-----------------------------|--------|
+| 11A  | 066       | Event bus: `EventBus<T>` + `InFrameQueue<T>` + `CrossSubsystemBus`     | ADR-0023                    | ✅ shipped |
+| 11B  | 067       | Config / CVars: typed registry + TOML persistence + Phase-10 migration | ADR-0024                    | ✅ shipped |
+| 11C  | 068       | Dev console: RmlUi-backed overlay + command registry + release gate    | ADR-0025                    | ✅ shipped |
+| 11D  | 069       | RmlUi + text shaping: FreeType + HarfBuzz + SDF atlas + LocaleBridge   | ADR-0026 / 0028             | ✅ shipped (null backend + gated RmlUi path) |
+| 11E  | 070       | UI backend + HUD/menu templates + settings binder + a11y cross-walk    | ADR-0027                    | ✅ shipped |
+| 11F  | 071       | Playable Runtime: `Engine::Impl` + runtime rewrite + CI self-test       | ADR-0029 / 0030             | ✅ shipped |
+
+**Phase-11 closeout (2026-04-21):** `ctest --preset dev-win` — **271/271 green** on clang-cl 22.1.3 / Ninja / Win11.  Added `greywater::runtime` static library so `gw_runtime`, `apps/sandbox_playable`, and `gw_tests` share one `runtime::Engine` owner.  Exit gates: `runtime_self_test` (0.55 s) and `playable_sandbox` (0.54 s) both PASS with `PLAYABLE OK` marker.  Dependency gates `GW_ENABLE_{RMLUI,FREETYPE,HARFBUZZ,TOMLPP}` default OFF for CI; the `playable-{win,linux}` CMake presets flip every Phase-10 + Phase-11 dep ON for the shipping build.  Hand-off to Phase 12 — Physics.
 
 ### *Living Scene* (week 083)
 A character walks across a navmeshed scene driven by a BT, with animations blending and physics collisions resolving deterministically under lockstep. BT authored both via the editor graph view and via BLD chat produce identical runtime behaviour.

@@ -1,0 +1,36 @@
+<rml>
+<head>
+    <title>Greywater HUD</title>
+    <!--
+      Phase 11 Wave 11E — sandbox HUD template (ADR-0027).
+      Kept intentionally minimal: a health bar, a caption channel, and
+      a top-right FPS counter. CVar binds:
+        - #hud-fps  ← dev.show_fps
+        - #hud-text-scale ← ui.text.scale
+    -->
+    <link type="text/rcss" href="hud.rcss"/>
+</head>
+<body class="hud-root">
+
+    <div id="hud-top-left" class="hud-zone">
+        <div id="hud-health" class="hud-bar">
+            <div id="hud-health-fill" class="bar-fill"></div>
+            <span id="hud-health-label" class="bar-label" data-aria-label="health">100</span>
+        </div>
+        <div id="hud-shield" class="hud-bar">
+            <div id="hud-shield-fill" class="bar-fill shield"></div>
+            <span id="hud-shield-label" class="bar-label" data-aria-label="shield">100</span>
+        </div>
+    </div>
+
+    <div id="hud-bottom-center" class="hud-zone hud-captions">
+        <!-- Caption channel — populated by AudioMarkerCrossed → caption sink. -->
+        <span id="caption-channel" role="status" aria-live="polite"></span>
+    </div>
+
+    <div id="hud-top-right" class="hud-zone">
+        <span id="hud-fps" class="hud-diag">60 fps</span>
+    </div>
+
+</body>
+</rml>

@@ -59,6 +59,23 @@ add_executable(gw_tests
     unit/input/scanner_test.cpp
     unit/input/adaptive_profile_test.cpp
     unit/input/rebind_test.cpp
+    # Phase 11 Wave 11A — Event Bus (ADR-0023)
+    unit/events/event_bus_test.cpp
+    unit/events/cross_subsystem_bus_test.cpp
+    # Phase 11 Wave 11B — CVar Registry + TOML (ADR-0024)
+    unit/config/cvar_registry_test.cpp
+    unit/config/toml_binding_test.cpp
+    # Phase 11 Wave 11C — Dev Console (ADR-0025)
+    unit/console/console_service_test.cpp
+    # Phase 11 Wave 11D — UI substrate (ADR-0026 / 0028)
+    unit/ui/locale_bridge_test.cpp
+    unit/ui/font_library_test.cpp
+    unit/ui/glyph_atlas_test.cpp
+    unit/ui/text_shaper_test.cpp
+    unit/ui/settings_binder_test.cpp
+    unit/ui/ui_service_test.cpp
+    # Phase 11 Wave 11F — Engine boot integration (ADR-0029)
+    integration/engine_boot_test.cpp
     test_main.cpp
 )
 
@@ -68,6 +85,9 @@ target_link_libraries(gw_tests
         greywater::assets
         greywater::audio
         greywater::input
+        greywater::ui
+        greywater::console
+        greywater::runtime
         doctest::doctest
         volk
         xxhash

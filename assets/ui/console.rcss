@@ -1,0 +1,70 @@
+/* assets/ui/console.rcss — Phase 11 Wave 11C dev console styling.
+ *
+ * Fixed bottom-anchored sheet covering the lower half of the viewport;
+ * scrollable output buffer + single-line input row with prompt.
+ */
+
+body.console-root {
+    position: absolute;
+    left: 0; right: 0; top: 0;
+    height: 45%;
+    background: rgba(0, 0, 0, 0.85);
+    color: #e8eaed;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 14dp;
+    padding: 8dp 12dp;
+    border-bottom: 2dp solid #4ea1ff;
+}
+
+#console-output {
+    position: absolute;
+    left: 12dp; right: 12dp; top: 12dp;
+    bottom: 48dp;
+    overflow-y: auto;
+    color: #d6dadd;
+    line-height: 1.4;
+}
+
+#console-input-row {
+    position: absolute;
+    left: 12dp; right: 12dp; bottom: 12dp;
+    height: 28dp;
+    display: flex;
+    gap: 6dp;
+    align-items: center;
+    border-top: 1dp solid rgba(255,255,255,0.15);
+    padding-top: 4dp;
+}
+#console-prompt {
+    color: #4ea1ff;
+    font-weight: 700;
+}
+#console-input {
+    flex: 1;
+    background: transparent;
+    color: #e8eaed;
+    border: none;
+    outline: none;
+    font-family: inherit;
+    font-size: inherit;
+}
+#console-input:focus {
+    outline: 1dp solid #4ea1ff;
+}
+
+#console-autocomplete {
+    position: absolute;
+    left: 24dp; bottom: 44dp;
+    background: rgba(0,0,0,0.95);
+    border: 1dp solid #4ea1ff;
+    padding: 4dp 6dp;
+    border-radius: 4dp;
+    font-size: 13dp;
+    color: #d6dadd;
+    max-height: 160dp;
+    overflow-y: auto;
+}
+
+.console-line-err   { color: #ff8a80; }
+.console-line-ok    { color: #a0e0a0; }
+.console-line-dim   { color: #808a92; }

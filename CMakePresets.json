@@ -64,6 +64,34 @@
                 "CMAKE_CXX_FLAGS_DEBUG_INIT": "-O1 -g -fsanitize=thread -fno-omit-frame-pointer",
                 "CMAKE_EXE_LINKER_FLAGS_DEBUG_INIT": "-fsanitize=thread"
             }
+        },
+        {
+            "name": "playable-linux",
+            "inherits": "dev-linux",
+            "displayName": "Playable Linux (Phase 11 gw_runtime, all deps ON)",
+            "description": "ADR-0029: flips every Phase 11 dep ON for the exit-demo build.",
+            "cacheVariables": {
+                "GW_ENABLE_MINIAUDIO":   "ON",
+                "GW_ENABLE_SDL3":        "ON",
+                "GW_ENABLE_RMLUI":       "ON",
+                "GW_ENABLE_FREETYPE":    "ON",
+                "GW_ENABLE_HARFBUZZ":    "ON",
+                "GW_ENABLE_TOMLPP":      "ON"
+            }
+        },
+        {
+            "name": "playable-win",
+            "inherits": "dev-win",
+            "displayName": "Playable Windows (Phase 11 gw_runtime, all deps ON)",
+            "description": "ADR-0029: flips every Phase 11 dep ON for the exit-demo build.",
+            "cacheVariables": {
+                "GW_ENABLE_MINIAUDIO":   "ON",
+                "GW_ENABLE_SDL3":        "ON",
+                "GW_ENABLE_RMLUI":       "ON",
+                "GW_ENABLE_FREETYPE":    "ON",
+                "GW_ENABLE_HARFBUZZ":    "ON",
+                "GW_ENABLE_TOMLPP":      "ON"
+            }
         }
     ],
     "buildPresets": [
@@ -73,7 +101,9 @@
         { "name": "release-win",   "configurePreset": "release-win" },
         { "name": "linux-asan",    "configurePreset": "linux-asan" },
         { "name": "linux-ubsan",   "configurePreset": "linux-ubsan" },
-        { "name": "linux-tsan",    "configurePreset": "linux-tsan" }
+        { "name": "linux-tsan",    "configurePreset": "linux-tsan" },
+        { "name": "playable-linux","configurePreset": "playable-linux" },
+        { "name": "playable-win",  "configurePreset": "playable-win" }
     ],
     "testPresets": [
         {
@@ -85,6 +115,18 @@
         {
             "name": "dev-win",
             "configurePreset": "dev-win",
+            "output": { "outputOnFailure": true },
+            "execution": { "noTestsAction": "error", "stopOnFailure": false }
+        },
+        {
+            "name": "playable-linux",
+            "configurePreset": "playable-linux",
+            "output": { "outputOnFailure": true },
+            "execution": { "noTestsAction": "error", "stopOnFailure": false }
+        },
+        {
+            "name": "playable-win",
+            "configurePreset": "playable-win",
             "output": { "outputOnFailure": true },
             "execution": { "noTestsAction": "error", "stopOnFailure": false }
         }
@@ -104,6 +146,22 @@
                 { "type": "configure", "name": "dev-win" },
                 { "type": "build",     "name": "dev-win" },
                 { "type": "test",      "name": "dev-win" }
+            ]
+        },
+        {
+            "name": "playable-linux",
+            "steps": [
+                { "type": "configure", "name": "playable-linux" },
+                { "type": "build",     "name": "playable-linux" },
+                { "type": "test",      "name": "playable-linux" }
+            ]
+        },
+        {
+            "name": "playable-win",
+            "steps": [
+                { "type": "configure", "name": "playable-win" },
+                { "type": "build",     "name": "playable-win" },
+                { "type": "test",      "name": "playable-win" }
             ]
         }
     ]

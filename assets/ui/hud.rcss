@@ -1,0 +1,77 @@
+/* assets/ui/hud.rcss — Phase 11 Wave 11E sandbox HUD styles (ADR-0027).
+ *
+ * All units use dp (density-independent px). The UIService multiplies by
+ * ui.text.scale + ui.dpi.scale before passing to the render backend, so
+ * text always respects the accessibility scale CVar.
+ *
+ * Colour tokens map to WCAG-2.2-AA pairs. The high-contrast boost
+ * (ui.contrast.boost=true) switches on the `.hud-root.contrast` class
+ * which overrides the palette to pure black/white.
+ */
+
+body.hud-root {
+    position: absolute;
+    left: 0; top: 0; right: 0; bottom: 0;
+    font-family: "Inter";
+    color: #e8eaed;
+    text-shadow: 0px 1px 1px #000000;
+}
+
+.hud-zone {
+    position: absolute;
+    padding: 16dp;
+}
+
+#hud-top-left     { left: 0;   top: 0;   }
+#hud-top-right    { right: 0;  top: 0;   }
+#hud-bottom-center{ left: 0; right: 0; bottom: 48dp; text-align: center; }
+
+.hud-bar {
+    width: 220dp; height: 14dp;
+    margin-top: 4dp;
+    background: rgba(0,0,0,0.45);
+    border: 1dp solid rgba(255,255,255,0.4);
+    border-radius: 4dp;
+    position: relative;
+}
+.bar-fill {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    background: #4caf50;
+    border-radius: 3dp;
+    width: 100%;
+}
+.bar-fill.shield { background: #2196f3; }
+
+.bar-label {
+    position: absolute;
+    left: 0; right: 0; top: 0; bottom: 0;
+    text-align: center;
+    font-size: 12dp;
+    color: #ffffff;
+}
+
+.hud-captions {
+    font-size: 20dp;
+    text-align: center;
+    background: rgba(0,0,0,0.55);
+    padding: 6dp 12dp;
+    border-radius: 6dp;
+    display: inline-block;
+}
+
+.hud-diag {
+    font-size: 14dp;
+    color: #ffffff;
+    background: rgba(0,0,0,0.5);
+    padding: 2dp 6dp;
+    border-radius: 3dp;
+}
+
+/* -------- High-contrast boost (ui.contrast.boost=true) -------- */
+body.hud-root.contrast {
+    color: #ffffff;
+    text-shadow: 0px 1px 2px #000000;
+}
+body.hud-root.contrast .bar-fill          { background: #ffffff; }
+body.hud-root.contrast .bar-fill.shield   { background: #ffff00; }
+body.hud-root.contrast .hud-captions      { background: #000000; color: #ffffff; }

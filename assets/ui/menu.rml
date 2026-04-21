@@ -1,0 +1,26 @@
+<rml>
+<head>
+    <title>Greywater Main Menu</title>
+    <!-- Phase 11 Wave 11E — keyboard-navigable root menu (ADR-0027). -->
+    <link type="text/rcss" href="menu.rcss"/>
+</head>
+<body id="menu-root" class="menu-root" tabindex="-1">
+
+    <h1 id="menu-title">Greywater</h1>
+    <h2 id="menu-subtitle">For I stand on the ridge of the universe.</h2>
+
+    <div class="menu-list" role="menu">
+        <button id="menu-continue" class="menu-item" tabindex="0" data-aria-label="continue">Continue</button>
+        <button id="menu-new-game" class="menu-item" tabindex="0" data-aria-label="newgame">New Game</button>
+        <button id="menu-settings" class="menu-item" tabindex="0" data-aria-label="settings">Settings</button>
+        <button id="menu-credits"  class="menu-item" tabindex="0" data-aria-label="credits">Credits</button>
+        <button id="menu-quit"     class="menu-item menu-item-danger" tabindex="0" data-aria-label="quit">Quit</button>
+    </div>
+
+    <div id="menu-footer">
+        <span id="menu-version">v0.11.0</span>
+        <span id="menu-cheats-banner" style="display:none;">CHEATS ENABLED</span>
+    </div>
+
+</body>
+</rml>

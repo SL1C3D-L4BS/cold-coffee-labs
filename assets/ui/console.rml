@@ -1,0 +1,25 @@
+<rml>
+<head>
+    <title>Console</title>
+    <!--
+      Phase 11 Wave 11C/11E — dev-console overlay template (ADR-0025).
+      Toggled by the tilde key (~) in dev builds; release builds require
+      `dev.console.allow_release = true`.
+    -->
+    <link type="text/rcss" href="console.rcss"/>
+</head>
+<body id="console-root" class="console-root">
+
+    <div id="console-output" role="log" aria-live="polite"></div>
+
+    <div id="console-input-row">
+        <span id="console-prompt">&gt;</span>
+        <input id="console-input" type="text" autofocus/>
+    </div>
+
+    <div id="console-autocomplete" style="display:none;">
+        <!-- Populated by ConsoleService::complete() -->
+    </div>
+
+</body>
+</rml>

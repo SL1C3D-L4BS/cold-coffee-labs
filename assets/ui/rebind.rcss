@@ -1,0 +1,45 @@
+/* assets/ui/rebind.rcss — Phase 11 Wave 11E rebind pane (ADR-0027). */
+
+body.rebind-root { padding: 64dp 96dp; }
+
+.rebind-hint {
+    color: #a0a6ad;
+    margin-bottom: 16dp;
+    font-size: 14dp;
+}
+
+#rebind-list {
+    max-width: 900dp;
+    display: flex;
+    flex-direction: column;
+    gap: 6dp;
+}
+
+.rebind-row {
+    display: grid;
+    grid-template-columns: 2fr 2fr 2fr 80dp 80dp;
+    gap: 8dp;
+    padding: 10dp 12dp;
+    background: rgba(255,255,255,0.03);
+    border-radius: 6dp;
+    align-items: center;
+}
+.rebind-row:focus-within {
+    border: 1dp solid #4ea1ff;
+    background: rgba(78,161,255,0.12);
+}
+
+.rebind-action    { font-size: 16dp; color: #e8eaed; }
+.rebind-primary,
+.rebind-secondary { font-size: 14dp; color: #a0a6ad; font-family: monospace; }
+
+.rebind-set, .rebind-clear {
+    padding: 6dp 10dp;
+    background: rgba(255,255,255,0.06);
+    border: 1dp solid transparent;
+    border-radius: 4dp;
+    font-size: 13dp;
+    color: #e8eaed;
+}
+
+#rebind-footer { margin-top: 32dp; display: flex; gap: 12dp; }

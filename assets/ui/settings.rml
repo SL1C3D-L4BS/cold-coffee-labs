@@ -1,0 +1,112 @@
+<rml>
+<head>
+    <title>Settings</title>
+    <!--
+      Phase 11 Wave 11E — user-facing settings template (ADR-0027).
+      Bound through SettingsBinder → CVarRegistry. Binds shipping for
+      Phase 11:
+        #settings-master-volume  ← audio.master.volume
+        #settings-music-volume   ← audio.music.volume
+        #settings-sfx-volume     ← audio.sfx.volume
+        #settings-voice-volume   ← audio.voice.volume
+        #settings-text-scale     ← ui.text.scale
+        #settings-contrast-boost ← ui.contrast.boost
+        #settings-reduce-motion  ← ui.reduce_motion
+        #settings-captions       ← ui.caption.enable
+        #settings-caption-scale  ← ui.caption.scale
+        #settings-invert-y       ← input.look.invert_y
+        #settings-mouse-sens     ← input.mouse.sensitivity
+        #settings-vsync          ← gfx.swapchain.vsync
+        #settings-msaa           ← gfx.render.msaa
+    -->
+    <link type="text/rcss" href="menu.rcss"/>
+    <link type="text/rcss" href="settings.rcss"/>
+</head>
+<body id="settings-root" class="menu-root settings-root">
+
+    <h1>Settings</h1>
+
+    <nav id="settings-tabs" role="tablist">
+        <button id="tab-audio"   class="settings-tab active" role="tab" tabindex="0">Audio</button>
+        <button id="tab-video"   class="settings-tab"        role="tab" tabindex="0">Video</button>
+        <button id="tab-input"   class="settings-tab"        role="tab" tabindex="0">Input</button>
+        <button id="tab-access"  class="settings-tab"        role="tab" tabindex="0">Accessibility</button>
+    </nav>
+
+    <section id="settings-pane-audio" class="settings-pane" role="tabpanel">
+        <div class="settings-row">
+            <label for="settings-master-volume">Master volume</label>
+            <input id="settings-master-volume" type="range" min="0" max="1" step="0.01"/>
+        </div>
+        <div class="settings-row">
+            <label for="settings-music-volume">Music volume</label>
+            <input id="settings-music-volume" type="range" min="0" max="1" step="0.01"/>
+        </div>
+        <div class="settings-row">
+            <label for="settings-sfx-volume">SFX volume</label>
+            <input id="settings-sfx-volume" type="range" min="0" max="1" step="0.01"/>
+        </div>
+        <div class="settings-row">
+            <label for="settings-voice-volume">Voice volume</label>
+            <input id="settings-voice-volume" type="range" min="0" max="1" step="0.01"/>
+        </div>
+    </section>
+
+    <section id="settings-pane-video" class="settings-pane" role="tabpanel" style="display:none;">
+        <div class="settings-row">
+            <label for="settings-vsync">V-Sync</label>
+            <input id="settings-vsync" type="checkbox"/>
+        </div>
+        <div class="settings-row">
+            <label for="settings-msaa">MSAA</label>
+            <select id="settings-msaa">
+                <option value="1">Off</option>
+                <option value="2">2×</option>
+                <option value="4">4×</option>
+                <option value="8">8×</option>
+            </select>
+        </div>
+    </section>
+
+    <section id="settings-pane-input" class="settings-pane" role="tabpanel" style="display:none;">
+        <div class="settings-row">
+            <label for="settings-mouse-sens">Mouse sensitivity</label>
+            <input id="settings-mouse-sens" type="range" min="0.1" max="10" step="0.05"/>
+        </div>
+        <div class="settings-row">
+            <label for="settings-invert-y">Invert Y</label>
+            <input id="settings-invert-y" type="checkbox"/>
+        </div>
+    </section>
+
+    <section id="settings-pane-access" class="settings-pane" role="tabpanel" style="display:none;">
+        <div class="settings-row">
+            <label for="settings-text-scale">Text scale</label>
+            <input id="settings-text-scale" type="range" min="0.75" max="2" step="0.05"/>
+        </div>
+        <div class="settings-row">
+            <label for="settings-contrast-boost">High contrast</label>
+            <input id="settings-contrast-boost" type="checkbox"/>
+        </div>
+        <div class="settings-row">
+            <label for="settings-reduce-motion">Reduce motion</label>
+            <input id="settings-reduce-motion" type="checkbox"/>
+        </div>
+        <div class="settings-row">
+            <label for="settings-captions">Captions</label>
+            <input id="settings-captions" type="checkbox"/>
+        </div>
+        <div class="settings-row">
+            <label for="settings-caption-scale">Caption scale</label>
+            <input id="settings-caption-scale" type="range" min="0.5" max="2" step="0.05"/>
+        </div>
+    </section>
+
+    <div id="settings-footer">
+        <button id="settings-apply"  class="menu-item">Apply</button>
+        <button id="settings-reset"  class="menu-item">Reset defaults</button>
+        <button id="settings-back"   class="menu-item">Back</button>
+    </div>
+
+</body>
+</rml>

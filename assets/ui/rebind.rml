@@ -1,0 +1,39 @@
+<rml>
+<head>
+    <title>Rebind controls</title>
+    <!--
+      Phase 11 Wave 11E — controller/keyboard rebind template (ADR-0027).
+      The rebind row template is cloned once per action bound in
+      input/action_map.toml. `data-action` contains the action id.
+    -->
+    <link type="text/rcss" href="menu.rcss"/>
+    <link type="text/rcss" href="rebind.rcss"/>
+</head>
+<body id="rebind-root" class="menu-root rebind-root">
+
+    <h1>Rebind controls</h1>
+    <p class="rebind-hint">
+        Select an action and press any key or button to assign. Press
+        <kbd>Esc</kbd> to cancel, <kbd>Del</kbd> to clear.
+    </p>
+
+    <div id="rebind-list" role="list">
+        <!-- Filled at runtime from ActionMap. -->
+        <template id="rebind-row-template">
+            <div class="rebind-row" role="listitem">
+                <span class="rebind-action"></span>
+                <span class="rebind-primary">—</span>
+                <span class="rebind-secondary">—</span>
+                <button class="rebind-set">Set</button>
+                <button class="rebind-clear">Clear</button>
+            </div>
+        </template>
+    </div>
+
+    <div id="rebind-footer">
+        <button id="rebind-reset" class="menu-item">Reset to defaults</button>
+        <button id="rebind-back"  class="menu-item">Back</button>
+    </div>
+
+</body>
+</rml>

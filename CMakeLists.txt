@@ -74,18 +74,23 @@ corrosion_import_crate(
     CRATE_TYPES staticlib
 )
 
+# --- Tests / CTest ------------------------------------------------------------
+# Must come BEFORE add_subdirectory() calls that use add_test(), otherwise
+# those tests silently vanish from the generated CTestTestfile.cmake.
+enable_testing()
+include(CTest)
+
 # --- Executables and libraries -----------------------------------------------
 add_subdirectory(gameplay)   # hot-reloadable C++ dylib (docs/00 §2.5)
 add_subdirectory(sandbox)    # First Light: hello-triangle
 add_subdirectory(editor)     # Editor — hello-BLD C-ABI smoke for week 004
-add_subdirectory(runtime)    # Shipping runtime executable (skeleton)
+add_subdirectory(runtime)    # Shipping runtime executable (Phase 11 boot wiring)
+add_subdirectory(apps)       # Phase 11 Wave 11F: sandbox_playable exit-demo
 
 # --- Tools --------------------------------------------------------------------
 add_subdirectory(tools/cook)
 
-# --- Tests --------------------------------------------------------------------
-enable_testing()
-include(CTest)
+# --- Unit + integration test suite -------------------------------------------
 add_subdirectory(tests)
 
 message(STATUS "Greywater configure complete — ${CMAKE_BUILD_TYPE} on ${CMAKE_SYSTEM_NAME}, compiler ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")

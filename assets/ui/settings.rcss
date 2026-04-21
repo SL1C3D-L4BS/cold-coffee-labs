@@ -1,0 +1,59 @@
+/* assets/ui/settings.rcss — Phase 11 Wave 11E settings pane (ADR-0027). */
+
+body.settings-root {
+    padding: 64dp 96dp;
+}
+
+#settings-tabs {
+    display: flex;
+    gap: 8dp;
+    margin-top: 16dp;
+    margin-bottom: 24dp;
+}
+
+.settings-tab {
+    padding: 8dp 16dp;
+    background: rgba(255,255,255,0.04);
+    color: #a0a6ad;
+    border: 1dp solid transparent;
+    border-radius: 4dp;
+    font-size: 15dp;
+}
+.settings-tab.active {
+    background: rgba(78,161,255,0.12);
+    color: #e8eaed;
+    border-color: #4ea1ff;
+}
+.settings-tab:focus {
+    outline: none;
+    border: 2dp solid #4ea1ff;
+}
+
+.settings-pane {
+    max-width: 720dp;
+    display: flex;
+    flex-direction: column;
+    gap: 12dp;
+}
+
+.settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8dp 12dp;
+    background: rgba(255,255,255,0.03);
+    border-radius: 6dp;
+}
+.settings-row > label {
+    font-size: 16dp;
+    color: #e8eaed;
+}
+.settings-row input[type="range"] {
+    width: 320dp;
+}
+
+#settings-footer {
+    margin-top: 32dp;
+    display: flex;
+    gap: 12dp;
+}

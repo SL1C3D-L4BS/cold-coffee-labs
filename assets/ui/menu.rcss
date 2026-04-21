@@ -1,0 +1,75 @@
+/* assets/ui/menu.rcss — Phase 11 Wave 11E root menu styles (ADR-0027).
+ *
+ * The focus ring thickness is sourced from ui.focus_ring_px (CVar).
+ * Keyboard / gamepad nav: arrow-keys / d-pad cycle .menu-item list;
+ * Activate = Enter / A / Space.
+ */
+
+body.menu-root {
+    position: absolute;
+    left: 0; top: 0; right: 0; bottom: 0;
+    font-family: "Inter";
+    background: #0b0f14;
+    color: #e8eaed;
+    padding: 96dp 128dp;
+}
+
+#menu-title {
+    font-size: 64dp;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -1dp;
+}
+
+#menu-subtitle {
+    font-size: 18dp;
+    font-style: italic;
+    color: #a0a6ad;
+    margin-top: 8dp;
+    margin-bottom: 48dp;
+}
+
+.menu-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12dp;
+    max-width: 420dp;
+}
+
+.menu-item {
+    display: block;
+    padding: 14dp 20dp;
+    font-size: 20dp;
+    background: rgba(255,255,255,0.06);
+    color: #e8eaed;
+    border: 1dp solid transparent;
+    border-radius: 6dp;
+    text-align: left;
+}
+
+.menu-item:hover {
+    background: rgba(255,255,255,0.12);
+    cursor: pointer;
+}
+
+.menu-item:focus {
+    outline: none;
+    border: 2dp solid #4ea1ff;       /* default focus ring; updated from CVar ui.focus_ring_px */
+    background: rgba(78, 161, 255, 0.16);
+}
+
+.menu-item-danger { color: #ff8a80; }
+
+#menu-footer {
+    position: absolute;
+    left: 128dp; right: 128dp; bottom: 24dp;
+    display: flex;
+    justify-content: space-between;
+    color: #606770;
+    font-size: 13dp;
+}
+
+#menu-cheats-banner {
+    color: #ffd54f;
+    font-weight: 700;
+}

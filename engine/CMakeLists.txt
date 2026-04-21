@@ -60,6 +60,11 @@ add_subdirectory(vscript)
 add_subdirectory(audio)
 add_subdirectory(input)
 
+# Phase 11 Wave 11C — Dev Console (ADR-0025).
+add_subdirectory(console)
+# Phase 11 Waves 11D/11E — UI: RmlUi service + backends + HUD/menu templates.
+add_subdirectory(ui)
+
 # Project version plumbed through a generated header so release binaries
 # and diagnostics report the exact build (git SHA landed in Phase 1 CI).
 configure_file(

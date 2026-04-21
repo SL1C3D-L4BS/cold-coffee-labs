@@ -265,8 +265,75 @@ if(GW_ENABLE_LIBOPUS)
     set(GW_AUDIO_OPUS ON CACHE BOOL "engine/audio: compile Opus decoder" FORCE)
 endif()
 
-# --- Phase 11+ deps below are opted in by their owning CMakeLists.txt --------
-#   Phase 11+: RmlUi, HarfBuzz, FreeType
+# --- Phase 11 — Runtime II: UI, Events, Config, Console (optional/gated) ----
+# ADR-0026 / 0027 / 0028 pins. All four deps default OFF so clean-checkout
+# CI continues to build the null UI backend (hand-rolled TOML, no RmlUi, no
+# text shaping). The `gw_runtime` / `playable-*` presets flip them ON.
+#
+#   GW_ENABLE_RMLUI       — RmlUi 6.2 in-game UI (ADR-0026)
+#   GW_ENABLE_FREETYPE    — FreeType 2.14.3 font raster (ADR-0028)
+#   GW_ENABLE_HARFBUZZ    — HarfBuzz 14.1.0 complex-script shaping (ADR-0028)
+#   GW_ENABLE_TOMLPP      — toml++ 3.4.0 strict TOML parser (ADR-0024)
+option(GW_ENABLE_RMLUI    "Fetch RmlUi and enable the production UI context"    OFF)
+option(GW_ENABLE_FREETYPE "Fetch FreeType and enable TrueType glyph raster"     OFF)
+option(GW_ENABLE_HARFBUZZ "Fetch HarfBuzz and enable complex text shaping"      OFF)
+option(GW_ENABLE_TOMLPP   "Fetch toml++ for strict TOML loading/saving"         OFF)
+
+if(GW_ENABLE_FREETYPE)
+    CPMAddPackage(
+        NAME             freetype
+        GITHUB_REPOSITORY freetype/freetype
+        GIT_TAG          VER-2-14-3
+        OPTIONS
+            "FT_DISABLE_ZLIB TRUE"
+            "FT_DISABLE_BZIP2 TRUE"
+            "FT_DISABLE_PNG TRUE"
+            "FT_DISABLE_BROTLI TRUE"
+            "FT_DISABLE_HARFBUZZ TRUE"
+    )
+    set(GW_UI_FREETYPE ON CACHE BOOL "engine/ui: compile FreeType glyph raster" FORCE)
+endif()
+
+if(GW_ENABLE_HARFBUZZ)
+    CPMAddPackage(
+        NAME             harfbuzz
+        GITHUB_REPOSITORY harfbuzz/harfbuzz
+        GIT_TAG          14.1.0
+        OPTIONS
+            "HB_BUILD_SUBSET OFF"
+            "HB_BUILD_TESTS OFF"
+            "HB_BUILD_UTILS OFF"
+            "HB_HAVE_GLIB OFF"
+            "HB_HAVE_ICU OFF"
+    )
+    set(GW_UI_HARFBUZZ ON CACHE BOOL "engine/ui: compile HarfBuzz shaper" FORCE)
+endif()
+
+if(GW_ENABLE_RMLUI)
+    # RmlUi 6.2 — depends on FreeType. When GW_ENABLE_FREETYPE is off we
+    # still fetch the dep here; RmlUi's CMake script picks it up.
+    CPMAddPackage(
+        NAME             RmlUi
+        GITHUB_REPOSITORY mikke89/RmlUi
+        GIT_TAG          6.2
+        OPTIONS
+            "RMLUI_FONT_ENGINE freetype"
+            "BUILD_SAMPLES OFF"
+            "BUILD_TESTING OFF"
+    )
+    set(GW_UI_RMLUI ON CACHE BOOL "engine/ui: compile RmlUi context" FORCE)
+endif()
+
+if(GW_ENABLE_TOMLPP)
+    CPMAddPackage(
+        NAME             tomlplusplus
+        GITHUB_REPOSITORY marzer/tomlplusplus
+        GIT_TAG          v3.4.0
+    )
+    set(GW_CONFIG_TOMLPP ON CACHE BOOL "engine/core/config: prefer toml++ reader" FORCE)
+endif()
+
+# --- Phase 12+ deps below are opted in by their owning CMakeLists.txt --------
 #   Phase 12+: Jolt Physics
 #   Phase 13+: Ozz-animation, ACL, Recast/Detour
 #   Phase 14+: GameNetworkingSockets (voice chat uses Opus from Phase 10 pin)

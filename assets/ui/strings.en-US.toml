@@ -1,0 +1,35 @@
+# assets/ui/strings.en-US.toml — Phase 11 Wave 11E baseline locale table.
+# Loaded by LocaleBridge::register_string() at boot. Keys are stable hashes
+# (fnv1a32) — do not rename without a migration plan.
+
+# Menu labels
+"menu.continue" = "Continue"
+"menu.newgame"  = "New Game"
+"menu.settings" = "Settings"
+"menu.credits"  = "Credits"
+"menu.quit"     = "Quit"
+
+# Settings
+"settings.title"          = "Settings"
+"settings.audio"          = "Audio"
+"settings.video"          = "Video"
+"settings.input"          = "Input"
+"settings.accessibility"  = "Accessibility"
+"settings.apply"          = "Apply"
+"settings.reset"          = "Reset defaults"
+"settings.back"           = "Back"
+
+# HUD
+"hud.health.label"        = "Health"
+"hud.shield.label"        = "Shield"
+"hud.fps.suffix"          = "fps"
+
+# Console
+"console.prompt"          = ">"
+"console.welcome"         = "Greywater dev console ready. Type 'help' for commands."
+"console.unknown_command" = "unknown command"
+"console.cheats_banner"   = "CHEATS ENABLED"
+
+# Accessibility
+"a11y.focus_announce"     = "focused: {0}"
+"a11y.caption.start"      = "(captioned)"
