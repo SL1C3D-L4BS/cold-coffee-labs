@@ -377,6 +377,8 @@ void transition_image(VkCommandBuffer cmd, VkImage image,
 // -----------------------------------------------------------------------------
 
 int main() {
+    std::setvbuf(stdout, nullptr, _IONBF, 0);
+    std::setvbuf(stderr, nullptr, _IONBF, 0);
     std::fprintf(stdout, "[sandbox] starting %s\n", gw::core::version_string());
 
     // --- GLFW ----------------------------------------------------------------
@@ -402,7 +404,10 @@ int main() {
     app.applicationVersion = VK_MAKE_VERSION(0, 0, 1);
     app.pEngineName        = "Greywater_Engine";
     app.engineVersion      = VK_MAKE_VERSION(0, 0, 1);
-    app.apiVersion         = VK_API_VERSION_1_2;
+    // RX 580 exposes Vulkan 1.3; request 1.3 so volk loads all promoted entry
+    // points (vkCmdPipelineBarrier2, vkCmdBeginRendering, vkQueueSubmit2, …).
+    // The engine baseline is 1.2 opportunistic-1.3, so 1.3 is valid for dev hardware.
+    app.apiVersion         = VK_API_VERSION_1_3;
 
     uint32_t glfw_ext_count = 0;
     const char** glfw_exts = glfwGetRequiredInstanceExtensions(&glfw_ext_count);
@@ -499,6 +504,8 @@ int main() {
 
     // --- Swapchain -----------------------------------------------------------
     Swapchain sc = create_swapchain(gpu, device, surface, *qfi.graphics, *qfi.present, window);
+    std::fprintf(stdout, "[sandbox] swapchain %ux%u (fmt=%d, %zu images)\n",
+        sc.extent.width, sc.extent.height, sc.format, sc.images.size());
 
     // --- Pipeline ------------------------------------------------------------
     const std::string shader_dir = GW_SHADER_DIR;
@@ -513,6 +520,7 @@ int main() {
     GW_CHECK_VK(vkCreatePipelineLayout(device, &pli, nullptr, &pipeline_layout));
 
     VkPipeline pipeline = make_triangle_pipeline(device, pipeline_layout, sc.format, vs, fs);
+    std::fprintf(stdout, "[sandbox] pipeline ready — entering render loop\n");
 
     // Shaders are retained by the pipeline; we can destroy the modules now.
     vkDestroyShaderModule(device, vs, nullptr);

@@ -9,14 +9,13 @@ target_link_libraries(gw_sandbox
     PRIVATE
         greywater::core
         glfw
-        volk::volk
+        volk::volk              # volk dynamically loads vulkan-1.dll via LoadLibrary
         GPUOpen::VulkanMemoryAllocator
-        Vulkan::Headers
+        Vulkan::Headers         # header-only; no import stubs
 )
-
-# Link against the platform loader: libvulkan (Linux) / vulkan-1.lib (Win)
-# so validation layers can attach at runtime.
-target_link_libraries(gw_sandbox PRIVATE Vulkan::Vulkan)
+# Do NOT link Vulkan::Vulkan (vulkan-1.lib) — volk owns the loader path.
+# Linking both causes the static-lib resolver to pick volk's null PFN_* variables
+# over vulkan-1.lib's IAT stubs, crashing at address 0x0 before main().
 
 target_compile_definitions(gw_sandbox PRIVATE
     VK_NO_PROTOTYPES
