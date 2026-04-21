@@ -3,6 +3,9 @@
 #include <stdexcept>
 #include <algorithm>
 
+#define VMA_IMPLEMENTATION
+#include <vk_mem_alloc.h>
+
 namespace gw {
 namespace render {
 namespace hal {
@@ -135,9 +138,52 @@ VulkanDevice::VulkanDevice(VkPhysicalDevice physical_device)
     if (result != VK_SUCCESS) {
         throw std::runtime_error("Failed to create Vulkan device");
     }
-    
-    // Load volk device function pointers
+
     volkLoadDevice(device_);
+    init_queues();
+    init_vma();
+    init_command_pools();
+}
+
+void VulkanDevice::init_queues() noexcept {
+    if (graphics_queue_family_ != UINT32_MAX)
+        vkGetDeviceQueue(device_, graphics_queue_family_, 0, &graphics_queue_);
+    if (compute_queue_family_ != UINT32_MAX)
+        vkGetDeviceQueue(device_, compute_queue_family_,  0, &compute_queue_);
+    if (transfer_queue_family_ != UINT32_MAX)
+        vkGetDeviceQueue(device_, transfer_queue_family_, 0, &transfer_queue_);
+}
+
+void VulkanDevice::init_vma() {
+    VmaVulkanFunctions vk_fns{};
+    vk_fns.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
+    vk_fns.vkGetDeviceProcAddr   = vkGetDeviceProcAddr;
+
+    VmaAllocatorCreateInfo ai{};
+    ai.physicalDevice   = physical_device_;
+    ai.device           = device_;
+    ai.instance         = VK_NULL_HANDLE;  // optional; filled when instance is passed in
+    ai.vulkanApiVersion = VK_API_VERSION_1_2;
+    ai.pVulkanFunctions = &vk_fns;
+
+    VkResult r = vmaCreateAllocator(&ai, &allocator_);
+    if (r != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create VMA allocator");
+    }
+}
+
+void VulkanDevice::init_command_pools() {
+    if (graphics_queue_family_ == UINT32_MAX) return;
+
+    VkCommandPoolCreateInfo ci{};
+    ci.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    ci.flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    ci.queueFamilyIndex = graphics_queue_family_;
+
+    VkResult r = vkCreateCommandPool(device_, &ci, nullptr, &graphics_cmd_pool_);
+    if (r != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create graphics command pool");
+    }
 }
 
 VulkanDevice::~VulkanDevice() {
@@ -147,37 +193,58 @@ VulkanDevice::~VulkanDevice() {
 VulkanDevice::VulkanDevice(VulkanDevice&& other) noexcept
     : device_(other.device_)
     , physical_device_(other.physical_device_)
+    , allocator_(other.allocator_)
+    , graphics_queue_(other.graphics_queue_)
+    , compute_queue_(other.compute_queue_)
+    , transfer_queue_(other.transfer_queue_)
     , graphics_queue_family_(other.graphics_queue_family_)
     , compute_queue_family_(other.compute_queue_family_)
     , transfer_queue_family_(other.transfer_queue_family_)
+    , graphics_cmd_pool_(other.graphics_cmd_pool_)
     , features_(other.features_)
     , properties_(other.properties_)
     , memory_properties_(other.memory_properties_) {
-    other.device_ = VK_NULL_HANDLE;
-    other.physical_device_ = VK_NULL_HANDLE;
+    other.device_            = VK_NULL_HANDLE;
+    other.physical_device_   = VK_NULL_HANDLE;
+    other.allocator_         = VK_NULL_HANDLE;
+    other.graphics_cmd_pool_ = VK_NULL_HANDLE;
 }
 
 VulkanDevice& VulkanDevice::operator=(VulkanDevice&& other) noexcept {
     if (this != &other) {
         release();
-        
-        device_ = other.device_;
-        physical_device_ = other.physical_device_;
+        device_                = other.device_;
+        physical_device_       = other.physical_device_;
+        allocator_             = other.allocator_;
+        graphics_queue_        = other.graphics_queue_;
+        compute_queue_         = other.compute_queue_;
+        transfer_queue_        = other.transfer_queue_;
         graphics_queue_family_ = other.graphics_queue_family_;
-        compute_queue_family_ = other.compute_queue_family_;
+        compute_queue_family_  = other.compute_queue_family_;
         transfer_queue_family_ = other.transfer_queue_family_;
-        features_ = other.features_;
-        properties_ = other.properties_;
-        memory_properties_ = other.memory_properties_;
-        
-        other.device_ = VK_NULL_HANDLE;
-        other.physical_device_ = VK_NULL_HANDLE;
+        graphics_cmd_pool_     = other.graphics_cmd_pool_;
+        features_              = other.features_;
+        properties_            = other.properties_;
+        memory_properties_     = other.memory_properties_;
+        other.device_            = VK_NULL_HANDLE;
+        other.physical_device_   = VK_NULL_HANDLE;
+        other.allocator_         = VK_NULL_HANDLE;
+        other.graphics_cmd_pool_ = VK_NULL_HANDLE;
     }
     return *this;
 }
 
 void VulkanDevice::release() noexcept {
     if (device_) {
+        vkDeviceWaitIdle(device_);
+        if (graphics_cmd_pool_ != VK_NULL_HANDLE) {
+            vkDestroyCommandPool(device_, graphics_cmd_pool_, nullptr);
+            graphics_cmd_pool_ = VK_NULL_HANDLE;
+        }
+        if (allocator_ != VK_NULL_HANDLE) {
+            vmaDestroyAllocator(allocator_);
+            allocator_ = VK_NULL_HANDLE;
+        }
         vkDestroyDevice(device_, nullptr);
         device_ = VK_NULL_HANDLE;
     }

@@ -8,8 +8,16 @@
 namespace gw::render::frame_graph {
 
 FrameGraph::FrameGraph() {
-    passes_.reserve(32);  // Reasonable starting capacity
+    passes_.reserve(32);
     resources_.reserve(64);
+}
+
+void FrameGraph::enable_multi_queue(VkDevice device,
+                                     VkQueue  graphics_queue,
+                                     VkQueue  compute_queue,
+                                     VkQueue  transfer_queue) {
+    scheduler_ = std::make_unique<MultiQueueScheduler>(
+        device, graphics_queue, compute_queue, transfer_queue);
 }
 
 Result<ResourceHandle> FrameGraph::declare_texture(const TextureDesc& desc) {
@@ -112,37 +120,31 @@ Result<std::monostate> FrameGraph::compile() {
     return std::monostate{};
 }
 
-Result<std::monostate> FrameGraph::execute(const RenderContext& context) {
+Result<std::monostate> FrameGraph::execute(const RenderContext& context,
+                                            const ResourceRegistry* registry) {
     if (!compiled_) {
         return std::unexpected(FrameGraphError{
             FrameGraphErrorType::CompilationFailed,
             "Frame graph must be compiled before execution"
         });
     }
-    
-    // Week 027: Use multi-queue scheduler if available
+
     if (scheduler_) {
-        auto schedule_result = scheduler_->schedule(passes_, execution_order_, compiled_barriers_);
-        if (!schedule_result) {
-            return std::unexpected(schedule_result.error());
-        }
-        
-        auto submit_result = scheduler_->submit(schedule_result.value());
-        if (!submit_result) {
-            return std::unexpected(submit_result.error());
-        }
-        
+        // Week 027: multi-queue submission path
+        auto sched = scheduler_->schedule(passes_, execution_order_, compiled_barriers_);
+        if (!sched) return std::unexpected(sched.error());
+
+        auto sub = scheduler_->submit(sched.value());
+        if (!sub) return std::unexpected(sub.error());
+
         return scheduler_->wait_for_completion();
-    } else {
-        // Fallback: Execute passes in topological order
-        for (PassHandle pass_handle : execution_order_) {
-            auto exec_result = execute_pass(pass_handle, context);
-            if (!exec_result) {
-                return std::unexpected(exec_result.error());
-            }
-        }
     }
-    
+
+    // Single-queue fallback: record all passes into the graphics command buffer.
+    for (PassHandle ph : execution_order_) {
+        auto r = execute_pass(ph, context, registry);
+        if (!r) return r;
+    }
     return std::monostate{};
 }
 
@@ -318,38 +320,117 @@ void FrameGraph::compute_resource_lifetimes() {
     }
 }
 
-Result<std::monostate> FrameGraph::execute_pass(const PassHandle pass_handle, 
-                                                const RenderContext& context) {
-    (void)context;
+Result<std::monostate> FrameGraph::execute_pass(PassHandle           pass_handle,
+                                                const RenderContext& context,
+                                                const ResourceRegistry* registry) {
     if (!is_valid_pass_handle(pass_handle)) {
-        auto err = make_invalid_handle_error("pass", pass_handle);
-        return std::unexpected(err.error());
+        return std::unexpected(make_invalid_handle_error("pass", pass_handle).error());
     }
 
-    const auto& pass = passes_[pass_handle];
-    (void)pass;
-    
-    // Find pass index in execution order to get barriers
-    auto pass_it = std::find(execution_order_.begin(), execution_order_.end(), pass_handle);
-    if (pass_it == execution_order_.end()) {
-        return std::unexpected(FrameGraphError{
-            FrameGraphErrorType::InvalidPassHandle,
-            "Pass not found in execution order"
-        });
+    // Non-const: std::move_only_function::operator() is non-const by default.
+    auto& pass = passes_[pass_handle];
+
+    // Resolve command buffer for this pass's queue
+    VkCommandBuffer vk_cmd = VK_NULL_HANDLE;
+    switch (pass.desc.queue) {
+        case QueueType::Compute:  vk_cmd = context.compute_cmd;  break;
+        case QueueType::Transfer: vk_cmd = context.graphics_cmd; break; // fallback
+        default:                  vk_cmd = context.graphics_cmd; break;
     }
-    
-    size_t pass_index = std::distance(execution_order_.begin(), pass_it);
-    const auto& barriers = compiled_barriers_[pass_index];
-    (void)barriers;
-    
-    // TODO: Create command buffer for the appropriate queue (Week 027)
-    // TODO: Insert barriers before pass execution using CommandBuffer::pipeline_barrier2
-    
-    // Execute the pass callback
-    // TODO: Create actual command buffer and wrap it
-    // pass.desc.execute(command_buffer);
-    
+
+    if (vk_cmd == VK_NULL_HANDLE) {
+        // No command buffer provided — pass is silently skipped during offline validation.
+        if (pass.desc.execute) {
+            CommandBuffer stub_cmd(vk_cmd);
+            pass.desc.execute(stub_cmd);
+        }
+        return std::monostate{};
+    }
+
+    // Locate compiled barriers for this pass
+    auto it = std::find(execution_order_.begin(), execution_order_.end(), pass_handle);
+    const size_t pass_idx = static_cast<size_t>(
+        std::distance(execution_order_.begin(), it));
+
+    // Emit pipeline barriers via sync2
+    if (pass_idx < compiled_barriers_.size()) {
+        PassBarriers barriers = compiled_barriers_[pass_idx];
+
+        // Patch VkImage / VkBuffer fields from the registry (Week 026)
+        if (registry) {
+            patch_barriers(barriers, *registry, resources_, pass);
+        }
+
+        const bool has_barriers =
+            !barriers.image_barriers.empty()  ||
+            !barriers.buffer_barriers.empty() ||
+            !barriers.memory_barriers.empty();
+
+        if (has_barriers) {
+            VkDependencyInfo dep{};
+            dep.sType                    = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            dep.dependencyFlags          = VK_DEPENDENCY_BY_REGION_BIT;
+            dep.imageMemoryBarrierCount  = static_cast<uint32_t>(
+                barriers.image_barriers.size());
+            dep.pImageMemoryBarriers     = barriers.image_barriers.empty()
+                                           ? nullptr : barriers.image_barriers.data();
+            dep.bufferMemoryBarrierCount = static_cast<uint32_t>(
+                barriers.buffer_barriers.size());
+            dep.pBufferMemoryBarriers    = barriers.buffer_barriers.empty()
+                                           ? nullptr : barriers.buffer_barriers.data();
+            dep.memoryBarrierCount       = static_cast<uint32_t>(
+                barriers.memory_barriers.size());
+            dep.pMemoryBarriers          = barriers.memory_barriers.empty()
+                                           ? nullptr : barriers.memory_barriers.data();
+            vkCmdPipelineBarrier2(vk_cmd, &dep);
+        }
+    }
+
+    // Invoke the user callback
+    if (pass.desc.execute) {
+        CommandBuffer wrapped(vk_cmd);
+        pass.desc.execute(wrapped);
+    }
+
     return std::monostate{};
+}
+
+void FrameGraph::patch_barriers(PassBarriers&                   barriers,
+                                 const ResourceRegistry&         registry,
+                                 const std::vector<ResourceData>& resources,
+                                 const PassData&                  pass) {
+    // Patch image barriers
+    for (auto& ib : barriers.image_barriers) {
+        if (ib.image != VK_NULL_HANDLE) continue;  // Already set
+        // Match to a resource that this pass reads or writes
+        for (ResourceHandle rh : pass.desc.reads) {
+            VkImage img = registry.get_image(rh);
+            if (img != VK_NULL_HANDLE) { ib.image = img; break; }
+        }
+        if (ib.image == VK_NULL_HANDLE) {
+            for (ResourceHandle wh : pass.desc.writes) {
+                VkImage img = registry.get_image(wh);
+                if (img != VK_NULL_HANDLE) { ib.image = img; break; }
+            }
+        }
+    }
+
+    // Patch buffer barriers
+    for (auto& bb : barriers.buffer_barriers) {
+        if (bb.buffer != VK_NULL_HANDLE) continue;
+        for (ResourceHandle rh : pass.desc.reads) {
+            VkBuffer buf = registry.get_buffer(rh);
+            if (buf != VK_NULL_HANDLE) { bb.buffer = buf; break; }
+        }
+        if (bb.buffer == VK_NULL_HANDLE) {
+            for (ResourceHandle wh : pass.desc.writes) {
+                VkBuffer buf = registry.get_buffer(wh);
+                if (buf != VK_NULL_HANDLE) { bb.buffer = buf; break; }
+            }
+        }
+    }
+
+    (void)resources;  // Available for richer lookup in Week 026 expansion
 }
 
 bool FrameGraph::is_valid_pass_handle(PassHandle handle) const {

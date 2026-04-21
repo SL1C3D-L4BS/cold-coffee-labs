@@ -32,3 +32,6 @@ doctest_discover_tests(gw_tests
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
     PROPERTIES LABELS smoke
 )
+
+# Week 032 — Foundation Renderer milestone perf gate.
+add_subdirectory(perf)

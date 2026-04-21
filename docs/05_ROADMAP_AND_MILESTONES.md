@@ -23,7 +23,7 @@ Greywater is two products in one build: the engine (`Greywater_Engine`) and the 
 | 2     | Platform & Core Utilities                    | 005–009   | 5w       | —                            | completed |
 | 3     | Math, ECS, Jobs & Reflection                 | 010–016   | 7w       | *Foundations Set*            | completed |
 | 4     | Renderer HAL & Vulkan Bootstrap              | 017–024   | 8w       | —                            | completed |
-| 5     | Frame Graph & Reference Renderer             | 025–032   | 8w       | *Foundation Renderer*        | planned  |
+| 5     | Frame Graph & Reference Renderer             | 025–032   | 8w       | *Foundation Renderer*        | in_progress |
 | 6     | Asset Pipeline & Content Cook                | 033–036   | 4w       | —                            | planned  |
 | 7     | Editor Foundation                            | 037–042   | 6w       | *Editor v0.1*                | planned  |
 | 8     | Scene Serialization & Visual Scripting       | 043–047   | 5w       | —                            | planned  |
@@ -366,7 +366,7 @@ Sign-off state (2026-05-01): **COMPLETED** - All core systems validated, ECS fra
 
 ### *Foundation Renderer* (week 032)
 The reference scene (a canonical indoor-outdoor test scene internal to Greywater) renders at ≥ 60 FPS @ 1080p on RX 580 with directional + point lights, cascaded shadows, IBL, tonemapping. Frame graph barriers inserted automatically; validation layers clean; async-compute path active.
-Sign-off state (2026-06-15): **COMPLETED** - Reference scene renders at target FPS, frame graph barriers functional, validation layers clean, async-compute path optimized.
+Sign-off state: **IN PROGRESS** — Phase 5 opened 2026-04-20. Target gate: week 032 (~2026-06-15). Scaffolding committed (`05c2813`); `execute_pass` and rendering passes pending.
 
 ### *Editor v0.1* (week 042)
 A designer opens the editor, creates a scene, places entities, saves, closes, reopens, and sees identical results. Reflection-driven inspector edits components correctly. ImGuizmo gizmos work in the viewport. Play-in-editor launches the gameplay module.

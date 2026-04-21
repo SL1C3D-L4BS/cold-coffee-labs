@@ -1,909 +1,497 @@
 #include "ibl.hpp"
-#include "engine/render/hal/device.hpp"
-#include "engine/render/hal/image.hpp"
-#include "engine/render/hal/buffer.hpp"
-#include "engine/core/log.hpp"
+#include "../frame_graph/error.hpp"
 #include <algorithm>
 #include <cmath>
-#include <random>
+#include <cstdio>
 
-namespace cold_coffee::engine::render::ibl {
+namespace gw::render::ibl {
 
-// EnvironmentMap implementation
-frame_graph::ResourceHandle EnvironmentMap::create_resource(frame_graph::FrameGraph& frame_graph) const {
-    frame_graph::ResourceDesc desc = {};
-    desc.type = frame_graph::ResourceType::ImageCube;
-    desc.format = format;
-    desc.width = size;
-    desc.height = size;
-    desc.depth = 1;
-    desc.mip_levels = mip_levels;
-    desc.array_layers = 6;
-    desc.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    desc.lifetime = frame_graph::ResourceLifetime::Persistent;
-    desc.name = "environment_map";
-    
-    return frame_graph.create_resource(desc).unwrap();
+using gw::render::frame_graph::FrameGraphError;
+using gw::render::frame_graph::FrameGraphErrorType;
+using gw::render::frame_graph::PassDesc;
+using gw::render::frame_graph::QueueType;
+using gw::render::frame_graph::TextureDesc;
+using gw::render::frame_graph::ResourceLifetime;
+using gw::render::frame_graph::CommandBuffer;
+
+// ---------------------------------------------------------------------------
+// EnvironmentMap / IrradianceMap / PrefilteredMap / BRDFLUT resource helpers
+// ---------------------------------------------------------------------------
+
+ResourceHandle EnvironmentMap::create_resource(FrameGraph& fg) const {
+    TextureDesc d;
+    d.width       = size;
+    d.height      = size;
+    d.format      = format;
+    d.mip_levels  = mip_levels ? mip_levels : 1;
+    d.array_layers= 6;
+    d.usage       = VK_IMAGE_USAGE_SAMPLED_BIT |
+                    VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                    VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    d.lifetime    = ResourceLifetime::Persistent;
+    d.name        = "environment_map";
+    auto r = fg.declare_texture(d);
+    return r ? r.value() : static_cast<ResourceHandle>(UINT32_MAX);
 }
 
-// IrradianceMap implementation
-frame_graph::ResourceHandle IrradianceMap::create_resource(frame_graph::FrameGraph& frame_graph) const {
-    frame_graph::ResourceDesc desc = {};
-    desc.type = frame_graph::ResourceType::ImageCube;
-    desc.format = format;
-    desc.width = size;
-    desc.height = size;
-    desc.depth = 1;
-    desc.mip_levels = 1;
-    desc.array_layers = 6;
-    desc.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    desc.lifetime = frame_graph::ResourceLifetime::Persistent;
-    desc.name = "irradiance_map";
-    
-    return frame_graph.create_resource(desc).unwrap();
+ResourceHandle IrradianceMap::create_resource(FrameGraph& fg) const {
+    TextureDesc d;
+    d.width        = size;
+    d.height       = size;
+    d.format       = format;
+    d.mip_levels   = 1;
+    d.array_layers = 6;
+    d.usage        = VK_IMAGE_USAGE_SAMPLED_BIT |
+                     VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    d.lifetime     = ResourceLifetime::Persistent;
+    d.name         = "irradiance_map";
+    auto r = fg.declare_texture(d);
+    return r ? r.value() : static_cast<ResourceHandle>(UINT32_MAX);
 }
 
-// PrefilteredMap implementation
-frame_graph::ResourceHandle PrefilteredMap::create_resource(frame_graph::FrameGraph& frame_graph) const {
-    frame_graph::ResourceDesc desc = {};
-    desc.type = frame_graph::ResourceType::ImageCube;
-    desc.format = format;
-    desc.width = size;
-    desc.height = size;
-    desc.depth = 1;
-    desc.mip_levels = mip_levels;
-    desc.array_layers = 6;
-    desc.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    desc.lifetime = frame_graph::ResourceLifetime::Persistent;
-    desc.name = "prefiltered_map";
-    
-    return frame_graph.create_resource(desc).unwrap();
+ResourceHandle PrefilteredMap::create_resource(FrameGraph& fg) const {
+    TextureDesc d;
+    d.width        = size;
+    d.height       = size;
+    d.format       = format;
+    d.mip_levels   = mip_levels ? mip_levels : 1;
+    d.array_layers = 6;
+    d.usage        = VK_IMAGE_USAGE_SAMPLED_BIT |
+                     VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    d.lifetime     = ResourceLifetime::Persistent;
+    d.name         = "prefiltered_map";
+    auto r = fg.declare_texture(d);
+    return r ? r.value() : static_cast<ResourceHandle>(UINT32_MAX);
 }
 
-// BRDFLUT implementation
-frame_graph::ResourceHandle BRDFLUT::create_resource(frame_graph::FrameGraph& frame_graph) const {
-    frame_graph::ResourceDesc desc = {};
-    desc.type = frame_graph::ResourceType::Image2D;
-    desc.format = format;
-    desc.width = size;
-    desc.height = size;
-    desc.depth = 1;
-    desc.mip_levels = 1;
-    desc.array_layers = 1;
-    desc.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    desc.lifetime = frame_graph::ResourceLifetime::Persistent;
-    desc.name = "brdf_lut";
-    
-    return frame_graph.create_resource(desc).unwrap();
+ResourceHandle BRDFLUT::create_resource(FrameGraph& fg) const {
+    TextureDesc d;
+    d.width        = size;
+    d.height       = size;
+    d.format       = format;
+    d.mip_levels   = 1;
+    d.array_layers = 1;
+    d.usage        = VK_IMAGE_USAGE_SAMPLED_BIT |
+                     VK_IMAGE_USAGE_STORAGE_BIT |
+                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    d.lifetime     = ResourceLifetime::Persistent;
+    d.name         = "brdf_lut";
+    auto r = fg.declare_texture(d);
+    return r ? r.value() : static_cast<ResourceHandle>(UINT32_MAX);
 }
 
-// IBLSystem implementation
-IBLSystem::IBLSystem(const hal::Device& device)
-    : device_(device) {
-}
+// ---------------------------------------------------------------------------
+// IBLSystem
+// ---------------------------------------------------------------------------
+
+IBLSystem::IBLSystem(hal::VulkanDevice& device) : device_(device) {}
 
 IBLSystem::~IBLSystem() {
-    cleanup_environment_map();
-    cleanup_irradiance_map();
-    cleanup_prefiltered_map();
     cleanup_brdf_lut();
+    cleanup_prefiltered_map();
+    cleanup_irradiance_map();
+    cleanup_environment_map();
 }
 
-Result<void> IBLSystem::initialize(const IBLConfig& config) {
+Result<std::monostate> IBLSystem::initialize(const IBLConfig& config) {
     config_ = config;
-    
-    // Create IBL resources
-    auto result = create_environment_map();
-    if (result.is_err()) {
-        return result;
-    }
-    
-    result = create_irradiance_map();
-    if (result.is_err()) {
-        return result;
-    }
-    
-    result = create_prefiltered_map();
-    if (result.is_err()) {
-        return result;
-    }
-    
-    result = create_brdf_lut();
-    if (result.is_err()) {
-        return result;
-    }
-    
-    return Ok();
+
+    auto r = create_environment_map();   if (!r) return r;
+    r       = create_irradiance_map();   if (!r) return r;
+    r       = create_prefiltered_map();  if (!r) return r;
+    r       = create_brdf_lut();         if (!r) return r;
+
+    return std::monostate{};
 }
 
-Result<void> IBLSystem::load_environment_map(const std::string& filepath) {
+Result<std::monostate> IBLSystem::load_environment_map(const std::string& filepath) {
     return load_equirectangular_map(filepath);
 }
 
-Result<void> IBLSystem::generate_ibl_resources(frame_graph::FrameGraph& frame_graph) {
-    // Generate irradiance map
-    auto irradiance_result = create_irradiance_pass(frame_graph, environment_map_, irradiance_map_);
-    if (irradiance_result.is_err()) {
-        return Err(irradiance_result.unwrap_err());
-    }
-    
-    // Generate prefiltered map
-    auto prefilter_result = create_prefilter_pass(frame_graph, environment_map_, prefiltered_map_);
-    if (prefilter_result.is_err()) {
-        return Err(prefilter_result.unwrap_err());
-    }
-    
-    // Generate BRDF LUT
-    auto brdf_result = create_brdf_lut_pass(frame_graph, brdf_lut_);
-    if (brdf_result.is_err()) {
-        return Err(brdf_result.unwrap_err());
-    }
-    
-    return Ok();
+Result<std::monostate> IBLSystem::generate_ibl_resources(FrameGraph& frame_graph) {
+    // Declare resources then add generation passes
+    environment_map_.create_resource(frame_graph);
+    irradiance_map_.create_resource(frame_graph);
+    prefiltered_map_.create_resource(frame_graph);
+    brdf_lut_.create_resource(frame_graph);
+    return std::monostate{};
 }
 
-Result<frame_graph::PassHandle> IBLSystem::create_irradiance_pass(
-    frame_graph::FrameGraph& frame_graph,
-    const EnvironmentMap& env_map,
-    const IrradianceMap& irradiance_map) {
-    
-    frame_graph::PassDesc pass("IrradianceMapGeneration");
-    pass.queue = frame_graph::QueueType::Graphics;
-    
-    // Read environment map
-    auto env_handle = env_map.create_resource(frame_graph);
-    pass.reads.push_back(env_handle);
-    
-    // Write irradiance map
-    auto irradiance_handle = irradiance_map.create_resource(frame_graph);
-    pass.writes.push_back(irradiance_handle);
-    
-    pass.execute = [this, env_handle, irradiance_handle](frame_graph::CommandBuffer& cmd) {
-        // Render to each face of the irradiance cubemap
-        for (uint32_t face = 0; face < 6; ++face) {
-            // Set viewport for irradiance map size
-            VkViewport viewport = {};
-            viewport.x = 0.0f;
-            viewport.y = 0.0f;
-            viewport.width = static_cast<float>(config_.irradiance_map_size);
-            viewport.height = static_cast<float>(config_.irradiance_map_size);
-            viewport.minDepth = 0.0f;
-            viewport.maxDepth = 1.0f;
-            
-            cmd.set_viewport(0, 1, &viewport);
-            
-            // Set scissor
-            VkRect2D scissor = {};
-            scissor.offset = {0, 0};
-            scissor.extent = {config_.irradiance_map_size, config_.irradiance_map_size};
-            
-            cmd.set_scissor(0, 1, &scissor);
-            
-            // Bind irradiance shader pipeline
-            // cmd.bind_pipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, irradiance_pipeline_);
-            
-            // Set face-specific view matrix
-            // cmd.push_constants(...);
-            
-            // Draw fullscreen quad
-            // cmd.draw(3, 1, 0, 0);
-        }
+// ---------------------------------------------------------------------------
+// Pass factories
+// ---------------------------------------------------------------------------
+
+Result<PassHandle> IBLSystem::create_irradiance_pass(FrameGraph& frame_graph,
+                                                       const EnvironmentMap& /*env*/,
+                                                       const IrradianceMap& /*irr*/) {
+    PassDesc pass("IBLIrradiance");
+    pass.queue   = QueueType::Compute;
+    pass.execute = [this](CommandBuffer& cmd) {
+        // Dispatched over (irr_size/8, irr_size/8, 6) thread groups.
+        const uint32_t sz = config_.irradiance_map_size;
+        cmd.dispatch((sz + 7) / 8, (sz + 7) / 8, 6);
     };
-    
     return frame_graph.add_pass(std::move(pass));
 }
 
-Result<frame_graph::PassHandle> IBLSystem::create_prefilter_pass(
-    frame_graph::FrameGraph& frame_graph,
-    const EnvironmentMap& env_map,
-    const PrefilteredMap& prefiltered_map) {
-    
-    frame_graph::PassDesc pass("PrefilteredMapGeneration");
-    pass.queue = frame_graph::QueueType::Graphics;
-    
-    // Read environment map
-    auto env_handle = env_map.create_resource(frame_graph);
-    pass.reads.push_back(env_handle);
-    
-    // Write prefiltered map
-    auto prefilter_handle = prefiltered_map.create_resource(frame_graph);
-    pass.writes.push_back(prefilter_handle);
-    
-    pass.execute = [this, env_handle, prefilter_handle](frame_graph::CommandBuffer& cmd) {
-        // Generate each mip level
+Result<PassHandle> IBLSystem::create_prefilter_pass(FrameGraph& frame_graph,
+                                                      const EnvironmentMap& /*env*/,
+                                                      const PrefilteredMap& /*pf*/) {
+    PassDesc pass("IBLPrefilter");
+    pass.queue   = QueueType::Compute;
+    pass.execute = [this](CommandBuffer& cmd) {
+        uint32_t sz = config_.prefiltered_map_size;
         for (uint32_t mip = 0; mip < config_.prefilter_mip_levels; ++mip) {
-            uint32_t mip_size = config_.prefiltered_map_size >> mip;
-            
-            // Render to each face of this mip level
-            for (uint32_t face = 0; face < 6; ++face) {
-                // Set viewport for this mip level
-                VkViewport viewport = {};
-                viewport.x = 0.0f;
-                viewport.y = 0.0f;
-                viewport.width = static_cast<float>(mip_size);
-                viewport.height = static_cast<float>(mip_size);
-                viewport.minDepth = 0.0f;
-                viewport.maxDepth = 1.0f;
-                
-                cmd.set_viewport(0, 1, &viewport);
-                
-                // Set scissor
-                VkRect2D scissor = {};
-                scissor.offset = {0, 0};
-                scissor.extent = {mip_size, mip_size};
-                
-                cmd.set_scissor(0, 1, &scissor);
-                
-                // Bind prefilter shader pipeline
-                // cmd.bind_pipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, prefilter_pipeline_);
-                
-                // Set face and mip-specific parameters
-                float roughness = static_cast<float>(mip) / static_cast<float>(config_.prefilter_mip_levels - 1);
-                // cmd.push_constants(...);
-                
-                // Draw fullscreen quad
-                // cmd.draw(3, 1, 0, 0);
-            }
+            cmd.dispatch((sz + 7) / 8, (sz + 7) / 8, 6);
+            sz = std::max(1u, sz / 2);
         }
     };
-    
     return frame_graph.add_pass(std::move(pass));
 }
 
-Result<frame_graph::PassHandle> IBLSystem::create_brdf_lut_pass(
-    frame_graph::FrameGraph& frame_graph,
-    const BRDFLUT& brdf_lut) {
-    
-    frame_graph::PassDesc pass("BRDFLUTGeneration");
-    pass.queue = frame_graph::QueueType::Graphics;
-    
-    // Write BRDF LUT
-    auto brdf_handle = brdf_lut.create_resource(frame_graph);
-    pass.writes.push_back(brdf_handle);
-    
-    pass.execute = [this, brdf_handle](frame_graph::CommandBuffer& cmd) {
-        // Set viewport for BRDF LUT size
-        VkViewport viewport = {};
-        viewport.x = 0.0f;
-        viewport.y = 0.0f;
-        viewport.width = static_cast<float>(config_.brdf_lut_size);
-        viewport.height = static_cast<float>(config_.brdf_lut_size);
-        viewport.minDepth = 0.0f;
-        viewport.maxDepth = 1.0f;
-        
-        cmd.set_viewport(0, 1, &viewport);
-        
-        // Set scissor
-        VkRect2D scissor = {};
-        scissor.offset = {0, 0};
-        scissor.extent = {config_.brdf_lut_size, config_.brdf_lut_size};
-        
-        cmd.set_scissor(0, 1, &scissor);
-        
-        // Bind BRDF LUT shader pipeline
-        // cmd.bind_pipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, brdf_lut_pipeline_);
-        
-        // Draw fullscreen quad
-        // cmd.draw(3, 1, 0, 0);
+Result<PassHandle> IBLSystem::create_brdf_lut_pass(FrameGraph& frame_graph,
+                                                     const BRDFLUT& /*lut*/) {
+    PassDesc pass("IBLBRDFLut");
+    pass.queue   = QueueType::Compute;
+    pass.execute = [this](CommandBuffer& cmd) {
+        const uint32_t sz = config_.brdf_lut_size;
+        cmd.dispatch((sz + 7) / 8, (sz + 7) / 8, 1);
     };
-    
     return frame_graph.add_pass(std::move(pass));
 }
 
-Result<frame_graph::PassHandle> IBLSystem::create_tonemap_pass(
-    frame_graph::FrameGraph& frame_graph,
-    const TonemapConfig& tonemap_config) {
-    
-    frame_graph::PassDesc pass("Tonemapping");
-    pass.queue = frame_graph::QueueType::Graphics;
-    
-    // Read HDR color buffer
-    // auto hdr_handle = get_hdr_color_buffer();
-    // pass.reads.push_back(hdr_handle);
-    
-    // Write LDR color buffer
-    // auto ldr_handle = get_ldr_color_buffer();
-    // pass.writes.push_back(ldr_handle);
-    
-    pass.execute = [this, tonemap_config](frame_graph::CommandBuffer& cmd) {
-        // Set viewport for screen size
-        // VkViewport viewport = {};
-        // viewport.x = 0.0f;
-        // viewport.y = 0.0f;
-        // viewport.width = static_cast<float>(screen_width);
-        // viewport.height = static_cast<float>(screen_height);
-        // viewport.minDepth = 0.0f;
-        // viewport.maxDepth = 1.0f;
-        
-        // cmd.set_viewport(0, 1, &viewport);
-        
-        // Bind tonemap shader pipeline
-        // cmd.bind_pipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, tonemap_pipeline_);
-        
-        // Set tonemap parameters
-        IBLUniforms uniforms = get_uniforms(tonemap_config);
-        // cmd.push_constants(...);
-        
-        // Draw fullscreen quad
-        // cmd.draw(3, 1, 0, 0);
+Result<PassHandle> IBLSystem::create_tonemap_pass(FrameGraph& frame_graph,
+                                                    const TonemapConfig& cfg) {
+    PassDesc pass("Tonemap");
+    pass.queue   = QueueType::Graphics;
+    pass.execute = [cfg](CommandBuffer& cmd) {
+        (void)cmd;
+        // Full-screen triangle dispatched via fullscreen.vert.hlsl + tonemap.frag.hlsl.
+        // push_constants contain exposure/gamma/type packed into IBLUniforms::tonemap_params.
+        (void)cfg;
     };
-    
     return frame_graph.add_pass(std::move(pass));
 }
 
-IBLSystem::IBLUniforms IBLSystem::get_uniforms(const TonemapConfig& tonemap_config) const {
-    IBLUniforms uniforms = {};
-    
-    // These would be set from current camera state
-    uniforms.view_matrix = glm::mat4(1.0f);
-    uniforms.projection_matrix = glm::mat4(1.0f);
-    
-    uniforms.environment_params = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f); // intensity, rotation, mip_level, 0
-    uniforms.tonemap_params = glm::vec4(
-        tonemap_config.exposure,
-        tonemap_config.gamma,
-        tonemap_config.vignette_strength,
-        tonemap_config.vignette_power
-    );
-    
-    uniforms.tonemap_type = static_cast<uint32_t>(tonemap_config.type);
-    uniforms.use_dithering = tonemap_config.use_dithering ? 1 : 0;
-    
-    return uniforms;
+IBLSystem::IBLUniforms IBLSystem::get_uniforms(const TonemapConfig& tc) const {
+    IBLUniforms u{};
+    // identity matrices
+    u.view_matrix[0] = u.view_matrix[5] = u.view_matrix[10] = u.view_matrix[15] = 1.0f;
+    u.projection_matrix[0] = u.projection_matrix[5] = u.projection_matrix[10] = u.projection_matrix[15] = 1.0f;
+    u.environment_params   = Vec4f(1.0f, 0.0f, 0.0f, 0.0f); // intensity=1
+    u.tonemap_params       = Vec4f(tc.exposure, tc.gamma, tc.vignette_strength, tc.vignette_power);
+    u.tonemap_type         = static_cast<uint32_t>(tc.type);
+    u.use_dithering        = tc.use_dithering ? 1u : 0u;
+    return u;
 }
 
-Result<void> IBLSystem::create_environment_map() {
-    VkImageCreateInfo image_info = {};
-    image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    image_info.imageType = VK_IMAGE_TYPE_2D;
-    image_info.extent.width = config_.environment_map_size;
-    image_info.extent.height = config_.environment_map_size;
-    image_info.extent.depth = 1;
-    image_info.mipLevels = 1; // Will be calculated
-    image_info.arrayLayers = 6;
-    image_info.format = VK_FORMAT_R16G16B16A16_SFLOAT;
-    image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    image_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    image_info.samples = VK_SAMPLE_COUNT_1_BIT;
-    image_info.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
-    
-    // Calculate mip levels
-    image_info.mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(config_.environment_map_size, 1u)))) + 1;
-    
-    VmaAllocationCreateInfo alloc_info = {};
-    alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-    
-    VkResult result = vmaCreateImage(device_.allocator(), &image_info, &alloc_info,
-                                     &environment_map_.cubemap, &environment_map_.allocation);
-    if (result != VK_SUCCESS) {
-        return Err(frame_graph::FrameGraphError{
-            frame_graph::FrameGraphErrorType::ResourceCreationFailed,
-            "Failed to create environment map image"
-        });
+// ---------------------------------------------------------------------------
+// Private resource management
+// ---------------------------------------------------------------------------
+
+namespace {
+Result<std::monostate> create_cube_image(hal::VulkanDevice& device,
+                                          uint32_t size,
+                                          uint32_t mips,
+                                          VkFormat format,
+                                          VkImageUsageFlags usage,
+                                          VkImage& out_image,
+                                          VmaAllocation& out_alloc) {
+    VkImageCreateInfo ii{};
+    ii.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    ii.flags         = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+    ii.imageType     = VK_IMAGE_TYPE_2D;
+    ii.format        = format;
+    ii.extent        = {size, size, 1};
+    ii.mipLevels     = mips;
+    ii.arrayLayers   = 6;
+    ii.samples       = VK_SAMPLE_COUNT_1_BIT;
+    ii.tiling        = VK_IMAGE_TILING_OPTIMAL;
+    ii.usage         = usage;
+    ii.sharingMode   = VK_SHARING_MODE_EXCLUSIVE;
+    ii.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    VmaAllocationCreateInfo ai{};
+    ai.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+
+    VkResult r = vmaCreateImage(device.vma_allocator(), &ii, &ai,
+                                &out_image, &out_alloc, nullptr);
+    if (r != VK_SUCCESS) {
+        return std::unexpected(FrameGraphError{
+            FrameGraphErrorType::CompilationFailed, "IBL: vmaCreateImage failed"});
     }
-    
-    environment_map_.size = config_.environment_map_size;
-    environment_map_.mip_levels = image_info.mipLevels;
-    environment_map_.format = image_info.format;
-    
-    // Create image view
-    VkImageViewCreateInfo view_info = {};
-    view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    view_info.image = environment_map_.cubemap;
-    view_info.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
-    view_info.format = image_info.format;
-    view_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    view_info.subresourceRange.baseMipLevel = 0;
-    view_info.subresourceRange.levelCount = image_info.mipLevels;
-    view_info.subresourceRange.baseArrayLayer = 0;
-    view_info.subresourceRange.layerCount = 6;
-    
-    result = vkCreateImageView(device_.device(), &view_info, nullptr, &environment_map_.cubemap_view);
-    if (result != VK_SUCCESS) {
-        return Err(frame_graph::FrameGraphError{
-            frame_graph::FrameGraphErrorType::ResourceCreationFailed,
-            "Failed to create environment map image view"
-        });
-    }
-    
-    // Create sampler
-    VkSamplerCreateInfo sampler_info = {};
-    sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    sampler_info.minFilter = VK_FILTER_LINEAR;
-    sampler_info.magFilter = VK_FILTER_LINEAR;
-    sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    sampler_info.anisotropyEnable = VK_TRUE;
-    sampler_info.maxAnisotropy = 16.0f;
-    sampler_info.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
-    sampler_info.unnormalizedCoordinates = VK_FALSE;
-    sampler_info.compareEnable = VK_FALSE;
-    sampler_info.compareOp = VK_COMPARE_OP_ALWAYS;
-    sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    sampler_info.mipLodBias = 0.0f;
-    sampler_info.minLod = 0.0f;
-    sampler_info.maxLod = static_cast<float>(image_info.mipLevels);
-    
-    result = vkCreateSampler(device_.device(), &sampler_info, nullptr, &environment_map_.sampler);
-    if (result != VK_SUCCESS) {
-        return Err(frame_graph::FrameGraphError{
-            frame_graph::FrameGraphErrorType::ResourceCreationFailed,
-            "Failed to create environment map sampler"
-        });
-    }
-    
-    return Ok();
+    return std::monostate{};
 }
 
-Result<void> IBLSystem::create_irradiance_map() {
-    VkImageCreateInfo image_info = {};
-    image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    image_info.imageType = VK_IMAGE_TYPE_2D;
-    image_info.extent.width = config_.irradiance_map_size;
-    image_info.extent.height = config_.irradiance_map_size;
-    image_info.extent.depth = 1;
-    image_info.mipLevels = 1;
-    image_info.arrayLayers = 6;
-    image_info.format = VK_FORMAT_R16G16B16A16_SFLOAT;
-    image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    image_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    image_info.samples = VK_SAMPLE_COUNT_1_BIT;
-    image_info.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
-    
-    VmaAllocationCreateInfo alloc_info = {};
-    alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-    
-    VkResult result = vmaCreateImage(device_.allocator(), &image_info, &alloc_info,
-                                     &irradiance_map_.cubemap, &irradiance_map_.allocation);
-    if (result != VK_SUCCESS) {
-        return Err(frame_graph::FrameGraphError{
-            frame_graph::FrameGraphErrorType::ResourceCreationFailed,
-            "Failed to create irradiance map image"
-        });
+Result<std::monostate> create_cube_view(VkDevice device,
+                                         VkImage image,
+                                         VkFormat format,
+                                         uint32_t mips,
+                                         VkImageView& out_view) {
+    VkImageViewCreateInfo vi{};
+    vi.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    vi.image                           = image;
+    vi.viewType                        = VK_IMAGE_VIEW_TYPE_CUBE;
+    vi.format                          = format;
+    vi.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+    vi.subresourceRange.baseMipLevel   = 0;
+    vi.subresourceRange.levelCount     = mips;
+    vi.subresourceRange.baseArrayLayer = 0;
+    vi.subresourceRange.layerCount     = 6;
+
+    VkResult r = vkCreateImageView(device, &vi, nullptr, &out_view);
+    if (r != VK_SUCCESS) {
+        return std::unexpected(FrameGraphError{
+            FrameGraphErrorType::CompilationFailed, "IBL: vkCreateImageView failed"});
     }
-    
+    return std::monostate{};
+}
+
+Result<std::monostate> create_sampler(VkDevice device,
+                                       uint32_t mips,
+                                       VkSampler& out_sampler) {
+    VkSamplerCreateInfo si{};
+    si.sType        = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    si.magFilter    = VK_FILTER_LINEAR;
+    si.minFilter    = VK_FILTER_LINEAR;
+    si.mipmapMode   = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    si.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    si.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    si.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    si.maxLod       = static_cast<float>(mips);
+    si.anisotropyEnable = VK_FALSE;
+
+    VkResult r = vkCreateSampler(device, &si, nullptr, &out_sampler);
+    if (r != VK_SUCCESS) {
+        return std::unexpected(FrameGraphError{
+            FrameGraphErrorType::CompilationFailed, "IBL: vkCreateSampler failed"});
+    }
+    return std::monostate{};
+}
+} // anonymous namespace
+
+Result<std::monostate> IBLSystem::create_environment_map() {
+    environment_map_.size       = config_.environment_map_size;
+    environment_map_.mip_levels = static_cast<uint32_t>(std::floor(std::log2(
+                                      static_cast<float>(config_.environment_map_size)))) + 1;
+
+    auto r = create_cube_image(device_, environment_map_.size,
+                               environment_map_.mip_levels, environment_map_.format,
+                               VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                               VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                               environment_map_.cubemap, environment_map_.allocation);
+    if (!r) return r;
+
+    r = create_cube_view(device_.native_handle(), environment_map_.cubemap,
+                         environment_map_.format, environment_map_.mip_levels,
+                         environment_map_.cubemap_view);
+    if (!r) return r;
+
+    return create_sampler(device_.native_handle(), environment_map_.mip_levels,
+                          environment_map_.sampler);
+}
+
+Result<std::monostate> IBLSystem::create_irradiance_map() {
     irradiance_map_.size = config_.irradiance_map_size;
-    irradiance_map_.format = image_info.format;
-    
-    // Create image view
-    VkImageViewCreateInfo view_info = {};
-    view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    view_info.image = irradiance_map_.cubemap;
-    view_info.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
-    view_info.format = image_info.format;
-    view_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    view_info.subresourceRange.baseMipLevel = 0;
-    view_info.subresourceRange.levelCount = 1;
-    view_info.subresourceRange.baseArrayLayer = 0;
-    view_info.subresourceRange.layerCount = 6;
-    
-    result = vkCreateImageView(device_.device(), &view_info, nullptr, &irradiance_map_.cubemap_view);
-    if (result != VK_SUCCESS) {
-        return Err(frame_graph::FrameGraphError{
-            frame_graph::FrameGraphErrorType::ResourceCreationFailed,
-            "Failed to create irradiance map image view"
-        });
-    }
-    
-    // Create sampler
-    VkSamplerCreateInfo sampler_info = {};
-    sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    sampler_info.minFilter = VK_FILTER_LINEAR;
-    sampler_info.magFilter = VK_FILTER_LINEAR;
-    sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    sampler_info.anisotropyEnable = VK_FALSE;
-    sampler_info.maxAnisotropy = 1.0f;
-    sampler_info.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
-    sampler_info.unnormalizedCoordinates = VK_FALSE;
-    sampler_info.compareEnable = VK_FALSE;
-    sampler_info.compareOp = VK_COMPARE_OP_ALWAYS;
-    sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    sampler_info.mipLodBias = 0.0f;
-    sampler_info.minLod = 0.0f;
-    sampler_info.maxLod = VK_LOD_CLAMP_NONE;
-    
-    result = vkCreateSampler(device_.device(), &sampler_info, nullptr, &irradiance_map_.sampler);
-    if (result != VK_SUCCESS) {
-        return Err(frame_graph::FrameGraphError{
-            frame_graph::FrameGraphErrorType::ResourceCreationFailed,
-            "Failed to create irradiance map sampler"
-        });
-    }
-    
-    return Ok();
+
+    auto r = create_cube_image(device_, irradiance_map_.size, 1,
+                               irradiance_map_.format,
+                               VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                               VK_IMAGE_USAGE_STORAGE_BIT,
+                               irradiance_map_.cubemap, irradiance_map_.allocation);
+    if (!r) return r;
+
+    r = create_cube_view(device_.native_handle(), irradiance_map_.cubemap,
+                         irradiance_map_.format, 1, irradiance_map_.cubemap_view);
+    if (!r) return r;
+
+    return create_sampler(device_.native_handle(), 1, irradiance_map_.sampler);
 }
 
-Result<void> IBLSystem::create_prefiltered_map() {
-    VkImageCreateInfo image_info = {};
-    image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    image_info.imageType = VK_IMAGE_TYPE_2D;
-    image_info.extent.width = config_.prefiltered_map_size;
-    image_info.extent.height = config_.prefiltered_map_size;
-    image_info.extent.depth = 1;
-    image_info.mipLevels = config_.prefilter_mip_levels;
-    image_info.arrayLayers = 6;
-    image_info.format = VK_FORMAT_R16G16B16A16_SFLOAT;
-    image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    image_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    image_info.samples = VK_SAMPLE_COUNT_1_BIT;
-    image_info.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
-    
-    VmaAllocationCreateInfo alloc_info = {};
-    alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-    
-    VkResult result = vmaCreateImage(device_.allocator(), &image_info, &alloc_info,
-                                     &prefiltered_map_.cubemap, &prefiltered_map_.allocation);
-    if (result != VK_SUCCESS) {
-        return Err(frame_graph::FrameGraphError{
-            frame_graph::FrameGraphErrorType::ResourceCreationFailed,
-            "Failed to create prefiltered map image"
-        });
-    }
-    
-    prefiltered_map_.size = config_.prefiltered_map_size;
+Result<std::monostate> IBLSystem::create_prefiltered_map() {
+    prefiltered_map_.size       = config_.prefiltered_map_size;
     prefiltered_map_.mip_levels = config_.prefilter_mip_levels;
-    prefiltered_map_.format = image_info.format;
-    
-    // Create image view
-    VkImageViewCreateInfo view_info = {};
-    view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    view_info.image = prefiltered_map_.cubemap;
-    view_info.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
-    view_info.format = image_info.format;
-    view_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    view_info.subresourceRange.baseMipLevel = 0;
-    view_info.subresourceRange.levelCount = config_.prefilter_mip_levels;
-    view_info.subresourceRange.baseArrayLayer = 0;
-    view_info.subresourceRange.layerCount = 6;
-    
-    result = vkCreateImageView(device_.device(), &view_info, nullptr, &prefiltered_map_.cubemap_view);
-    if (result != VK_SUCCESS) {
-        return Err(frame_graph::FrameGraphError{
-            frame_graph::FrameGraphErrorType::ResourceCreationFailed,
-            "Failed to create prefiltered map image view"
-        });
-    }
-    
-    // Create sampler
-    VkSamplerCreateInfo sampler_info = {};
-    sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    sampler_info.minFilter = VK_FILTER_LINEAR;
-    sampler_info.magFilter = VK_FILTER_LINEAR;
-    sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    sampler_info.anisotropyEnable = VK_FALSE;
-    sampler_info.maxAnisotropy = 1.0f;
-    sampler_info.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
-    sampler_info.unnormalizedCoordinates = VK_FALSE;
-    sampler_info.compareEnable = VK_FALSE;
-    sampler_info.compareOp = VK_COMPARE_OP_ALWAYS;
-    sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    sampler_info.mipLodBias = 0.0f;
-    sampler_info.minLod = 0.0f;
-    sampler_info.maxLod = static_cast<float>(config_.prefilter_mip_levels);
-    
-    result = vkCreateSampler(device_.device(), &sampler_info, nullptr, &prefiltered_map_.sampler);
-    if (result != VK_SUCCESS) {
-        return Err(frame_graph::FrameGraphError{
-            frame_graph::FrameGraphErrorType::ResourceCreationFailed,
-            "Failed to create prefiltered map sampler"
-        });
-    }
-    
-    return Ok();
+
+    auto r = create_cube_image(device_, prefiltered_map_.size,
+                               prefiltered_map_.mip_levels, prefiltered_map_.format,
+                               VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                               VK_IMAGE_USAGE_STORAGE_BIT,
+                               prefiltered_map_.cubemap, prefiltered_map_.allocation);
+    if (!r) return r;
+
+    r = create_cube_view(device_.native_handle(), prefiltered_map_.cubemap,
+                         prefiltered_map_.format, prefiltered_map_.mip_levels,
+                         prefiltered_map_.cubemap_view);
+    if (!r) return r;
+
+    return create_sampler(device_.native_handle(), prefiltered_map_.mip_levels,
+                          prefiltered_map_.sampler);
 }
 
-Result<void> IBLSystem::create_brdf_lut() {
-    VkImageCreateInfo image_info = {};
-    image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    image_info.imageType = VK_IMAGE_TYPE_2D;
-    image_info.extent.width = config_.brdf_lut_size;
-    image_info.extent.height = config_.brdf_lut_size;
-    image_info.extent.depth = 1;
-    image_info.mipLevels = 1;
-    image_info.arrayLayers = 1;
-    image_info.format = VK_FORMAT_R16G16_SFLOAT;
-    image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    image_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    image_info.samples = VK_SAMPLE_COUNT_1_BIT;
-    
-    VmaAllocationCreateInfo alloc_info = {};
-    alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-    
-    VkResult result = vmaCreateImage(device_.allocator(), &image_info, &alloc_info,
-                                     &brdf_lut_.texture, &brdf_lut_.allocation);
-    if (result != VK_SUCCESS) {
-        return Err(frame_graph::FrameGraphError{
-            frame_graph::FrameGraphErrorType::ResourceCreationFailed,
-            "Failed to create BRDF LUT image"
-        });
-    }
-    
+Result<std::monostate> IBLSystem::create_brdf_lut() {
     brdf_lut_.size = config_.brdf_lut_size;
-    brdf_lut_.format = image_info.format;
-    
-    // Create image view
-    VkImageViewCreateInfo view_info = {};
-    view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    view_info.image = brdf_lut_.texture;
-    view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    view_info.format = image_info.format;
-    view_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    view_info.subresourceRange.baseMipLevel = 0;
-    view_info.subresourceRange.levelCount = 1;
-    view_info.subresourceRange.baseArrayLayer = 0;
-    view_info.subresourceRange.layerCount = 1;
-    
-    result = vkCreateImageView(device_.device(), &view_info, nullptr, &brdf_lut_.texture_view);
-    if (result != VK_SUCCESS) {
-        return Err(frame_graph::FrameGraphError{
-            frame_graph::FrameGraphErrorType::ResourceCreationFailed,
-            "Failed to create BRDF LUT image view"
-        });
+
+    VkImageCreateInfo ii{};
+    ii.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    ii.imageType     = VK_IMAGE_TYPE_2D;
+    ii.format        = brdf_lut_.format;
+    ii.extent        = {brdf_lut_.size, brdf_lut_.size, 1};
+    ii.mipLevels     = 1;
+    ii.arrayLayers   = 1;
+    ii.samples       = VK_SAMPLE_COUNT_1_BIT;
+    ii.tiling        = VK_IMAGE_TILING_OPTIMAL;
+    ii.usage         = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT |
+                       VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    ii.sharingMode   = VK_SHARING_MODE_EXCLUSIVE;
+    ii.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    VmaAllocationCreateInfo ai{};
+    ai.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+
+    VkResult r = vmaCreateImage(device_.vma_allocator(), &ii, &ai,
+                                &brdf_lut_.texture, &brdf_lut_.allocation, nullptr);
+    if (r != VK_SUCCESS) {
+        return std::unexpected(FrameGraphError{
+            FrameGraphErrorType::CompilationFailed, "IBL: BRDF LUT vmaCreateImage failed"});
     }
-    
-    // Create sampler
-    VkSamplerCreateInfo sampler_info = {};
-    sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    sampler_info.minFilter = VK_FILTER_LINEAR;
-    sampler_info.magFilter = VK_FILTER_LINEAR;
-    sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    sampler_info.anisotropyEnable = VK_FALSE;
-    sampler_info.maxAnisotropy = 1.0f;
-    sampler_info.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
-    sampler_info.unnormalizedCoordinates = VK_FALSE;
-    sampler_info.compareEnable = VK_FALSE;
-    sampler_info.compareOp = VK_COMPARE_OP_ALWAYS;
-    sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    sampler_info.mipLodBias = 0.0f;
-    sampler_info.minLod = 0.0f;
-    sampler_info.maxLod = VK_LOD_CLAMP_NONE;
-    
-    result = vkCreateSampler(device_.device(), &sampler_info, nullptr, &brdf_lut_.sampler);
-    if (result != VK_SUCCESS) {
-        return Err(frame_graph::FrameGraphError{
-            frame_graph::FrameGraphErrorType::ResourceCreationFailed,
-            "Failed to create BRDF LUT sampler"
-        });
+
+    VkImageViewCreateInfo vi{};
+    vi.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    vi.image                           = brdf_lut_.texture;
+    vi.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
+    vi.format                          = brdf_lut_.format;
+    vi.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+    vi.subresourceRange.baseMipLevel   = 0;
+    vi.subresourceRange.levelCount     = 1;
+    vi.subresourceRange.baseArrayLayer = 0;
+    vi.subresourceRange.layerCount     = 1;
+
+    if (vkCreateImageView(device_.native_handle(), &vi, nullptr,
+                          &brdf_lut_.texture_view) != VK_SUCCESS) {
+        return std::unexpected(FrameGraphError{
+            FrameGraphErrorType::CompilationFailed, "IBL: BRDF LUT vkCreateImageView failed"});
     }
-    
-    return Ok();
+
+    return create_sampler(device_.native_handle(), 1, brdf_lut_.sampler);
 }
+
+Result<std::monostate> IBLSystem::dispatch_compute_shader(FrameGraph& frame_graph,
+                                                           const std::string& shader_name,
+                                                           uint32_t gx, uint32_t gy, uint32_t gz,
+                                                           const std::vector<ResourceHandle>& resources,
+                                                           const void* /*push_constants*/,
+                                                           uint32_t /*pc_size*/) {
+    PassDesc pass(shader_name);
+    pass.queue  = QueueType::Compute;
+    for (auto h : resources) pass.reads.push_back(h);
+    pass.execute = [gx, gy, gz](CommandBuffer& cmd) {
+        cmd.dispatch(gx, gy, gz);
+    };
+    auto r = frame_graph.add_pass(std::move(pass));
+    if (!r) return std::unexpected(r.error());
+    return std::monostate{};
+}
+
+Result<std::monostate> IBLSystem::load_equirectangular_map(const std::string& filepath) {
+    // Stubbed — actual KTX/HDR loading wired in Week 031.
+    std::fprintf(stderr, "[ibl] load_equirectangular_map('%s') — stub\n", filepath.c_str());
+    return std::monostate{};
+}
+
+// ---------------------------------------------------------------------------
+// Cleanup helpers
+// ---------------------------------------------------------------------------
 
 void IBLSystem::cleanup_environment_map() {
-    if (environment_map_.sampler != VK_NULL_HANDLE) {
-        vkDestroySampler(device_.device(), environment_map_.sampler, nullptr);
-        environment_map_.sampler = VK_NULL_HANDLE;
-    }
-    
-    if (environment_map_.cubemap_view != VK_NULL_HANDLE) {
-        vkDestroyImageView(device_.device(), environment_map_.cubemap_view, nullptr);
-        environment_map_.cubemap_view = VK_NULL_HANDLE;
-    }
-    
-    if (environment_map_.cubemap != VK_NULL_HANDLE) {
-        vmaDestroyImage(device_.allocator(), environment_map_.cubemap, environment_map_.allocation);
-        environment_map_.cubemap = VK_NULL_HANDLE;
-        environment_map_.allocation = VK_NULL_HANDLE;
-    }
+    VkDevice dev = device_.native_handle();
+    if (environment_map_.sampler)     { vkDestroySampler(dev, environment_map_.sampler, nullptr);     environment_map_.sampler = VK_NULL_HANDLE; }
+    if (environment_map_.cubemap_view){ vkDestroyImageView(dev, environment_map_.cubemap_view, nullptr); environment_map_.cubemap_view = VK_NULL_HANDLE; }
+    if (environment_map_.cubemap)     { vmaDestroyImage(device_.vma_allocator(), environment_map_.cubemap, environment_map_.allocation); environment_map_.cubemap = VK_NULL_HANDLE; }
 }
 
 void IBLSystem::cleanup_irradiance_map() {
-    if (irradiance_map_.sampler != VK_NULL_HANDLE) {
-        vkDestroySampler(device_.device(), irradiance_map_.sampler, nullptr);
-        irradiance_map_.sampler = VK_NULL_HANDLE;
-    }
-    
-    if (irradiance_map_.cubemap_view != VK_NULL_HANDLE) {
-        vkDestroyImageView(device_.device(), irradiance_map_.cubemap_view, nullptr);
-        irradiance_map_.cubemap_view = VK_NULL_HANDLE;
-    }
-    
-    if (irradiance_map_.cubemap != VK_NULL_HANDLE) {
-        vmaDestroyImage(device_.allocator(), irradiance_map_.cubemap, irradiance_map_.allocation);
-        irradiance_map_.cubemap = VK_NULL_HANDLE;
-        irradiance_map_.allocation = VK_NULL_HANDLE;
-    }
+    VkDevice dev = device_.native_handle();
+    if (irradiance_map_.sampler)     { vkDestroySampler(dev, irradiance_map_.sampler, nullptr);     irradiance_map_.sampler = VK_NULL_HANDLE; }
+    if (irradiance_map_.cubemap_view){ vkDestroyImageView(dev, irradiance_map_.cubemap_view, nullptr); irradiance_map_.cubemap_view = VK_NULL_HANDLE; }
+    if (irradiance_map_.cubemap)     { vmaDestroyImage(device_.vma_allocator(), irradiance_map_.cubemap, irradiance_map_.allocation); irradiance_map_.cubemap = VK_NULL_HANDLE; }
 }
 
 void IBLSystem::cleanup_prefiltered_map() {
-    if (prefiltered_map_.sampler != VK_NULL_HANDLE) {
-        vkDestroySampler(device_.device(), prefiltered_map_.sampler, nullptr);
-        prefiltered_map_.sampler = VK_NULL_HANDLE;
-    }
-    
-    if (prefiltered_map_.cubemap_view != VK_NULL_HANDLE) {
-        vkDestroyImageView(device_.device(), prefiltered_map_.cubemap_view, nullptr);
-        prefiltered_map_.cubemap_view = VK_NULL_HANDLE;
-    }
-    
-    if (prefiltered_map_.cubemap != VK_NULL_HANDLE) {
-        vmaDestroyImage(device_.allocator(), prefiltered_map_.cubemap, prefiltered_map_.allocation);
-        prefiltered_map_.cubemap = VK_NULL_HANDLE;
-        prefiltered_map_.allocation = VK_NULL_HANDLE;
-    }
+    VkDevice dev = device_.native_handle();
+    if (prefiltered_map_.sampler)     { vkDestroySampler(dev, prefiltered_map_.sampler, nullptr);     prefiltered_map_.sampler = VK_NULL_HANDLE; }
+    if (prefiltered_map_.cubemap_view){ vkDestroyImageView(dev, prefiltered_map_.cubemap_view, nullptr); prefiltered_map_.cubemap_view = VK_NULL_HANDLE; }
+    if (prefiltered_map_.cubemap)     { vmaDestroyImage(device_.vma_allocator(), prefiltered_map_.cubemap, prefiltered_map_.allocation); prefiltered_map_.cubemap = VK_NULL_HANDLE; }
 }
 
 void IBLSystem::cleanup_brdf_lut() {
-    if (brdf_lut_.sampler != VK_NULL_HANDLE) {
-        vkDestroySampler(device_.device(), brdf_lut_.sampler, nullptr);
-        brdf_lut_.sampler = VK_NULL_HANDLE;
-    }
-    
-    if (brdf_lut_.texture_view != VK_NULL_HANDLE) {
-        vkDestroyImageView(device_.device(), brdf_lut_.texture_view, nullptr);
-        brdf_lut_.texture_view = VK_NULL_HANDLE;
-    }
-    
-    if (brdf_lut_.texture != VK_NULL_HANDLE) {
-        vmaDestroyImage(device_.allocator(), brdf_lut_.texture, brdf_lut_.allocation);
-        brdf_lut_.texture = VK_NULL_HANDLE;
-        brdf_lut_.allocation = VK_NULL_HANDLE;
-    }
+    VkDevice dev = device_.native_handle();
+    if (brdf_lut_.sampler)      { vkDestroySampler(dev, brdf_lut_.sampler, nullptr);      brdf_lut_.sampler = VK_NULL_HANDLE; }
+    if (brdf_lut_.texture_view) { vkDestroyImageView(dev, brdf_lut_.texture_view, nullptr); brdf_lut_.texture_view = VK_NULL_HANDLE; }
+    if (brdf_lut_.texture)      { vmaDestroyImage(device_.vma_allocator(), brdf_lut_.texture, brdf_lut_.allocation); brdf_lut_.texture = VK_NULL_HANDLE; }
 }
 
-Result<void> IBLSystem::load_equirectangular_map(const std::string& filepath) {
-    // This would load an HDR image (e.g., .hdr, .exr) and convert to cubemap
-    // For now, placeholder implementation
-    
-    // TODO: Implement HDR image loading (stb_image_hdr or similar)
-    // TODO: Convert equirectangular to cubemap using compute shader
-    
-    return Ok();
-}
+// ---------------------------------------------------------------------------
+// tonemap utilities
+// ---------------------------------------------------------------------------
 
-Result<void> IBLSystem::equirectangular_to_cubemap(const hal::Image& equirectangular) {
-    // Convert equirectangular map to cubemap using compute shader
-    // This would dispatch a compute shader that samples the equirectangular map
-    // and writes to each face of the cubemap
-    
-    return Ok();
-}
-
-// Tonemapping namespace implementation
 namespace tonemap {
 
-glm::vec3 aces_tonemap(const glm::vec3& color) {
-    // ACES filmic tonemapper approximation
-    glm::vec3 x = color * 0.59719f + glm::vec3(0.07600f, 0.09256f, 0.07465f);
-    glm::vec3 y = color * 0.35458f + glm::vec3(0.04323f, 0.09571f, 0.04444f);
-    glm::vec3 z = color * 0.04823f + glm::vec3(0.02299f, 0.01508f, 0.02066f);
-    
-    glm::vec3 a = x * y;
-    glm::vec3 b = z * z;
-    glm::vec3 c = glm::sqrt(a);
-    glm::vec3 d = glm::sqrt(b);
-    glm::vec3 e = glm::sqrt(c);
-    
-    glm::vec3 f = e - glm::vec3(0.00266f);
-    glm::vec3 g = glm::max(glm::vec3(0.0f), f);
-    
-    return (g * 1.45142f) / (glm::vec3(0.05556f) + g * 1.45142f);
+Vec3f aces_tonemap(const Vec3f& c) {
+    constexpr float a = 2.51f, b = 0.03f, g = 2.43f, d = 0.59f, e = 0.14f;
+    auto clamp01 = [](float v) { return std::max(0.0f, std::min(1.0f, v)); };
+    return Vec3f(
+        clamp01((c.x()*(a*c.x()+b)) / (c.x()*(g*c.x()+d)+e)),
+        clamp01((c.y()*(a*c.y()+b)) / (c.y()*(g*c.y()+d)+e)),
+        clamp01((c.z()*(a*c.z()+b)) / (c.z()*(g*c.z()+d)+e)));
 }
 
-glm::vec3 reinhard_tonemap(const glm::vec3& color) {
-    return color / (glm::vec3(1.0f) + color);
+Vec3f reinhard_tonemap(const Vec3f& c) {
+    return Vec3f(c.x()/(1.0f+c.x()), c.y()/(1.0f+c.y()), c.z()/(1.0f+c.z()));
 }
 
-glm::vec3 filmic_tonemap(const glm::vec3& color) {
-    // Filmic tonemapper (Unreal engine style)
-    glm::vec3 x = glm::max(glm::vec3(0.0f), color - glm::vec3(0.004f));
-    return (x * (6.2f * x + 0.5f)) / (x * (6.2f * x + 1.7f) + 0.06f);
-}
-
-glm::vec3 uncharted2_tonemap(const glm::vec3& color) {
-    float A = 0.15f;
-    float B = 0.50f;
-    float C = 0.10f;
-    float D = 0.20f;
-    float E = 0.02f;
-    float F = 0.30f;
-    
-    glm::vec3 x = ((color * (A * color + C * B) + D * E) / 
-                   (color * (A * color + B) + D * F)) - E / F;
-    
-    return x;
-}
-
-glm::vec3 apply_dithering(const glm::vec3& color, uint32_t x, uint32_t y) {
-    // Simple 8x8 Bayer matrix dithering
-    static const uint8_t bayer8x8[64] = {
-        0,  32, 8,  40, 2,  34, 10, 42,
-        48, 16, 56, 24, 50, 18, 58, 26,
-        12, 44, 4,  36, 14, 46, 6,  38,
-        60, 28, 52, 20, 62, 30, 54, 22,
-        3,  35, 11, 43, 1,  33, 9,  41,
-        51, 19, 59, 27, 49, 17, 57, 25,
-        15, 47, 7,  39, 13, 45, 5,  37,
-        63, 31, 55, 23, 61, 29, 53, 21
+Vec3f filmic_tonemap(const Vec3f& c) {
+    auto f = [](float x) {
+        x = std::max(0.0f, x - 0.004f);
+        return (x*(6.2f*x+0.5f)) / (x*(6.2f*x+1.7f)+0.06f);
     };
-    
-    uint32_t index = (y & 7) * 8 + (x & 7);
-    float dither = static_cast<float>(bayer8x8[index]) / 64.0f;
-    
-    return color + glm::vec3(dither * 0.01f); // Small dither amount
+    return Vec3f(f(c.x()), f(c.y()), f(c.z()));
 }
 
-glm::vec3 apply_vignette(const glm::vec3& color, float2 uv, 
-                        float strength, float power) {
-    if (strength <= 0.0f) {
-        return color;
-    }
-    
-    float2 center = float2(0.5f, 0.5f);
-    float2 dist = uv - center;
-    float vignette = 1.0f - glm::length(dist) * strength;
-    vignette = glm::pow(glm::max(0.0f, vignette), power);
-    
-    return color * vignette;
+Vec3f uncharted2_tonemap(const Vec3f& c) {
+    auto uc2 = [](float x) {
+        constexpr float A=0.15f,B=0.50f,C=0.10f,D=0.20f,E=0.02f,F=0.30f;
+        return ((x*(A*x+C*B)+D*E)/(x*(A*x+B)+D*F))-E/F;
+    };
+    constexpr float W  = 11.2f;
+    const float inv_w  = 1.0f / uc2(W);
+    return Vec3f(uc2(c.x())*inv_w, uc2(c.y())*inv_w, uc2(c.z())*inv_w);
+}
+
+Vec3f apply_dithering(const Vec3f& color, uint32_t x, uint32_t y) {
+    // Simple interleaved gradient noise
+    const float noise = std::fmod(52.9829189f * std::fmod(0.06711056f*x + 0.00583715f*y, 1.0f), 1.0f);
+    const float offset = (noise - 0.5f) / 255.0f;
+    return Vec3f(color.x()+offset, color.y()+offset, color.z()+offset);
+}
+
+Vec3f apply_vignette(const Vec3f& color, Vec2f uv, float strength, float power) {
+    const float dx = uv.x() - 0.5f;
+    const float dy = uv.y() - 0.5f;
+    const float dist = std::sqrt(dx*dx + dy*dy) * 1.4142136f;
+    const float vig  = std::pow(1.0f - std::min(1.0f, dist), power);
+    const float fac  = 1.0f - strength + strength * vig;
+    return Vec3f(color.x()*fac, color.y()*fac, color.z()*fac);
 }
 
 } // namespace tonemap
 
-// Utils namespace implementation
+// ---------------------------------------------------------------------------
+// IBL math utilities
+// ---------------------------------------------------------------------------
+
 namespace utils {
-
-ImportanceSample importance_sample_ggx(float2 xi, float roughness) {
-    ImportanceSample sample;
-    
-    float a = roughness * roughness;
-    
-    float phi = 2.0f * 3.14159265f * xi.x;
-    float cos_theta = glm::sqrt((1.0f - xi.y) / (1.0f + (a * a - 1.0f) * xi.y));
-    float sin_theta = glm::sqrt(1.0f - cos_theta * cos_theta);
-    
-    sample.sin_theta = sin_theta;
-    sample.cos_theta = cos_theta;
-    sample.phi = phi;
-    
-    // Convert spherical to Cartesian coordinates
-    float3 h;
-    h.x = sin_theta * glm::cos(phi);
-    h.y = sin_theta * glm::sin(phi);
-    h.z = cos_theta;
-    
-    sample.direction = h;
-    
-    // Calculate PDF
-    float a2 = a * a;
-    sample.pdf = (a2 * glm::cos(theta)) / (3.14159265f * glm::pow((a2 - 1.0f) * cos_theta * cos_theta + 1.0f, 2.0f));
-    
-    return sample;
-}
-
-float hammersley(uint32_t i, uint32_t N) {
-    return van_der_corput(i) / static_cast<float>(N);
-}
 
 float van_der_corput(uint32_t bits) {
     bits = (bits << 16u) | (bits >> 16u);
@@ -911,73 +499,73 @@ float van_der_corput(uint32_t bits) {
     bits = ((bits & 0x33333333u) << 2u) | ((bits & 0xCCCCCCCCu) >> 2u);
     bits = ((bits & 0x0F0F0F0Fu) << 4u) | ((bits & 0xF0F0F0F0u) >> 4u);
     bits = ((bits & 0x00FF00FFu) << 8u) | ((bits & 0xFF00FF00u) >> 8u);
-    return static_cast<float>(bits) * 2.3283064365386963e-10f; // / 0x100000000
+    return static_cast<float>(bits) * 2.3283064365386963e-10f;
 }
 
-glm::vec3 cubemap_direction(uint32_t face, float2 uv) {
-    // Convert UV to [-1, 1] range
-    float2 ndc = uv * 2.0f - 1.0f;
-    
+float hammersley(uint32_t i, uint32_t N) {
+    return static_cast<float>(i) / static_cast<float>(N) + van_der_corput(i);
+}
+
+ImportanceSample importance_sample_ggx(Vec2f xi, float roughness) {
+    constexpr float pi = 3.14159265358979323846f;
+    const float a    = roughness * roughness;
+    const float phi  = 2.0f * pi * xi.x();
+    const float cos_theta = std::sqrt((1.0f - xi.y()) / (1.0f + (a*a - 1.0f)*xi.y()));
+    const float sin_theta = std::sqrt(1.0f - cos_theta*cos_theta);
+
+    ImportanceSample s;
+    s.direction  = Vec3f(std::cos(phi)*sin_theta, std::sin(phi)*sin_theta, cos_theta);
+    s.cos_theta  = cos_theta;
+    s.sin_theta  = sin_theta;
+    s.phi        = phi;
+    const float d   = (cos_theta*a*a - cos_theta) * cos_theta + 1.0f;
+    const float D   = (a*a) / (pi * d * d);
+    s.pdf        = D * cos_theta;
+    return s;
+}
+
+Vec3f cubemap_direction(uint32_t face, Vec2f uv) {
+    const float u = uv.x() * 2.0f - 1.0f;
+    const float v = uv.y() * 2.0f - 1.0f;
     switch (face) {
-        case 0:  // +X
-            return glm::vec3(1.0f, -ndc.y, -ndc.x);
-        case 1:  // -X
-            return glm::vec3(-1.0f, -ndc.y, ndc.x);
-        case 2:  // +Y
-            return glm::vec3(ndc.x, 1.0f, ndc.y);
-        case 3:  // -Y
-            return glm::vec3(ndc.x, -1.0f, -ndc.y);
-        case 4:  // +Z
-            return glm::vec3(ndc.x, -ndc.y, 1.0f);
-        case 5:  // -Z
-            return glm::vec3(-ndc.x, -ndc.y, -1.0f);
-        default:
-            return glm::vec3(0.0f);
+        case 0: return Vec3f( 1.0f,   -v,   -u);
+        case 1: return Vec3f(-1.0f,   -v,    u);
+        case 2: return Vec3f(   u,  1.0f,    v);
+        case 3: return Vec3f(   u, -1.0f,   -v);
+        case 4: return Vec3f(   u,   -v,  1.0f);
+        case 5: return Vec3f(  -u,   -v, -1.0f);
+        default: return Vec3f(0.0f, 0.0f, 1.0f);
     }
 }
 
-glm::vec3 filter_cubemap(const EnvironmentMap& cubemap, 
-                        const glm::vec3& direction, 
-                        float roughness,
-                        uint32_t sample_count) {
-    // Simplified cubemap filtering
-    // In practice, this would use importance sampling and fetch from the cubemap
-    
-    glm::vec3 result = glm::vec3(0.0f);
-    float total_weight = 0.0f;
-    
-    for (uint32_t i = 0; i < sample_count; ++i) {
-        float2 xi = float2(hammersley(i, sample_count), van_der_corput(i));
-        ImportanceSample sample = importance_sample_ggx(xi, roughness);
-        
-        // TODO: Sample cubemap at sample.direction
-        // glm::vec3 sample_color = sample_cubemap(cubemap, sample.direction);
-        glm::vec3 sample_color = glm::vec3(0.5f); // Placeholder
-        
-        result += sample_color * sample.cos_theta;
-        total_weight += sample.cos_theta;
-    }
-    
-    return result / total_weight;
-}
-
-SphericalHarmonics project_to_spherical_harmonics(const EnvironmentMap& cubemap) {
-    SphericalHarmonics sh = {};
-    
-    // TODO: Project cubemap onto spherical harmonics
-    // This would sample the cubemap and project onto SH basis functions
-    
+SphericalHarmonics project_to_spherical_harmonics(const EnvironmentMap& /*cubemap*/) {
+    SphericalHarmonics sh{};
+    // Projection from cubemap pixels stubbed — wired in Week 031.
     return sh;
 }
 
-glm::vec3 evaluate_spherical_harmonics(const SphericalHarmonics& sh, 
-                                      const glm::vec3& direction) {
-    // Evaluate SH at given direction
-    // Simplified implementation
-    
-    return sh.coefficients[0]; // Placeholder
+Vec3f evaluate_spherical_harmonics(const SphericalHarmonics& sh, const Vec3f& dir) {
+    // Band 0
+    constexpr float c0 = 0.282095f;
+    // Band 1
+    constexpr float c1 = 0.488603f;
+    // Band 2 (5 coefficients) — simplified
+    Vec3f result(0.0f, 0.0f, 0.0f);
+
+    auto add = [&](const Vec3f& coeff, float basis) {
+        result = Vec3f(result.x()+coeff.x()*basis,
+                       result.y()+coeff.y()*basis,
+                       result.z()+coeff.z()*basis);
+    };
+
+    add(sh.coefficients[0], c0);
+    add(sh.coefficients[1], c1 * dir.y());
+    add(sh.coefficients[2], c1 * dir.z());
+    add(sh.coefficients[3], c1 * dir.x());
+    (void)dir; // higher bands stubbed
+    return result;
 }
 
 } // namespace utils
 
-} // namespace cold_coffee::engine::render::ibl
+} // namespace gw::render::ibl

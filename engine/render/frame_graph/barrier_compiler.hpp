@@ -72,26 +72,28 @@ private:
         const PassData& pass,
         PassHandle pass_handle,
         const std::vector<ResourceData>& resources);
-    
+
     Result<std::monostate> update_resource_states(
         const PassData& pass,
         const std::vector<ResourceData>& resources);
-    
+
     // State transition helpers
     VkImageMemoryBarrier2 create_image_barrier(
         ResourceHandle res_handle,
         const ResourceState& old_state,
         const ResourceState& new_state,
         const ResourceData& res_data);
-    
+
     VkBufferMemoryBarrier2 create_buffer_barrier(
         ResourceHandle res_handle,
         const ResourceState& old_state,
         const ResourceState& new_state,
         const ResourceData& res_data);
-    
-    // Determine required states for read/write access patterns
-    ResourceState get_required_read_state(const ResourceData& res_data) const;
+
+    // Determine required states for read/write access patterns.
+    // queue_type drives the pipeline stage for reads (compute vs fragment).
+    ResourceState get_required_read_state(const ResourceData& res_data,
+                                          QueueType queue_type) const;
     ResourceState get_required_write_state(const ResourceData& res_data) const;
 };
 

@@ -293,8 +293,11 @@ Result<std::monostate> ClusteredLighting::create_buffers() {
         });
     }
     
-    // Create light list buffer
-    buffer_info.size = lights_.size() * sizeof(uint32_t) * 8;  // Max 8 lights per cluster estimate
+    // Create light list buffer — reserve capacity for at least 1024 light indices
+    const VkDeviceSize light_list_bytes =
+        std::max(1024ull * sizeof(uint32_t),
+                 lights_.size() * sizeof(uint32_t) * 8);
+    buffer_info.size = light_list_bytes;  // Grown dynamically via re-creation in Week 032
     result = vmaCreateBuffer(allocator_, &buffer_info, &alloc_info,
                             &light_list_buffer_, &light_list_allocation_, nullptr);
     if (result != VK_SUCCESS) {

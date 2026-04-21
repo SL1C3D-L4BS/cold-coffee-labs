@@ -6,8 +6,9 @@
 
 namespace gw::render::frame_graph {
 
-TransientAliasing::TransientAliasing(VmaAllocator allocator)
-    : allocator_(allocator) {
+TransientAliasing::TransientAliasing(VkDevice device, VmaAllocator allocator)
+    : device_(device)
+    , allocator_(allocator) {
 }
 
 TransientAliasing::~TransientAliasing() {
@@ -101,12 +102,12 @@ Result<VkImage> TransientAliasing::create_aliased_image(const TextureDesc& desc,
     // Bind to the aliased memory if we have a transient heap
     if (alloc_info.is_aliasing && transient_memory_ != VK_NULL_HANDLE) {
         VkBindImageMemoryInfo bind_info{};
-        bind_info.sType = VK_STRUCTURE_TYPE_BIND_IMAGE_MEMORY_INFO;
-        bind_info.image = image;
-        bind_info.memory = transient_memory_;
+        bind_info.sType       = VK_STRUCTURE_TYPE_BIND_IMAGE_MEMORY_INFO;
+        bind_info.image       = image;
+        bind_info.memory      = transient_memory_;
         bind_info.memoryOffset = alloc_info.offset;
-        
-        result = vkBindImageMemory2(VK_NULL_HANDLE, 1, &bind_info);
+
+        result = vkBindImageMemory2(device_, 1, &bind_info);
         if (result != VK_SUCCESS) {
             vmaDestroyImage(allocator_, image, allocation);
             return std::unexpected(FrameGraphError{
@@ -158,12 +159,12 @@ Result<VkBuffer> TransientAliasing::create_aliased_buffer(const BufferDesc& desc
     // Bind to the aliased memory if we have a transient heap
     if (alloc_info.is_aliasing && transient_memory_ != VK_NULL_HANDLE) {
         VkBindBufferMemoryInfo bind_info{};
-        bind_info.sType = VK_STRUCTURE_TYPE_BIND_BUFFER_MEMORY_INFO;
-        bind_info.buffer = buffer;
-        bind_info.memory = transient_memory_;
+        bind_info.sType        = VK_STRUCTURE_TYPE_BIND_BUFFER_MEMORY_INFO;
+        bind_info.buffer       = buffer;
+        bind_info.memory       = transient_memory_;
         bind_info.memoryOffset = alloc_info.offset;
-        
-        result = vkBindBufferMemory2(VK_NULL_HANDLE, 1, &bind_info);
+
+        result = vkBindBufferMemory2(device_, 1, &bind_info);
         if (result != VK_SUCCESS) {
             vmaDestroyBuffer(allocator_, buffer, allocation);
             return std::unexpected(FrameGraphError{
@@ -296,43 +297,44 @@ Result<std::vector<ResourceBinding>> TransientAliasing::perform_interval_colorin
 }
 
 Result<std::monostate> TransientAliasing::create_transient_heap(VkDeviceSize required_size) {
-    if (transient_memory_ != VK_NULL_HANDLE) {
-        return std::monostate{};  // Already created
-    }
-    
-    VkMemoryAllocateInfo alloc_info{};
-    alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    alloc_info.allocationSize = required_size;
-    
-    // Find appropriate memory type for transient resources
-    VkPhysicalDeviceMemoryProperties mem_props;
-    VkPhysicalDevice physical_device = VK_NULL_HANDLE;  // TODO: Get from device
-    vkGetPhysicalDeviceMemoryProperties(physical_device, &mem_props);
-    
-    // Find device local memory type
-    for (uint32_t i = 0; i < mem_props.memoryTypeCount; ++i) {
-        if (mem_props.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) {
-            alloc_info.memoryTypeIndex = i;
-            break;
-        }
-    }
-    
-    VkResult result = vkAllocateMemory(VK_NULL_HANDLE, &alloc_info, nullptr, &transient_memory_);
-    if (result != VK_SUCCESS) {
+    if (transient_memory_ != VK_NULL_HANDLE) return std::monostate{};
+
+    // Use VMA to allocate a dedicated pool for transient resources.
+    VmaPoolCreateInfo pool_ci{};
+    pool_ci.flags         = VMA_POOL_CREATE_LINEAR_ALGORITHM_BIT;
+    pool_ci.memoryTypeIndex = 0;  // resolved below
+
+    // Query device-local memory type via VMA's helpers
+    VmaAllocationCreateInfo tmp_ai{};
+    tmp_ai.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+    VkResult r   = vmaFindMemoryTypeIndex(allocator_, UINT32_MAX, &tmp_ai,
+                                           &pool_ci.memoryTypeIndex);
+    if (r != VK_SUCCESS) {
         return std::unexpected(FrameGraphError{
             FrameGraphErrorType::CompilationFailed,
-            "Failed to allocate transient memory heap"
+            "No device-local memory type found for transient heap"
         });
     }
-    
-    heap_size_ = required_size;
+
+    pool_ci.blockSize = required_size > 0 ? required_size : (64ull * 1024 * 1024);
+
+    r = vmaCreatePool(allocator_, &pool_ci, &transient_pool_);
+    if (r != VK_SUCCESS) {
+        return std::unexpected(FrameGraphError{
+            FrameGraphErrorType::CompilationFailed,
+            "Failed to create VMA transient pool"
+        });
+    }
+
+    heap_size_ = pool_ci.blockSize;
     return std::monostate{};
 }
 
 void TransientAliasing::destroy_transient_heap() {
-    if (transient_memory_ != VK_NULL_HANDLE) {
-        vkFreeMemory(VK_NULL_HANDLE, transient_memory_, nullptr);
-        transient_memory_ = VK_NULL_HANDLE;
+    transient_memory_ = VK_NULL_HANDLE;
+    if (transient_pool_ != VK_NULL_HANDLE) {
+        vmaDestroyPool(allocator_, transient_pool_);
+        transient_pool_ = VK_NULL_HANDLE;
     }
     heap_size_ = 0;
 }

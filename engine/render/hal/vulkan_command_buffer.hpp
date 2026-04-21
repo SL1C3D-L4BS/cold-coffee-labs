@@ -20,7 +20,7 @@ public:
     VulkanCommandBuffer(VulkanCommandBuffer&& other) noexcept;
     VulkanCommandBuffer& operator=(VulkanCommandBuffer&& other) noexcept;
 
-    [[nodiscard]] void* native_handle() const noexcept { return buffer_; }
+    [[nodiscard]] VkCommandBuffer native_handle() const noexcept { return buffer_; }
     [[nodiscard]] bool is_recording() const noexcept { return state_ == State::Recording; }
 
     // Recording operations
@@ -28,11 +28,19 @@ public:
     void end();
     void reset();
 
-    // Submission helpers
+    // synchronization2 barrier (primary API for Phase 5+)
+    void pipeline_barrier2(
+        VkDependencyFlags dependency_flags,
+        const std::vector<VkImageMemoryBarrier2>&  image_barriers   = {},
+        const std::vector<VkBufferMemoryBarrier2>& buffer_barriers  = {},
+        const std::vector<VkMemoryBarrier2>&       memory_barriers  = {});
+
+    // Legacy barrier (kept for compatibility with Phase 1 sandbox path)
     void pipeline_barrier(
         VkPipelineStageFlags src_stage,
         VkPipelineStageFlags dst_stage,
         VkDependencyFlags dependency_flags = VK_DEPENDENCY_BY_REGION_BIT);
+
     void copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size);
 
 private:

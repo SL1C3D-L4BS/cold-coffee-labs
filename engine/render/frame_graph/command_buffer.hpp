@@ -1,52 +1,73 @@
 #pragma once
 
 #include "types.hpp"
-#include "../hal/vulkan_command_buffer.hpp"
 #include <volk.h>
+#include <vector>
 
 namespace gw::render::frame_graph {
 
-// Abstract command buffer interface for frame graph passes
+// Thin wrapper around VkCommandBuffer for use inside frame graph pass callbacks.
+// The command buffer must be in recording state when the callback is invoked.
 class CommandBuffer {
 public:
-    explicit CommandBuffer(::gw::render::hal::VulkanCommandBuffer& vk_cmd_buffer);
+    // Construct from a live VkCommandBuffer that is already recording.
+    // Passing VK_NULL_HANDLE is allowed during offline validation (no-ops all calls).
+    explicit CommandBuffer(VkCommandBuffer cmd) noexcept : cmd_(cmd) {}
     ~CommandBuffer() = default;
-    
-    // Non-copyable, movable
+
     CommandBuffer(const CommandBuffer&) = delete;
     CommandBuffer& operator=(const CommandBuffer&) = delete;
     CommandBuffer(CommandBuffer&&) noexcept = default;
     CommandBuffer& operator=(CommandBuffer&&) = delete;
-    
-    // Pipeline barrier with synchronization2 (Week 026)
+
+    [[nodiscard]] VkCommandBuffer native_handle() const noexcept { return cmd_; }
+    [[nodiscard]] bool            valid()         const noexcept { return cmd_ != VK_NULL_HANDLE; }
+
+    // synchronization2 barrier
     void pipeline_barrier2(
-        VkDependencyFlags dependency_flags,
-        const std::vector<VkImageMemoryBarrier2>& image_barriers = {},
-        const std::vector<VkBufferMemoryBarrier2>& buffer_barriers = {},
-        const std::vector<VkMemoryBarrier2>& memory_barriers = {});
-    
-    // Basic operations
-    void copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size);
-    void begin_render_pass(VkRenderPass render_pass, VkFramebuffer framebuffer, 
-                          VkExtent2D extent, const std::vector<VkClearValue>& clear_values = {});
-    void end_render_pass();
-    void bind_pipeline(VkPipeline pipeline);
-    void bind_descriptor_sets(VkPipelineLayout layout, const std::vector<VkDescriptorSet>& sets,
-                             uint32_t first_set = 0);
-    void set_viewport(uint32_t first_viewport, const std::vector<VkViewport>& viewports);
-    void set_scissor(uint32_t first_scissor, const std::vector<VkRect2D>& scissors);
-    void draw(uint32_t vertex_count, uint32_t instance_count = 1, 
+        VkDependencyFlags                          dependency_flags,
+        const std::vector<VkImageMemoryBarrier2>&  image_barriers   = {},
+        const std::vector<VkBufferMemoryBarrier2>& buffer_barriers  = {},
+        const std::vector<VkMemoryBarrier2>&       memory_barriers  = {});
+
+    // Dynamic rendering
+    void begin_rendering(const VkRenderingInfo& rendering_info);
+    void end_rendering();
+
+    // Pipeline / descriptor state
+    void bind_pipeline(VkPipelineBindPoint bind_point, VkPipeline pipeline);
+    void bind_descriptor_sets(VkPipelineBindPoint bind_point,
+                               VkPipelineLayout layout,
+                               const std::vector<VkDescriptorSet>& sets,
+                               uint32_t first_set = 0);
+    void push_constants(VkPipelineLayout layout, VkShaderStageFlags stages,
+                        uint32_t offset, uint32_t size, const void* data);
+
+    // Viewport / scissor
+    void set_viewport(const VkViewport& vp);
+    void set_scissor(const VkRect2D& sc);
+
+    // Draw / dispatch
+    void draw(uint32_t vertex_count, uint32_t instance_count = 1,
               uint32_t first_vertex = 0, uint32_t first_instance = 0);
     void draw_indexed(uint32_t index_count, uint32_t instance_count = 1,
-                      uint32_t first_index = 0, int32_t vertex_offset = 0, uint32_t first_instance = 0);
-    void dispatch(uint32_t group_count_x, uint32_t group_count_y, uint32_t group_count_z);
-    
-    // Resource binding helpers (Week 026+)
+                      uint32_t first_index = 0, int32_t vertex_offset = 0,
+                      uint32_t first_instance = 0);
+    void dispatch(uint32_t group_x, uint32_t group_y, uint32_t group_z);
+
+    // Buffer ops
+    void copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size);
     void bind_vertex_buffer(VkBuffer buffer, VkDeviceSize offset = 0);
-    void bind_index_buffer(VkBuffer buffer, VkDeviceSize offset = 0, VkIndexType index_type = VK_INDEX_TYPE_UINT32);
-    
+    void bind_index_buffer(VkBuffer buffer, VkDeviceSize offset = 0,
+                           VkIndexType index_type = VK_INDEX_TYPE_UINT32);
+
+    // Clear operations
+    void clear_color_image(VkImage image, VkImageLayout layout,
+                            const VkClearColorValue& color,
+                            const VkImageSubresourceRange& range);
+
 private:
-    ::gw::render::hal::VulkanCommandBuffer& vk_cmd_buffer_;
+    VkCommandBuffer cmd_;
 };
 
 } // namespace gw::render::frame_graph

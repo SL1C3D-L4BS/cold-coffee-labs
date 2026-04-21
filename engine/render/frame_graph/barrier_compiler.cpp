@@ -97,10 +97,10 @@ Result<PassBarriers> BarrierCompiler::compile_pass_barriers(
             auto err = make_invalid_handle_error("read resource", read_res);
             return std::unexpected(err.error());
         }
-        
+
         const auto& res_data = resources[read_res];
         const auto& current_state = current_states_[read_res];
-        auto required_state = get_required_read_state(res_data);
+        auto required_state = get_required_read_state(res_data, pass.desc.queue);
         
         // If current state doesn't match required, create barrier
         if (current_state.image_layout != required_state.image_layout ||
@@ -212,52 +212,63 @@ VkBufferMemoryBarrier2 BarrierCompiler::create_buffer_barrier(
     return barrier;
 }
 
-ResourceState BarrierCompiler::get_required_read_state(const ResourceData& res_data) const {
+ResourceState BarrierCompiler::get_required_read_state(const ResourceData& res_data,
+                                                        QueueType queue_type) const {
     ResourceState state{};
-    
+
+    const bool is_compute = (queue_type == QueueType::Compute);
+
     if (std::holds_alternative<TextureDesc>(res_data.desc)) {
         const auto& tex_desc = std::get<TextureDesc>(res_data.desc);
         state.is_image = true;
-        state.aspect_mask = tex_desc.is_depth() ? 
+        state.aspect_mask = tex_desc.is_depth() ?
             VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
         state.base_mip_level = 0;
         state.level_count = tex_desc.mip_levels;
         state.base_array_layer = 0;
         state.layer_count = tex_desc.array_layers;
-        
-        // Determine layout and access based on usage
+
         if (tex_desc.usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) {
             state.image_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
             state.access_flags = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+            state.pipeline_stage = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT;
         } else if (tex_desc.usage & VK_IMAGE_USAGE_SAMPLED_BIT) {
             state.image_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            state.access_flags = VK_ACCESS_2_SHADER_READ_BIT;
+            state.access_flags = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+            state.pipeline_stage = is_compute
+                ? VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT
+                : VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
         } else {
+            // Storage image or other: use GENERAL layout
             state.image_layout = VK_IMAGE_LAYOUT_GENERAL;
             state.access_flags = VK_ACCESS_2_SHADER_READ_BIT;
+            state.pipeline_stage = is_compute
+                ? VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT
+                : VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
         }
-        
-        state.pipeline_stage = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;  // Default
     } else {
         const auto& buf_desc = std::get<BufferDesc>(res_data.desc);
         state.is_image = false;
         state.offset = 0;
         state.size = buf_desc.size;
-        
-        // Determine access based on usage
+
         if (buf_desc.usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) {
             state.access_flags = VK_ACCESS_2_UNIFORM_READ_BIT;
-            state.pipeline_stage = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | 
-                                 VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+            state.pipeline_stage = is_compute
+                ? VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT
+                : (VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT |
+                   VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
         } else if (buf_desc.usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) {
-            state.access_flags = VK_ACCESS_2_SHADER_READ_BIT;
-            state.pipeline_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+            state.access_flags = VK_ACCESS_2_SHADER_STORAGE_READ_BIT;
+            state.pipeline_stage = is_compute
+                ? VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT
+                : VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
         } else {
             state.access_flags = VK_ACCESS_2_TRANSFER_READ_BIT;
             state.pipeline_stage = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
         }
     }
-    
+
     return state;
 }
 

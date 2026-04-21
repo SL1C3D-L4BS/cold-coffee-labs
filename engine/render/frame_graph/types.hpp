@@ -2,9 +2,9 @@
 
 #include <cstdint>
 #include <functional>
-#include <span>
 #include <string>
 #include <variant>
+#include <vector>
 #include <volk.h>
 
 namespace gw::render::frame_graph {
@@ -76,21 +76,17 @@ enum class AccessType : uint8_t {
 // Pass execution callback type
 using PassExecuteFunc = std::move_only_function<void(CommandBuffer&)>;
 
-// Pass description
+// Pass description — owns its resource lists; safe to store and move.
 struct PassDesc {
     std::string name;
     QueueType queue = QueueType::Graphics;
-    
-    // Resources this pass reads from
-    std::span<const ResourceHandle> reads;
-    
-    // Resources this pass writes to
-    std::span<const ResourceHandle> writes;
-    
-    // Execution callback
+
+    std::vector<ResourceHandle> reads;
+    std::vector<ResourceHandle> writes;
+
     PassExecuteFunc execute;
-    
-    PassDesc(const std::string& pass_name) : name(pass_name) {}
+
+    explicit PassDesc(std::string pass_name) : name(std::move(pass_name)) {}
 };
 
 // Internal storage for declared passes/resources (compiled graph state)

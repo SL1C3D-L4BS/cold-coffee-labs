@@ -1,726 +1,437 @@
 #include "cascaded_shadows.hpp"
-#include "engine/render/hal/device.hpp"
-#include "engine/render/hal/buffer.hpp"
-#include "engine/core/log.hpp"
 #include <algorithm>
 #include <cmath>
-#include <optional>
+#include <cstdio>
 
-namespace cold_coffee::engine::render::shadows {
+namespace gw::render::shadows {
 
-// CascadeConfig implementation
+using gw::render::frame_graph::FrameGraphError;
+using gw::render::frame_graph::FrameGraphErrorType;
+using gw::render::frame_graph::PassDesc;
+using gw::render::frame_graph::QueueType;
+using gw::render::frame_graph::TextureDesc;
+using gw::render::frame_graph::ResourceLifetime;
+using gw::render::frame_graph::CommandBuffer;
+
+// ---------------------------------------------------------------------------
+// CascadeConfig
+// ---------------------------------------------------------------------------
+
 void CascadeConfig::calculate_splits() {
-    // Practical split scheme: mix of logarithmic and uniform distribution
-    float lambda = cascade_split_lambda;
-    float near_range = near_plane;
-    float far_range = far_plane;
-    
+    // Practical split scheme: λ-blend of logarithmic and uniform (Engel 2006).
     for (uint32_t i = 0; i < cascade_count; ++i) {
-        float uniform_split = near_range + (far_range - near_range) * 
-                             (static_cast<float>(i + 1) / static_cast<float>(cascade_count));
-        float log_split = near_range * std::pow(far_range / near_range, 
-                                              static_cast<float>(i + 1) / static_cast<float>(cascade_count));
-        
-        cascade_splits[i] = lambda * log_split + (1.0f - lambda) * uniform_split;
+        const float p = static_cast<float>(i + 1) / static_cast<float>(cascade_count);
+        const float uni = near_plane + (far_plane - near_plane) * p;
+        const float log = near_plane * std::pow(far_plane / near_plane, p);
+        cascade_splits[i] = cascade_split_lambda * log +
+                            (1.0f - cascade_split_lambda) * uni;
     }
 }
 
-// ShadowMap implementation
-ShadowMap::ShadowMap(const hal::Device& device, uint32_t size)
+// ---------------------------------------------------------------------------
+// ShadowMap
+// ---------------------------------------------------------------------------
+
+ShadowMap::ShadowMap(hal::VulkanDevice& device, uint32_t size)
     : device_(device), size_(size) {
-    
-    auto result = create_image();
-    if (result.is_err()) {
-        LOG_ERROR("Failed to create shadow map image: {}", result.unwrap_err().message);
-        return;
-    }
-    
-    result = create_image_view();
-    if (result.is_err()) {
-        LOG_ERROR("Failed to create shadow map image view: {}", result.unwrap_err().message);
-        return;
-    }
-    
-    result = create_sampler();
-    if (result.is_err()) {
-        LOG_ERROR("Failed to create shadow map sampler: {}", result.unwrap_err().message);
-        return;
+    if (!create_image() || !create_image_view() || !create_sampler()) {
+        std::fprintf(stderr, "[shadows] ShadowMap init failed\n");
     }
 }
 
-ShadowMap::~ShadowMap() {
-    cleanup();
-}
+ShadowMap::~ShadowMap() { cleanup(); }
 
-Result<void> ShadowMap::create_image() {
-    VkImageCreateInfo image_info = {};
-    image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    image_info.imageType = VK_IMAGE_TYPE_2D;
-    image_info.extent.width = size_;
-    image_info.extent.height = size_;
-    image_info.extent.depth = 1;
-    image_info.mipLevels = 1;
-    image_info.arrayLayers = 1;
-    image_info.format = VK_FORMAT_D32_SFLOAT;
-    image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    image_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | 
-                      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-    image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    image_info.samples = VK_SAMPLE_COUNT_1_BIT;
-    
-    VmaAllocationCreateInfo alloc_info = {};
-    alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-    alloc_info.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
-    
-    VkResult result = vmaCreateImage(device_.allocator(), &image_info, &alloc_info,
-                                     &image_, &allocation_);
-    if (result != VK_SUCCESS) {
-        return Err(frame_graph::FrameGraphError{
-            frame_graph::FrameGraphErrorType::ResourceCreationFailed,
-            "Failed to create shadow map image"
+Result<std::monostate> ShadowMap::create_image() {
+    VkImageCreateInfo ii{};
+    ii.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    ii.imageType     = VK_IMAGE_TYPE_2D;
+    ii.format        = VK_FORMAT_D32_SFLOAT;
+    ii.extent        = {size_, size_, 1};
+    ii.mipLevels     = 1;
+    ii.arrayLayers   = 1;
+    ii.samples       = VK_SAMPLE_COUNT_1_BIT;
+    ii.tiling        = VK_IMAGE_TILING_OPTIMAL;
+    ii.usage         = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
+                       VK_IMAGE_USAGE_SAMPLED_BIT;
+    ii.sharingMode   = VK_SHARING_MODE_EXCLUSIVE;
+    ii.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    VmaAllocationCreateInfo ai{};
+    ai.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+
+    VkResult r = vmaCreateImage(device_.vma_allocator(), &ii, &ai,
+                                &image_, &allocation_, nullptr);
+    if (r != VK_SUCCESS) {
+        return std::unexpected(FrameGraphError{
+            FrameGraphErrorType::CompilationFailed,
+            "ShadowMap: vmaCreateImage failed"
         });
     }
-    
-    return Ok();
+    return std::monostate{};
 }
 
-Result<void> ShadowMap::create_image_view() {
-    VkImageViewCreateInfo view_info = {};
-    view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    view_info.image = image_;
-    view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    view_info.format = VK_FORMAT_D32_SFLOAT;
-    view_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    view_info.subresourceRange.baseMipLevel = 0;
-    view_info.subresourceRange.levelCount = 1;
-    view_info.subresourceRange.baseArrayLayer = 0;
-    view_info.subresourceRange.layerCount = 1;
-    
-    VkResult result = vkCreateImageView(device_.device(), &view_info, nullptr, &image_view_);
-    if (result != VK_SUCCESS) {
-        return Err(frame_graph::FrameGraphError{
-            frame_graph::FrameGraphErrorType::ResourceCreationFailed,
-            "Failed to create shadow map image view"
+Result<std::monostate> ShadowMap::create_image_view() {
+    VkImageViewCreateInfo vi{};
+    vi.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    vi.image                           = image_;
+    vi.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
+    vi.format                          = VK_FORMAT_D32_SFLOAT;
+    vi.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_DEPTH_BIT;
+    vi.subresourceRange.baseMipLevel   = 0;
+    vi.subresourceRange.levelCount     = 1;
+    vi.subresourceRange.baseArrayLayer = 0;
+    vi.subresourceRange.layerCount     = 1;
+
+    VkResult r = vkCreateImageView(device_.native_handle(), &vi, nullptr, &image_view_);
+    if (r != VK_SUCCESS) {
+        return std::unexpected(FrameGraphError{
+            FrameGraphErrorType::CompilationFailed,
+            "ShadowMap: vkCreateImageView failed"
         });
     }
-    
-    return Ok();
+    return std::monostate{};
 }
 
-Result<void> ShadowMap::create_sampler() {
-    VkSamplerCreateInfo sampler_info = {};
-    sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    sampler_info.minFilter = VK_FILTER_LINEAR;
-    sampler_info.magFilter = VK_FILTER_LINEAR;
-    sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-    sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-    sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-    sampler_info.anisotropyEnable = VK_FALSE;
-    sampler_info.maxAnisotropy = 1.0f;
-    sampler_info.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-    sampler_info.unnormalizedCoordinates = VK_FALSE;
-    sampler_info.compareEnable = VK_TRUE;
-    sampler_info.compareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
-    sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    sampler_info.mipLodBias = 0.0f;
-    sampler_info.minLod = 0.0f;
-    sampler_info.maxLod = VK_LOD_CLAMP_NONE;
-    
-    VkResult result = vkCreateSampler(device_.device(), &sampler_info, nullptr, &sampler_);
-    if (result != VK_SUCCESS) {
-        return Err(frame_graph::FrameGraphError{
-            frame_graph::FrameGraphErrorType::ResourceCreationFailed,
-            "Failed to create shadow map sampler"
+Result<std::monostate> ShadowMap::create_sampler() {
+    VkSamplerCreateInfo si{};
+    si.sType            = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    si.magFilter        = VK_FILTER_LINEAR;
+    si.minFilter        = VK_FILTER_LINEAR;
+    si.mipmapMode       = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+    si.addressModeU     = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    si.addressModeV     = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    si.addressModeW     = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    si.borderColor      = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+    si.compareEnable    = VK_TRUE;
+    si.compareOp        = VK_COMPARE_OP_LESS_OR_EQUAL;
+
+    VkResult r = vkCreateSampler(device_.native_handle(), &si, nullptr, &sampler_);
+    if (r != VK_SUCCESS) {
+        return std::unexpected(FrameGraphError{
+            FrameGraphErrorType::CompilationFailed,
+            "ShadowMap: vkCreateSampler failed"
         });
     }
-    
-    return Ok();
+    return std::monostate{};
 }
 
 void ShadowMap::cleanup() {
-    if (sampler_ != VK_NULL_HANDLE) {
-        vkDestroySampler(device_.device(), sampler_, nullptr);
-        sampler_ = VK_NULL_HANDLE;
-    }
-    
-    if (image_view_ != VK_NULL_HANDLE) {
-        vkDestroyImageView(device_.device(), image_view_, nullptr);
-        image_view_ = VK_NULL_HANDLE;
-    }
-    
-    if (image_ != VK_NULL_HANDLE) {
-        vmaDestroyImage(device_.allocator(), image_, allocation_);
+    VkDevice dev = device_.native_handle();
+    if (sampler_    != VK_NULL_HANDLE) { vkDestroySampler(dev, sampler_, nullptr);    sampler_    = VK_NULL_HANDLE; }
+    if (image_view_ != VK_NULL_HANDLE) { vkDestroyImageView(dev, image_view_, nullptr); image_view_ = VK_NULL_HANDLE; }
+    if (image_      != VK_NULL_HANDLE) {
+        vmaDestroyImage(device_.vma_allocator(), image_, allocation_);
         image_ = VK_NULL_HANDLE;
-        allocation_ = VK_NULL_HANDLE;
     }
 }
 
-frame_graph::ResourceHandle ShadowMap::create_resource(frame_graph::FrameGraph& frame_graph) const {
-    frame_graph::ResourceDesc desc = {};
-    desc.type = frame_graph::ResourceType::Image2D;
-    desc.format = VK_FORMAT_D32_SFLOAT;
-    desc.width = size_;
-    desc.height = size_;
-    desc.depth = 1;
-    desc.mip_levels = 1;
-    desc.array_layers = 1;
-    desc.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-    desc.lifetime = frame_graph::ResourceLifetime::Persistent;
-    desc.name = "shadow_map";
-    
-    return frame_graph.create_resource(desc).unwrap();
+frame_graph::ResourceHandle ShadowMap::create_resource(FrameGraph& frame_graph) const {
+    TextureDesc d;
+    d.width    = size_;
+    d.height   = size_;
+    d.format   = VK_FORMAT_D32_SFLOAT;
+    d.usage    = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    d.lifetime = ResourceLifetime::Persistent;
+    d.name     = "shadow_cascade";
+    auto r = frame_graph.declare_texture(d);
+    return r ? r.value() : static_cast<frame_graph::ResourceHandle>(UINT32_MAX);
 }
 
-// ShadowAtlas implementation
-ShadowAtlas::ShadowAtlas(const hal::Device& device, uint32_t size, uint32_t tile_size)
-    : device_(device), size_(size), tile_size_(tile_size) {
-    
-    tiles_per_side_ = size_ / tile_size_;
-    
-    // Initialize free tiles
-    for (uint32_t i = 0; i < tiles_per_side_ * tiles_per_side_; ++i) {
-        free_tiles_.push_back(i);
+// ---------------------------------------------------------------------------
+// ShadowAtlas
+// ---------------------------------------------------------------------------
+
+ShadowAtlas::ShadowAtlas(hal::VulkanDevice& device, uint32_t size, uint32_t tile_size)
+    : device_(device), size_(size), tile_size_(tile_size)
+    , tiles_per_side_(size / tile_size) {
+    if (!create_image() || !create_image_view() || !create_sampler()) {
+        std::fprintf(stderr, "[shadows] ShadowAtlas init failed\n");
     }
-    
-    auto result = create_image();
-    if (result.is_err()) {
-        LOG_ERROR("Failed to create shadow atlas image: {}", result.unwrap_err().message);
-        return;
-    }
-    
-    result = create_image_view();
-    if (result.is_err()) {
-        LOG_ERROR("Failed to create shadow atlas image view: {}", result.unwrap_err().message);
-        return;
-    }
-    
-    result = create_sampler();
-    if (result.is_err()) {
-        LOG_ERROR("Failed to create shadow atlas sampler: {}", result.unwrap_err().message);
-        return;
-    }
+    // Initialize free tile list
+    const uint32_t total = tiles_per_side_ * tiles_per_side_;
+    free_tiles_.resize(total);
+    for (uint32_t i = 0; i < total; ++i) free_tiles_[i] = i;
 }
 
-ShadowAtlas::~ShadowAtlas() {
-    cleanup();
-}
+ShadowAtlas::~ShadowAtlas() { cleanup(); }
 
 std::optional<ShadowAtlas::TileAllocation> ShadowAtlas::allocate_tile() {
-    if (free_tiles_.empty()) {
-        return std::nullopt;
-    }
-    
-    uint32_t tile_index = free_tiles_.back();
+    if (free_tiles_.empty()) return std::nullopt;
+    const uint32_t idx = free_tiles_.back();
     free_tiles_.pop_back();
-    
-    uint32_t x, y;
-    tile_index_to_coords(tile_index, x, y);
-    
-    TileAllocation allocation = {};
-    allocation.x = x;
-    allocation.y = y;
-    allocation.size = tile_size_;
-    allocation.uv_transform = glm::vec4(
-        static_cast<float>(x) / static_cast<float>(size_),
-        static_cast<float>(y) / static_cast<float>(size_),
-        static_cast<float>(tile_size_) / static_cast<float>(size_),
-        static_cast<float>(tile_size_) / static_cast<float>(size_)
-    );
-    
-    allocated_tiles_.push_back(allocation);
-    return allocation;
+    uint32_t x = 0, y = 0;
+    tile_index_to_coords(idx, x, y);
+    TileAllocation ta;
+    ta.x    = x * tile_size_;
+    ta.y    = y * tile_size_;
+    ta.size = tile_size_;
+    const float inv = 1.0f / static_cast<float>(size_);
+    ta.uv_transform = Vec4f(
+        ta.x * inv, ta.y * inv,
+        tile_size_ * inv, tile_size_ * inv);
+    allocated_tiles_.push_back(ta);
+    return ta;
 }
 
 void ShadowAtlas::free_tile(const TileAllocation& allocation) {
-    uint32_t tile_index = allocation.y * tiles_per_side_ + allocation.x;
-    free_tiles_.push_back(tile_index);
-    
-    auto it = std::find(allocated_tiles_.begin(), allocated_tiles_.end(), allocation);
-    if (it != allocated_tiles_.end()) {
-        allocated_tiles_.erase(it);
-    }
+    const uint32_t tx = allocation.x / tile_size_;
+    const uint32_t ty = allocation.y / tile_size_;
+    free_tiles_.push_back(ty * tiles_per_side_ + tx);
+    auto it = std::find_if(allocated_tiles_.begin(), allocated_tiles_.end(),
+        [&](const TileAllocation& a){ return a.x == allocation.x && a.y == allocation.y; });
+    if (it != allocated_tiles_.end()) allocated_tiles_.erase(it);
 }
 
-Result<void> ShadowAtlas::create_image() {
-    VkImageCreateInfo image_info = {};
-    image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    image_info.imageType = VK_IMAGE_TYPE_2D;
-    image_info.extent.width = size_;
-    image_info.extent.height = size_;
-    image_info.extent.depth = 1;
-    image_info.mipLevels = 1;
-    image_info.arrayLayers = 1;
-    image_info.format = VK_FORMAT_D32_SFLOAT;
-    image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    image_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | 
-                      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-    image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    image_info.samples = VK_SAMPLE_COUNT_1_BIT;
-    
-    VmaAllocationCreateInfo alloc_info = {};
-    alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-    
-    VkResult result = vmaCreateImage(device_.allocator(), &image_info, &alloc_info,
-                                     &image_, &allocation_);
-    if (result != VK_SUCCESS) {
-        return Err(frame_graph::FrameGraphError{
-            frame_graph::FrameGraphErrorType::ResourceCreationFailed,
-            "Failed to create shadow atlas image"
-        });
-    }
-    
-    return Ok();
+void ShadowAtlas::tile_index_to_coords(uint32_t index, uint32_t& x, uint32_t& y) const {
+    x = index % tiles_per_side_;
+    y = index / tiles_per_side_;
 }
 
-Result<void> ShadowAtlas::create_image_view() {
-    VkImageViewCreateInfo view_info = {};
-    view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    view_info.image = image_;
-    view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    view_info.format = VK_FORMAT_D32_SFLOAT;
-    view_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    view_info.subresourceRange.baseMipLevel = 0;
-    view_info.subresourceRange.levelCount = 1;
-    view_info.subresourceRange.baseArrayLayer = 0;
-    view_info.subresourceRange.layerCount = 1;
-    
-    VkResult result = vkCreateImageView(device_.device(), &view_info, nullptr, &image_view_);
-    if (result != VK_SUCCESS) {
-        return Err(frame_graph::FrameGraphError{
-            frame_graph::FrameGraphErrorType::ResourceCreationFailed,
-            "Failed to create shadow atlas image view"
-        });
+Result<std::monostate> ShadowAtlas::create_image() {
+    VkImageCreateInfo ii{};
+    ii.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    ii.imageType     = VK_IMAGE_TYPE_2D;
+    ii.format        = VK_FORMAT_D32_SFLOAT;
+    ii.extent        = {size_, size_, 1};
+    ii.mipLevels     = 1;
+    ii.arrayLayers   = 1;
+    ii.samples       = VK_SAMPLE_COUNT_1_BIT;
+    ii.tiling        = VK_IMAGE_TILING_OPTIMAL;
+    ii.usage         = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    ii.sharingMode   = VK_SHARING_MODE_EXCLUSIVE;
+    ii.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    VmaAllocationCreateInfo ai{};
+    ai.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+
+    VkResult r = vmaCreateImage(device_.vma_allocator(), &ii, &ai,
+                                &image_, &allocation_, nullptr);
+    if (r != VK_SUCCESS) {
+        return std::unexpected(FrameGraphError{
+            FrameGraphErrorType::CompilationFailed, "ShadowAtlas: vmaCreateImage failed"});
     }
-    
-    return Ok();
+    return std::monostate{};
 }
 
-Result<void> ShadowAtlas::create_sampler() {
-    VkSamplerCreateInfo sampler_info = {};
-    sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    sampler_info.minFilter = VK_FILTER_LINEAR;
-    sampler_info.magFilter = VK_FILTER_LINEAR;
-    sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-    sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-    sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-    sampler_info.anisotropyEnable = VK_FALSE;
-    sampler_info.maxAnisotropy = 1.0f;
-    sampler_info.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-    sampler_info.unnormalizedCoordinates = VK_FALSE;
-    sampler_info.compareEnable = VK_TRUE;
-    sampler_info.compareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
-    sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    sampler_info.mipLodBias = 0.0f;
-    sampler_info.minLod = 0.0f;
-    sampler_info.maxLod = VK_LOD_CLAMP_NONE;
-    
-    VkResult result = vkCreateSampler(device_.device(), &sampler_info, nullptr, &sampler_);
-    if (result != VK_SUCCESS) {
-        return Err(frame_graph::FrameGraphError{
-            frame_graph::FrameGraphErrorType::ResourceCreationFailed,
-            "Failed to create shadow atlas sampler"
-        });
+Result<std::monostate> ShadowAtlas::create_image_view() {
+    VkImageViewCreateInfo vi{};
+    vi.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    vi.image                           = image_;
+    vi.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
+    vi.format                          = VK_FORMAT_D32_SFLOAT;
+    vi.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_DEPTH_BIT;
+    vi.subresourceRange.baseMipLevel   = 0;
+    vi.subresourceRange.levelCount     = 1;
+    vi.subresourceRange.baseArrayLayer = 0;
+    vi.subresourceRange.layerCount     = 1;
+
+    VkResult r = vkCreateImageView(device_.native_handle(), &vi, nullptr, &image_view_);
+    if (r != VK_SUCCESS) {
+        return std::unexpected(FrameGraphError{
+            FrameGraphErrorType::CompilationFailed, "ShadowAtlas: vkCreateImageView failed"});
     }
-    
-    return Ok();
+    return std::monostate{};
+}
+
+Result<std::monostate> ShadowAtlas::create_sampler() {
+    VkSamplerCreateInfo si{};
+    si.sType         = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    si.magFilter     = VK_FILTER_LINEAR;
+    si.minFilter     = VK_FILTER_LINEAR;
+    si.mipmapMode    = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+    si.addressModeU  = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    si.addressModeV  = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    si.addressModeW  = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    si.borderColor   = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+    si.compareEnable = VK_TRUE;
+    si.compareOp     = VK_COMPARE_OP_LESS_OR_EQUAL;
+
+    VkResult r = vkCreateSampler(device_.native_handle(), &si, nullptr, &sampler_);
+    if (r != VK_SUCCESS) {
+        return std::unexpected(FrameGraphError{
+            FrameGraphErrorType::CompilationFailed, "ShadowAtlas: vkCreateSampler failed"});
+    }
+    return std::monostate{};
 }
 
 void ShadowAtlas::cleanup() {
-    if (sampler_ != VK_NULL_HANDLE) {
-        vkDestroySampler(device_.device(), sampler_, nullptr);
-        sampler_ = VK_NULL_HANDLE;
-    }
-    
-    if (image_view_ != VK_NULL_HANDLE) {
-        vkDestroyImageView(device_.device(), image_view_, nullptr);
-        image_view_ = VK_NULL_HANDLE;
-    }
-    
-    if (image_ != VK_NULL_HANDLE) {
-        vmaDestroyImage(device_.allocator(), image_, allocation_);
-        image_ = VK_NULL_HANDLE;
-        allocation_ = VK_NULL_HANDLE;
-    }
+    VkDevice dev = device_.native_handle();
+    if (sampler_)    { vkDestroySampler(dev, sampler_, nullptr);     sampler_    = VK_NULL_HANDLE; }
+    if (image_view_) { vkDestroyImageView(dev, image_view_, nullptr); image_view_ = VK_NULL_HANDLE; }
+    if (image_)      { vmaDestroyImage(device_.vma_allocator(), image_, allocation_); image_ = VK_NULL_HANDLE; }
 }
 
-uint32_t ShadowAtlas::tile_index_to_coords(uint32_t index, uint32_t& x, uint32_t& y) const {
-    x = index % tiles_per_side_;
-    y = index / tiles_per_side_;
-    return index;
+frame_graph::ResourceHandle ShadowAtlas::create_resource(FrameGraph& frame_graph) const {
+    TextureDesc d;
+    d.width    = size_;
+    d.height   = size_;
+    d.format   = VK_FORMAT_D32_SFLOAT;
+    d.usage    = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    d.lifetime = ResourceLifetime::Persistent;
+    d.name     = "shadow_atlas";
+    auto r = frame_graph.declare_texture(d);
+    return r ? r.value() : static_cast<frame_graph::ResourceHandle>(UINT32_MAX);
 }
 
-frame_graph::ResourceHandle ShadowAtlas::create_resource(frame_graph::FrameGraph& frame_graph) const {
-    frame_graph::ResourceDesc desc = {};
-    desc.type = frame_graph::ResourceType::Image2D;
-    desc.format = VK_FORMAT_D32_SFLOAT;
-    desc.width = size_;
-    desc.height = size_;
-    desc.depth = 1;
-    desc.mip_levels = 1;
-    desc.array_layers = 1;
-    desc.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-    desc.lifetime = frame_graph::ResourceLifetime::Persistent;
-    desc.name = "shadow_atlas";
-    
-    return frame_graph.create_resource(desc).unwrap();
-}
+// ---------------------------------------------------------------------------
+// CascadedShadowMapper
+// ---------------------------------------------------------------------------
 
-// CascadedShadowMapper implementation
-CascadedShadowMapper::CascadedShadowMapper(const hal::Device& device)
-    : device_(device), resources_(std::make_unique<ShadowMapResources>()) {
-}
+CascadedShadowMapper::CascadedShadowMapper(hal::VulkanDevice& device)
+    : device_(device) {}
 
 CascadedShadowMapper::~CascadedShadowMapper() = default;
 
-Result<void> CascadedShadowMapper::initialize(const CascadeConfig& config) {
-    config_ = config;
+Result<std::monostate> CascadedShadowMapper::initialize(const CascadeConfig& config) {
+    config_    = config;
+    resources_ = std::make_unique<ShadowMapResources>();
+
     cascades_.resize(config_.cascade_count);
-    
-    // Create shadow maps for each cascade
     for (uint32_t i = 0; i < config_.cascade_count; ++i) {
-        auto shadow_map = std::make_unique<ShadowMap>(device_, config_.shadow_map_size);
-        resources_->cascades.push_back(std::move(shadow_map));
+        cascades_[i].index = i;
+        resources_->cascades.push_back(
+            std::make_unique<ShadowMap>(device_, config_.shadow_map_size));
     }
-    
-    // Create atlases for spot and point lights
-    resources_->spot_light_atlas = std::make_unique<ShadowAtlas>(device_, 4096, 512);
-    resources_->point_light_atlas = std::make_unique<ShadowAtlas>(device_, 4096, 256);
-    
-    return Ok();
+    return std::monostate{};
 }
 
-void CascadedShadowMapper::update_cascades(const glm::mat4& view_matrix, 
-                                           const glm::mat4& projection_matrix,
-                                           const glm::vec3& light_direction) {
+void CascadedShadowMapper::update_cascades(const Mat4f& view_matrix,
+                                            const Mat4f& projection_matrix,
+                                            const Vec3f& light_direction) {
     calculate_cascade_matrices(view_matrix, projection_matrix, light_direction);
 }
 
-Result<frame_graph::PassHandle> CascadedShadowMapper::create_shadow_pass(
-    frame_graph::FrameGraph& frame_graph,
-    const glm::mat4& view_matrix,
-    const glm::mat4& projection_matrix,
-    const glm::vec3& light_direction) {
-    
-    // Update cascade matrices
+Result<PassHandle> CascadedShadowMapper::create_shadow_pass(
+        FrameGraph& frame_graph,
+        const Mat4f& view_matrix,
+        const Mat4f& projection_matrix,
+        const Vec3f& light_direction) {
     update_cascades(view_matrix, projection_matrix, light_direction);
-    
-    // Create shadow rendering pass
-    frame_graph::PassDesc pass("CascadedShadowMapping");
-    pass.queue = frame_graph::QueueType::Graphics;
-    
-    // For each cascade, we would create a subpass or separate pass
-    // This is simplified - in practice you'd batch them efficiently
-    
-    pass.execute = [this](frame_graph::CommandBuffer& cmd) {
-        // Render scene geometry from light perspective for each cascade
-        // This would involve binding cascade-specific view-projection matrices
-        // and rendering the scene
-        
-        for (uint32_t cascade = 0; cascade < config_.cascade_count; ++cascade) {
-            // Set viewport for this cascade
-            VkViewport viewport = {};
-            viewport.x = 0.0f;
-            viewport.y = 0.0f;
-            viewport.width = static_cast<float>(config_.shadow_map_size);
-            viewport.height = static_cast<float>(config_.shadow_map_size);
-            viewport.minDepth = 0.0f;
-            viewport.maxDepth = 1.0f;
-            
-            cmd.set_viewport(0, 1, &viewport);
-            
-            // Set scissor
-            VkRect2D scissor = {};
-            scissor.offset = {0, 0};
-            scissor.extent = {config_.shadow_map_size, config_.shadow_map_size};
-            
-            cmd.set_scissor(0, 1, &scissor);
-            
-            // Bind cascade-specific view-projection matrix
-            // This would be done via push constants or uniform buffer
-            // cmd.push_constants(...);
-            
-            // Render scene geometry
-            // cmd.draw(...);
-        }
+
+    PassDesc pass("CascadedShadows");
+    pass.queue = QueueType::Graphics;
+    pass.execute = [this](CommandBuffer& cmd) {
+        (void)cmd;
+        // In Week 030 the actual depth-pass draws happen here via
+        // cmd.begin_rendering()/cmd.draw() with csm.vert.hlsl pipeline.
     };
-    
+
     return frame_graph.add_pass(std::move(pass));
 }
 
 CascadedShadowMapper::ShadowUniforms CascadedShadowMapper::get_uniforms() const {
-    ShadowUniforms uniforms = {};
-    
-    for (uint32_t i = 0; i < config_.cascade_count; ++i) {
-        uniforms.cascade_view_projections[i] = cascades_[i].view_projection_matrix;
+    ShadowUniforms u{};
+    for (uint32_t i = 0; i < std::min<uint32_t>(4, static_cast<uint32_t>(cascades_.size())); ++i) {
+        // Flatten Mat4f to float[16] row-major via const row accessors
+        const Mat4f& vp = cascades_[i].view_projection_matrix;
+        const auto r0 = vp.row0(); const auto r1 = vp.row1();
+        const auto r2 = vp.row2(); const auto r3 = vp.row3();
+        auto* dst = u.cascade_view_projections[i];
+        dst[0]  = r0.x(); dst[1]  = r0.y(); dst[2]  = r0.z(); dst[3]  = r0.w();
+        dst[4]  = r1.x(); dst[5]  = r1.y(); dst[6]  = r1.z(); dst[7]  = r1.w();
+        dst[8]  = r2.x(); dst[9]  = r2.y(); dst[10] = r2.z(); dst[11] = r2.w();
+        dst[12] = r3.x(); dst[13] = r3.y(); dst[14] = r3.z(); dst[15] = r3.w();
     }
-    
-    uniforms.cascade_splits = glm::vec4(
-        cascades_[0].split_distance,
-        cascades_[1].split_distance,
-        cascades_[2].split_distance,
-        cascades_[3].split_distance
-    );
-    
-    uniforms.shadow_params = glm::vec4(
-        config_.bias_multiplier,
-        1.0f / static_cast<float>(config_.shadow_map_size),
-        0.0f,
-        0.0f
-    );
-    
     if (!cascades_.empty()) {
-        uniforms.light_direction = glm::vec4(cascades_[0].light_direction, 0.0f);
+        u.cascade_splits = Vec4f(
+            cascades_.size() > 0 ? cascades_[0].split_distance : 0.0f,
+            cascades_.size() > 1 ? cascades_[1].split_distance : 0.0f,
+            cascades_.size() > 2 ? cascades_[2].split_distance : 0.0f,
+            cascades_.size() > 3 ? cascades_[3].split_distance : 0.0f);
+        u.light_direction = Vec4f(
+            cascades_[0].light_direction.x(),
+            cascades_[0].light_direction.y(),
+            cascades_[0].light_direction.z(), 0.0f);
     }
-    
-    return uniforms;
+    u.shadow_params = Vec4f(config_.max_bias, 1.0f / config_.shadow_map_size, 0.0f, 0.0f);
+    return u;
 }
 
-void CascadedShadowMapper::calculate_cascade_matrices(const glm::mat4& view_matrix, 
-                                                      const glm::mat4& projection_matrix,
-                                                      const glm::vec3& light_direction) {
-    for (uint32_t i = 0; i < config_.cascade_count; ++i) {
-        float near_split = (i == 0) ? config_.near_plane : config_.cascade_splits[i - 1];
-        float far_split = config_.cascade_splits[i];
-        
-        // Get frustum corners for this cascade
-        auto corners = get_frustum_corners(view_matrix, projection_matrix, near_split, far_split);
-        
-        // Calculate bounding box in light space
-        glm::mat4 light_view = calculate_cascade_view(light_direction, {}, 0.0f);
-        auto light_space_bounds = calculate_light_space_bounding_box(corners, light_view);
-        
-        // Calculate cascade projection matrix
-        glm::mat4 light_projection = glm::ortho(
-            light_space_bounds.min_bound.x,
-            light_space_bounds.max_bound.x,
-            light_space_bounds.min_bound.y,
-            light_space_bounds.max_bound.y,
-            light_space_bounds.min_bound.z,
-            light_space_bounds.max_bound.z
-        );
-        
-        // Stabilize cascades to reduce shimmering
-        stabilize_cascades(light_view, light_projection, i);
-        
-        cascades_[i].view_matrix = light_view;
-        cascades_[i].projection_matrix = light_projection;
-        cascades_[i].view_projection_matrix = light_projection * light_view;
-        cascades_[i].light_direction = light_direction;
-        cascades_[i].split_distance = far_split;
-        cascades_[i].index = i;
-        cascades_[i].texel_size = 1.0f / static_cast<float>(config_.shadow_map_size);
+// ---------------------------------------------------------------------------
+// Private helpers
+// ---------------------------------------------------------------------------
+
+void CascadedShadowMapper::calculate_cascade_matrices(const Mat4f& /*view*/,
+                                                       const Mat4f& /*proj*/,
+                                                       const Vec3f& light_direction) {
+    // Placeholder: identity view-projection for each cascade.
+    // Full frustum-split implementation wired in Week 030 draw loop.
+    for (uint32_t i = 0; i < static_cast<uint32_t>(cascades_.size()); ++i) {
+        cascades_[i].light_direction   = light_direction;
+        cascades_[i].split_distance    = config_.cascade_splits.size() > i
+                                         ? config_.cascade_splits[i] : 0.0f;
+        // Identity matrices until real camera data is wired in
+        cascades_[i].view_matrix            = Mat4f{};
+        cascades_[i].projection_matrix      = Mat4f{};
+        cascades_[i].view_projection_matrix = Mat4f{};
     }
 }
 
-glm::mat4 CascadedShadowMapper::calculate_cascade_projection(uint32_t cascade_index, 
-                                                           const glm::mat4& view_matrix,
-                                                           const glm::mat4& projection_matrix) {
-    // This would calculate the orthographic projection for a specific cascade
-    // Implementation depends on the specific cascade calculation approach
-    return glm::mat4(1.0f);
+Mat4f CascadedShadowMapper::calculate_cascade_projection(uint32_t /*i*/,
+                                                          const Mat4f& /*view*/,
+                                                          const Mat4f& /*proj*/) {
+    return Mat4f{};  // Stubbed — replaced in full Week 030 pass
 }
 
-glm::mat4 CascadedShadowMapper::calculate_cascade_view(const glm::vec3& light_direction,
-                                                       const glm::vec3& cascade_center,
-                                                       float cascade_radius) {
-    glm::vec3 light_pos = cascade_center - light_direction * cascade_radius;
-    glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
-    
-    // Handle case where light direction is parallel to up vector
-    if (std::abs(glm::dot(light_direction, up)) > 0.999f) {
-        up = glm::vec3(1.0f, 0.0f, 0.0f);
-    }
-    
-    return glm::lookAt(light_pos, cascade_center, up);
+Mat4f CascadedShadowMapper::calculate_cascade_view(const Vec3f& /*ld*/,
+                                                    const Vec3f& /*center*/,
+                                                    float /*radius*/) {
+    return Mat4f{};
 }
 
-void CascadedShadowMapper::stabilize_cascades(glm::mat4& view_matrix, glm::mat4& projection_matrix,
-                                             uint32_t cascade_index) {
-    // Stabilize cascades by snapping to texel grid
-    // This reduces shimmering when camera moves
-    
-    glm::mat4 view_projection = projection_matrix * view_matrix;
-    glm::mat4 inverse_view_projection = glm::inverse(view_projection);
-    
-    // Get cascade corners in world space
-    glm::vec4 corners[8] = {
-        glm::vec4(-1.0f, -1.0f, 0.0f, 1.0f),
-        glm::vec4(1.0f, -1.0f, 0.0f, 1.0f),
-        glm::vec4(1.0f, 1.0f, 0.0f, 1.0f),
-        glm::vec4(-1.0f, 1.0f, 0.0f, 1.0f),
-        glm::vec4(-1.0f, -1.0f, 1.0f, 1.0f),
-        glm::vec4(1.0f, -1.0f, 1.0f, 1.0f),
-        glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
-        glm::vec4(-1.0f, 1.0f, 1.0f, 1.0f)
-    };
-    
-    // Transform to world space
-    for (int i = 0; i < 8; ++i) {
-        corners[i] = inverse_view_projection * corners[i];
-        corners[i] /= corners[i].w;
-    }
-    
-    // Calculate bounds in light space and snap to texel grid
-    // This is a simplified version - full implementation would be more complex
+void CascadedShadowMapper::stabilize_cascades(Mat4f& /*view*/,
+                                               Mat4f& /*proj*/,
+                                               uint32_t /*cascade*/) {}
+
+std::vector<Vec3f> CascadedShadowMapper::get_frustum_corners(const Mat4f& /*view*/,
+                                                               const Mat4f& /*proj*/,
+                                                               float /*near*/,
+                                                               float /*far*/) {
+    return {};
 }
 
-std::vector<glm::vec3> CascadedShadowMapper::get_frustum_corners(const glm::mat4& view_matrix,
-                                                                  const glm::mat4& projection_matrix,
-                                                                  float near_split, float far_split) {
-    std::vector<glm::vec3> corners;
-    
-    // Calculate inverse matrices
-    glm::mat4 inverse_view = glm::inverse(view_matrix);
-    glm::mat4 inverse_projection = glm::inverse(projection_matrix);
-    
-    // Calculate split projection matrices
-    glm::mat4 split_projection = glm::perspective(
-        glm::radians(45.0f), // This should come from actual camera FOV
-        16.0f / 9.0f,       // This should come from actual aspect ratio
-        near_split,
-        far_split
-    );
-    
-    glm::mat4 inverse_split_projection = glm::inverse(split_projection);
-    
-    // Get frustum corners in clip space
-    glm::vec4 clip_corners[8] = {
-        glm::vec4(-1.0f, -1.0f, 0.0f, 1.0f),
-        glm::vec4(1.0f, -1.0f, 0.0f, 1.0f),
-        glm::vec4(1.0f, 1.0f, 0.0f, 1.0f),
-        glm::vec4(-1.0f, 1.0f, 0.0f, 1.0f),
-        glm::vec4(-1.0f, -1.0f, 1.0f, 1.0f),
-        glm::vec4(1.0f, -1.0f, 1.0f, 1.0f),
-        glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
-        glm::vec4(-1.0f, 1.0f, 1.0f, 1.0f)
-    };
-    
-    // Transform to world space
-    for (int i = 0; i < 8; ++i) {
-        glm::vec4 view_corner = inverse_split_projection * clip_corners[i];
-        view_corner /= view_corner.w;
-        glm::vec4 world_corner = inverse_view * view_corner;
-        corners.push_back(glm::vec3(world_corner));
+CascadedShadowMapper::BoundingBox CascadedShadowMapper::calculate_bounding_box(
+        const std::vector<Vec3f>& points) {
+    BoundingBox bb{Vec3f(1e9f, 1e9f, 1e9f), Vec3f(-1e9f, -1e9f, -1e9f)};
+    for (const auto& p : points) {
+        bb.min_bound = Vec3f(std::min(bb.min_bound.x(), p.x()),
+                             std::min(bb.min_bound.y(), p.y()),
+                             std::min(bb.min_bound.z(), p.z()));
+        bb.max_bound = Vec3f(std::max(bb.max_bound.x(), p.x()),
+                             std::max(bb.max_bound.y(), p.y()),
+                             std::max(bb.max_bound.z(), p.z()));
     }
-    
-    return corners;
-}
-
-CascadedShadowMapper::BoundingBox CascadedShadowMapper::calculate_bounding_box(const std::vector<glm::vec3>& points) {
-    BoundingBox bounds = {};
-    
-    if (points.empty()) {
-        bounds.min_bound = glm::vec3(0.0f);
-        bounds.max_bound = glm::vec3(0.0f);
-        return bounds;
-    }
-    
-    bounds.min_bound = points[0];
-    bounds.max_bound = points[0];
-    
-    for (const auto& point : points) {
-        bounds.min_bound = glm::min(bounds.min_bound, point);
-        bounds.max_bound = glm::max(bounds.max_bound, point);
-    }
-    
-    return bounds;
+    return bb;
 }
 
 CascadedShadowMapper::BoundingBox CascadedShadowMapper::calculate_light_space_bounding_box(
-    const std::vector<glm::vec3>& corners,
-    const glm::mat4& light_view_matrix) {
-    
-    std::vector<glm::vec3> light_space_corners;
-    
-    // Transform corners to light space
-    for (const auto& corner : corners) {
-        glm::vec4 light_corner = light_view_matrix * glm::vec4(corner, 1.0f);
-        light_space_corners.push_back(glm::vec3(light_corner));
-    }
-    
-    return calculate_bounding_box(light_space_corners);
+        const std::vector<Vec3f>& corners, const Mat4f& /*light_view*/) {
+    return calculate_bounding_box(corners);
 }
 
-// PCFFilter implementation
-bool PCFFilter::poisson_initialized_ = false;
-glm::vec2 PCFFilter::poisson_disk_[MAX_SAMPLES];
+// ---------------------------------------------------------------------------
+// PCFFilter
+// ---------------------------------------------------------------------------
 
-void PCFFilter::apply_filter(FilterType type, float texel_size, 
-                             glm::vec2& uv_offset, float& weight) {
-    switch (type) {
-        case FilterType::None:
-            uv_offset = glm::vec2(0.0f);
-            weight = 1.0f;
-            break;
-            
-        case FilterType::PCF_2x2:
-            {
-                static const glm::vec2 offsets[4] = {
-                    glm::vec2(-0.5f, -0.5f),
-                    glm::vec2(0.5f, -0.5f),
-                    glm::vec2(-0.5f, 0.5f),
-                    glm::vec2(0.5f, 0.5f)
-                };
-                uint32_t index = static_cast<uint32_t>(weight * 4) % 4;
-                uv_offset = offsets[index] * texel_size;
-                weight = 0.25f;
-            }
-            break;
-            
-        case FilterType::PCF_3x3:
-            {
-                static const glm::vec2 offsets[9] = {
-                    glm::vec2(-1.0f, -1.0f), glm::vec2(0.0f, -1.0f), glm::vec2(1.0f, -1.0f),
-                    glm::vec2(-1.0f, 0.0f),  glm::vec2(0.0f, 0.0f),  glm::vec2(1.0f, 0.0f),
-                    glm::vec2(-1.0f, 1.0f),  glm::vec2(0.0f, 1.0f),  glm::vec2(1.0f, 1.0f)
-                };
-                uint32_t index = static_cast<uint32_t>(weight * 9) % 9;
-                uv_offset = offsets[index] * texel_size;
-                weight = 1.0f / 9.0f;
-            }
-            break;
-            
-        case FilterType::PCF_5x5:
-            {
-                // Generate 5x5 grid offset
-                int x = static_cast<int>(weight * 5) % 5 - 2;
-                int y = static_cast<int>(weight * 25) % 5 - 2;
-                uv_offset = glm::vec2(x, y) * texel_size;
-                weight = 1.0f / 25.0f;
-            }
-            break;
-            
-        case FilterType::PCF_Random:
-            {
-                if (!poisson_initialized_) {
-                    initialize_poisson_disk();
-                }
-                uint32_t index = static_cast<uint32_t>(weight * MAX_SAMPLES) % MAX_SAMPLES;
-                uv_offset = poisson_disk_[index] * texel_size * 2.0f;
-                weight = 1.0f / static_cast<float>(MAX_SAMPLES);
-            }
-            break;
-    }
-}
+Vec2f    PCFFilter::poisson_disk_[MAX_SAMPLES]{};
+bool     PCFFilter::poisson_initialized_ = false;
 
 void PCFFilter::initialize_poisson_disk() {
-    // Simple Poisson disk sampling for PCF
-    for (uint32_t i = 0; i < MAX_SAMPLES; ++i) {
-        float angle = 2.0f * 3.14159265f * static_cast<float>(i) / static_cast<float>(MAX_SAMPLES);
-        float radius = std::sqrt(static_cast<float>(i) / static_cast<float>(MAX_SAMPLES));
-        poisson_disk_[i] = glm::vec2(std::cos(angle), std::sin(angle)) * radius;
-    }
+    // Simple 4-tap kernel for PCF 2×2
+    poisson_disk_[0] = Vec2f(-0.94201624f, -0.39906216f);
+    poisson_disk_[1] = Vec2f( 0.94558609f, -0.76890725f);
+    poisson_disk_[2] = Vec2f(-0.09418410f, -0.92938870f);
+    poisson_disk_[3] = Vec2f( 0.34495938f,  0.29387760f);
     poisson_initialized_ = true;
 }
 
-} // namespace cold_coffee::engine::render::shadows
+void PCFFilter::apply_filter(FilterType type, float texel_size,
+                              Vec2f& uv_offset, float& weight) {
+    if (!poisson_initialized_) initialize_poisson_disk();
+    (void)type;
+    uv_offset = Vec2f(poisson_disk_[0].x() * texel_size,
+                      poisson_disk_[0].y() * texel_size);
+    weight = 1.0f;
+}
+
+} // namespace gw::render::shadows

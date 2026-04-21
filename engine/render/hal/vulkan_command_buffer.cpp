@@ -99,24 +99,43 @@ void VulkanCommandBuffer::reset() {
     state_ = State::Initial;
 }
 
+void VulkanCommandBuffer::pipeline_barrier2(
+        VkDependencyFlags dependency_flags,
+        const std::vector<VkImageMemoryBarrier2>&  image_barriers,
+        const std::vector<VkBufferMemoryBarrier2>& buffer_barriers,
+        const std::vector<VkMemoryBarrier2>&       memory_barriers) {
+
+    VkDependencyInfo di{};
+    di.sType                    = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    di.dependencyFlags          = dependency_flags;
+    di.memoryBarrierCount       = static_cast<uint32_t>(memory_barriers.size());
+    di.pMemoryBarriers          = memory_barriers.empty()  ? nullptr : memory_barriers.data();
+    di.bufferMemoryBarrierCount = static_cast<uint32_t>(buffer_barriers.size());
+    di.pBufferMemoryBarriers    = buffer_barriers.empty()  ? nullptr : buffer_barriers.data();
+    di.imageMemoryBarrierCount  = static_cast<uint32_t>(image_barriers.size());
+    di.pImageMemoryBarriers     = image_barriers.empty()   ? nullptr : image_barriers.data();
+
+    vkCmdPipelineBarrier2(buffer_, &di);
+}
+
 void VulkanCommandBuffer::pipeline_barrier(
         VkPipelineStageFlags src_stage,
         VkPipelineStageFlags dst_stage,
-        VkDependencyFlags dependency_flags) {
-    
-    VkMemoryBarrier2 barrier{};
-    barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
-    barrier.srcStageMask = src_stage;
-    barrier.dstStageMask = dst_stage;
-    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-    
-    VkDependencyInfo dependency_info{};
-    dependency_info.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-    dependency_info.memoryBarrierCount = 1;
-    dependency_info.pMemoryBarriers = &barrier;
-    
-    vkCmdPipelineBarrier2(buffer_, &dependency_info);
+        VkDependencyFlags /*dependency_flags*/) {
+    // Lifted to sync2: emit a global memory barrier covering the requested stages.
+    VkMemoryBarrier2 bar{};
+    bar.sType         = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
+    bar.srcStageMask  = static_cast<VkPipelineStageFlags2>(src_stage);
+    bar.dstStageMask  = static_cast<VkPipelineStageFlags2>(dst_stage);
+    bar.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+    bar.dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT;
+
+    VkDependencyInfo di{};
+    di.sType               = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    di.memoryBarrierCount  = 1;
+    di.pMemoryBarriers     = &bar;
+
+    vkCmdPipelineBarrier2(buffer_, &di);
 }
 
 void VulkanCommandBuffer::copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size) {

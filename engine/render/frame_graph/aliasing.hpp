@@ -35,7 +35,7 @@ struct ResourceBinding {
 // Transient resource aliasing manager (Week 026)
 class TransientAliasing {
 public:
-    explicit TransientAliasing(VmaAllocator allocator);
+    TransientAliasing(VkDevice device, VmaAllocator allocator);
     ~TransientAliasing();
     
     // Non-copyable, movable
@@ -61,10 +61,12 @@ public:
     void dump_aliasing_map() const;
     
 private:
+    VkDevice     device_;
     VmaAllocator allocator_;
-    
-    // Aliasing heap for transient resources
-    VmaAllocation transient_heap_ = VK_NULL_HANDLE;
+
+    // Aliasing heap for transient resources (backed by VmaPool)
+    VmaPool        transient_pool_   = VK_NULL_HANDLE;
+    VmaAllocation  transient_heap_   = VK_NULL_HANDLE;
     VkDeviceMemory transient_memory_ = VK_NULL_HANDLE;
     VkDeviceSize heap_size_ = 0;
     VkDeviceSize heap_alignment_ = 256;  // Common alignment requirement

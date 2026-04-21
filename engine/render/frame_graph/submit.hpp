@@ -3,10 +3,21 @@
 #include "barrier_compiler.hpp"
 #include "types.hpp"
 #include "error.hpp"
+#include <functional>
 #include <memory>
 #include <volk.h>
 #include <vector>
 #include <unordered_map>
+
+// std::hash specialisation so QueueType (enum class uint8_t) can key an unordered_map.
+namespace std {
+template<>
+struct hash<gw::render::frame_graph::QueueType> {
+    size_t operator()(gw::render::frame_graph::QueueType qt) const noexcept {
+        return std::hash<uint8_t>{}(static_cast<uint8_t>(qt));
+    }
+};
+} // namespace std
 
 namespace gw::render::frame_graph {
 
