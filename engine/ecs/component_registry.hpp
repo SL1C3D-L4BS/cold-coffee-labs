@@ -16,9 +16,11 @@
 
 #include "entity.hpp"
 
+#include <concepts>
 #include <cstdint>
 #include <optional>
 #include <string_view>
+#include <type_traits>
 #include <unordered_map>
 #include <vector>
 
@@ -133,6 +135,23 @@ template <typename T>
 #endif
 }
 
+// Detect via ADL whether a free function `describe(T*)` returning
+// `const gw::core::TypeInfo&` exists. Populated by the GW_REFLECT macro
+// (see editor/reflect/reflect.hpp); silently nullptr for components without it.
+template <typename T>
+concept HasDescribe = requires (T* p) {
+    { describe(p) } -> std::convertible_to<const gw::core::TypeInfo&>;
+};
+
+template <typename T>
+[[nodiscard]] inline const gw::core::TypeInfo* reflection_pointer() noexcept {
+    if constexpr (HasDescribe<T>) {
+        return &describe(static_cast<T*>(nullptr));
+    } else {
+        return nullptr;
+    }
+}
+
 template <typename T>
 [[nodiscard]] inline ComponentTypeInfo make_info_for() noexcept {
     constexpr auto name = gw_type_name<T>();
@@ -143,6 +162,7 @@ template <typename T>
                               std::is_trivially_destructible_v<T>;
     info.stable_hash        = fnv1a_64(name);
     info.debug_name         = name;
+    info.reflection         = reflection_pointer<T>();
 
     if constexpr (std::is_copy_constructible_v<T>) {
         info.copy_construct = [](void* dst, const void* src) {

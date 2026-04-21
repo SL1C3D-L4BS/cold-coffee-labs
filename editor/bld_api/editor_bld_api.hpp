@@ -68,15 +68,16 @@ GW_EDITOR_API bool gw_editor_stop();
 // Internal setup — called by EditorApplication on startup (same process,
 // not exported to external callers).
 // ---------------------------------------------------------------------------
-namespace gw::editor { class SelectionContext; }
-namespace gw::core   { class CommandStack; }
+namespace gw::editor       { class SelectionContext; }
+namespace gw::editor::undo { class CommandStack; }
+namespace gw::ecs          { class World; }
 
 namespace gw::editor::bld_api {
 
     struct EditorGlobals {
-        gw::editor::SelectionContext* selection  = nullptr;
-        gw::core::CommandStack*       cmd_stack  = nullptr;
-        void*                         world      = nullptr;   // gw::ecs::World* Phase 8
+        gw::editor::SelectionContext*  selection  = nullptr;
+        gw::editor::undo::CommandStack* cmd_stack = nullptr;
+        gw::ecs::World*                world     = nullptr;
     };
 
     // Defined in editor_bld_api.cpp; written once by EditorApplication.

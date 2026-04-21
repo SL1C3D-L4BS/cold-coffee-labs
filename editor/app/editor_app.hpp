@@ -12,7 +12,8 @@
 #include "editor/panels/panel_registry.hpp"
 #include "editor/selection/selection_context.hpp"
 #include "editor/pie/gameplay_host.hpp"
-#include "engine/core/command.hpp"
+#include "editor/undo/command_stack.hpp"
+#include "engine/ecs/world.hpp"
 
 #include <memory>
 
@@ -84,10 +85,11 @@ private:
     std::unique_ptr<EditorVulkanBackend> vk_;
 
     // Editor state.
-    SelectionContext       selection_;
-    gw::core::CommandStack cmd_stack_{256};
-    PanelRegistry          panels_;
+    SelectionContext              selection_;
+    gw::editor::undo::CommandStack cmd_stack_{};
+    PanelRegistry                 panels_;
     GameplayHost           pie_;
+    gw::ecs::World         scene_world_;   // authoring world — lives for the editor session
 
     // Layout built flag — persisted via ImGui ini.
     bool layout_built_ = false;

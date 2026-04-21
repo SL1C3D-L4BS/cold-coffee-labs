@@ -25,6 +25,8 @@
 #include "editor/panels/viewport_panel.hpp"
 #include "editor/panels/asset_browser_panel.hpp"
 #include "editor/panels/console_panel.hpp"
+#include "editor/scene/components.hpp"
+#include "engine/ecs/hierarchy.hpp"
 
 // volk must precede every Vulkan include in this TU so that imgui_impl_vulkan
 // picks up volk's dispatch tables (IMGUI_IMPL_VULKAN_USE_VOLK is set by the
@@ -200,6 +202,38 @@ EditorApplication::EditorApplication()
     // Wire BLD API globals.
     gw::editor::bld_api::g_globals.selection = &selection_;
     gw::editor::bld_api::g_globals.cmd_stack = &cmd_stack_;
+    gw::editor::bld_api::g_globals.world     = &scene_world_;
+
+    // Seed the scene with three demo entities so the Outliner and Inspector
+    // have something to display on first launch. A root with two children
+    // exercises the hierarchy + ECS for_each path end-to-end.
+    using gw::editor::scene::NameComponent;
+    using gw::editor::scene::TransformComponent;
+    using gw::editor::scene::VisibilityComponent;
+    using gw::ecs::HierarchyComponent;
+
+    const auto root   = scene_world_.create_entity();
+    const auto childA = scene_world_.create_entity();
+    const auto childB = scene_world_.create_entity();
+
+    scene_world_.add_component(root,   NameComponent{"Scene Root"});
+    scene_world_.add_component(root,   TransformComponent{});
+    scene_world_.add_component(root,   VisibilityComponent{});
+
+    scene_world_.add_component(childA, NameComponent{"Cube"});
+    scene_world_.add_component(childA, TransformComponent{
+        glm::vec3{-1.5f, 0.f, 0.f}, glm::quat{1.f, 0.f, 0.f, 0.f},
+        glm::vec3{1.f, 1.f, 1.f}});
+    scene_world_.add_component(childA, VisibilityComponent{});
+
+    scene_world_.add_component(childB, NameComponent{"Sphere"});
+    scene_world_.add_component(childB, TransformComponent{
+        glm::vec3{ 1.5f, 0.f, 0.f}, glm::quat{1.f, 0.f, 0.f, 0.f},
+        glm::vec3{1.f, 1.f, 1.f}});
+    scene_world_.add_component(childB, VisibilityComponent{});
+
+    (void)scene_world_.reparent(childA, root);
+    (void)scene_world_.reparent(childB, root);
 }
 
 EditorApplication::~EditorApplication() {
@@ -240,7 +274,7 @@ void EditorApplication::run() {
         EditorContext ctx{
             .selection    = selection_,
             .cmd_stack    = cmd_stack_,
-            .world        = nullptr,   // Phase 8
+            .world        = &scene_world_,
             .asset_db     = nullptr,   // Phase 8
             .delta_time_s = dt,
             .in_pie       = pie_.in_play()
@@ -816,9 +850,9 @@ void EditorApplication::build_ui() {
         }
         if (ImGui::BeginMenu("Edit")) {
             if (ImGui::MenuItem("Undo", "Ctrl+Z", false, cmd_stack_.can_undo()))
-                (void)cmd_stack_.undo();
+                cmd_stack_.undo();
             if (ImGui::MenuItem("Redo", "Ctrl+Y", false, cmd_stack_.can_redo()))
-                (void)cmd_stack_.redo();
+                cmd_stack_.redo();
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Window")) {
@@ -1096,8 +1130,12 @@ void EditorApplication::on_key_callback(GLFWwindow* w, int key,
     if (!app) return;
 
     if (action == GLFW_PRESS && (mods & GLFW_MOD_CONTROL)) {
-        if (key == GLFW_KEY_Z) { (void)app->cmd_stack_.undo(); return; }
-        if (key == GLFW_KEY_Y) { (void)app->cmd_stack_.redo(); return; }
+        if (key == GLFW_KEY_Z) {
+            if (mods & GLFW_MOD_SHIFT) app->cmd_stack_.redo();  // Ctrl+Shift+Z
+            else                        app->cmd_stack_.undo();
+            return;
+        }
+        if (key == GLFW_KEY_Y) { app->cmd_stack_.redo(); return; }
         if (key == GLFW_KEY_S) { gw_editor_save_scene("content/untitled.gwscene"); return; }
     }
 

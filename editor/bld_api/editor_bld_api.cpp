@@ -5,7 +5,9 @@
 
 // Full type definitions required — the header only forward-declares these.
 #include "editor/selection/selection_context.hpp"
-#include "engine/core/command.hpp"
+#include "editor/scene/components.hpp"
+#include "editor/undo/command_stack.hpp"
+#include "engine/ecs/world.hpp"
 
 #include <cstdlib>
 #include <cstring>
@@ -41,12 +43,21 @@ GW_EDITOR_API void gw_editor_set_selection(const uint64_t* handles,
 }
 
 // ---------------------------------------------------------------------------
-GW_EDITOR_API uint64_t gw_editor_create_entity(const char* /*name*/) {
-    return 0u;  // TODO(Phase 8)
+GW_EDITOR_API uint64_t gw_editor_create_entity(const char* name) {
+    if (!g_globals.world) return 0u;
+    const auto e = g_globals.world->create_entity();
+    g_globals.world->add_component(e,
+        gw::editor::scene::NameComponent{name ? name : "Entity"});
+    g_globals.world->add_component(e, gw::editor::scene::TransformComponent{});
+    return e.bits;
 }
 
-GW_EDITOR_API bool gw_editor_destroy_entity(uint64_t /*handle*/) {
-    return false;  // TODO(Phase 8)
+GW_EDITOR_API bool gw_editor_destroy_entity(uint64_t handle) {
+    if (!g_globals.world) return false;
+    const gw::ecs::Entity e{handle};
+    if (!g_globals.world->is_alive(e)) return false;
+    g_globals.world->destroy_entity(e);
+    return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -69,13 +80,15 @@ GW_EDITOR_API void gw_free_string(const char* s) {
 
 // ---------------------------------------------------------------------------
 GW_EDITOR_API bool gw_editor_undo() {
-    if (!g_globals.cmd_stack) return false;
-    return g_globals.cmd_stack->undo();
+    if (!g_globals.cmd_stack || !g_globals.cmd_stack->can_undo()) return false;
+    g_globals.cmd_stack->undo();
+    return true;
 }
 
 GW_EDITOR_API bool gw_editor_redo() {
-    if (!g_globals.cmd_stack) return false;
-    return g_globals.cmd_stack->redo();
+    if (!g_globals.cmd_stack || !g_globals.cmd_stack->can_redo()) return false;
+    g_globals.cmd_stack->redo();
+    return true;
 }
 
 GW_EDITOR_API const char* gw_editor_command_stack_summary(uint32_t max_entries) {

@@ -10,8 +10,9 @@ namespace gw::editor {
     struct EditorContext;
     class  SelectionContext;
 }
-namespace gw::core { class CommandStack; }
-namespace gw::assets { class AssetDatabase; class VirtualFilesystem; }
+namespace gw::editor::undo { class CommandStack; }
+namespace gw::ecs          { class World; }
+namespace gw::assets       { class AssetDatabase; class VirtualFilesystem; }
 
 namespace gw::editor {
 
@@ -20,14 +21,15 @@ namespace gw::editor {
 // Panels borrow these references; they never own them.
 // ---------------------------------------------------------------------------
 struct EditorContext {
-    SelectionContext&       selection;
-    gw::core::CommandStack& cmd_stack;
-    // ECS World* — Phase 8 will replace this with the real type.
-    // For Phase 7, panels store entities as opaque uint64_t handles.
-    void*                   world         = nullptr;  // gw::ecs::World* (Phase 8)
-    gw::assets::AssetDatabase* asset_db   = nullptr;
-    float                   delta_time_s  = 0.f;
-    bool                    in_pie        = false;
+    SelectionContext&              selection;
+    gw::editor::undo::CommandStack& cmd_stack;
+    // Real ECS world pointer since 2026-04-20 Phase-7 Path-A. Never null in a
+    // running editor; unit tests that construct a bare EditorContext may pass
+    // nullptr.
+    gw::ecs::World*            world        = nullptr;
+    gw::assets::AssetDatabase* asset_db     = nullptr;
+    float                      delta_time_s = 0.f;
+    bool                       in_pie       = false;
 };
 
 // ---------------------------------------------------------------------------

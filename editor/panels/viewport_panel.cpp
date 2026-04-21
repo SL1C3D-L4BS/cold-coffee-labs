@@ -2,7 +2,7 @@
 // Spec ref: Phase 7 §6 — offscreen render target, camera, gizmos, debug draw.
 #include "viewport_panel.hpp"
 #include "editor/viewport/debug_draw.hpp"
-#include "editor/commands/editor_commands.hpp"
+#include "editor/undo/commands.hpp"
 
 #include <imgui.h>
 #include <imgui_impl_vulkan.h>

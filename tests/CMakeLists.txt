@@ -10,8 +10,9 @@ add_executable(gw_tests
     containers_test.cpp
     string_test.cpp
     unit/render/frame_graph_test.cpp
-    # Phase 3 — Core systems (command stack fixed in Phase 7 gap-fill)
-    unit/core/command_stack_test.cpp
+    # Phase 7 fullstack Path-A — Editor CommandStack (docs/adr/0005-editor-command-stack.md)
+    unit/editor_undo/command_stack_test.cpp
+    "${CMAKE_SOURCE_DIR}/editor/undo/command_stack.cpp"
     # Phase 7 gap-fill — ECS World (docs/adr/0004-ecs-world.md)
     unit/ecs/world_test.cpp
     # Phase 6 — Asset Pipeline

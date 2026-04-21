@@ -1,161 +1,182 @@
 // editor/panels/outliner_panel.cpp
+// Walks the real ECS world via World::visit_roots / visit_descendants.
+// Create / rename / delete / reparent all flow through the CommandStack so
+// every mutation is undoable (ADR-0004 §2.7, ADR-0005).
 #include "outliner_panel.hpp"
-#include "editor/commands/editor_commands.hpp"
+#include "editor/undo/commands.hpp"
+#include "editor/scene/components.hpp"
+#include "engine/ecs/world.hpp"
+#include "engine/ecs/hierarchy.hpp"
 
 #include <imgui.h>
-#include <algorithm>
+#include <cstdio>
 #include <cstring>
 
 namespace gw::editor {
 
-// ---------------------------------------------------------------------------
-void OutlinerPanel::add_entity(EntityHandle h, const char* n, EntityHandle parent) {
-    EntityEntry e{};
-    e.handle = h;
-    e.parent = parent;
-    std::strncpy(e.name, n ? n : "Entity", sizeof(e.name) - 1);
-    entities_.push_back(e);
+namespace {
+
+// Read the entity's display name (from its NameComponent). Returns a stable
+// internal buffer pointer so ImGui can render it directly; ok to read across
+// the whole frame since components live at stable addresses within a single
+// panel-render scope.
+const char* name_of(const gw::ecs::World* w, EntityHandle e) {
+    if (!w) return "<?>";
+    const auto* nc = w->get_component<scene::NameComponent>(e);
+    return (nc && nc->c_str()[0] != '\0') ? nc->c_str() : "<unnamed>";
 }
 
-void OutlinerPanel::remove_entity(EntityHandle h) {
-    entities_.erase(
-        std::remove_if(entities_.begin(), entities_.end(),
-            [h](const EntityEntry& e){ return e.handle == h; }),
-        entities_.end());
+// True when `e` has a child (first_child != null). Safe for entities without
+// a HierarchyComponent (returns false).
+bool has_children(const gw::ecs::World* w, EntityHandle e) {
+    if (!w) return false;
+    const auto* h = w->get_component<gw::ecs::HierarchyComponent>(e);
+    return h && !h->first_child.is_null();
 }
 
+} // namespace
+
 // ---------------------------------------------------------------------------
-void OutlinerPanel::draw_entity_row(EditorContext& ctx, EntityHandle h,
-                                     const char* label, bool /*has_children*/)
-{
-    bool selected = ctx.selection.is_selected(h);
+void OutlinerPanel::draw_entity_row(EditorContext& ctx, EntityHandle h) {
+    auto* world = ctx.world;
+    const char* label = name_of(world, h);
 
-    ImGuiTreeNodeFlags flags =
-        ImGuiTreeNodeFlags_Leaf |
-        ImGuiTreeNodeFlags_SpanFullWidth |
-        ImGuiTreeNodeFlags_OpenOnArrow;
-    if (selected) flags |= ImGuiTreeNodeFlags_Selected;
-
-    // Rename mode.
+    // Rename mode — an active InputText that commits on Enter / focus loss.
     if (rename_target_ == h) {
         ImGui::SetNextItemWidth(-1.f);
-        if (ImGui::InputText("##rename", rename_buf_, sizeof(rename_buf_),
+        const bool commit = ImGui::InputText("##rename", rename_buf_, sizeof(rename_buf_),
                               ImGuiInputTextFlags_EnterReturnsTrue |
-                              ImGuiInputTextFlags_AutoSelectAll)) {
-            // Apply rename — update local cache.
-            for (auto& e : entities_) {
-                if (e.handle == h)
-                    std::strncpy(e.name, rename_buf_, sizeof(e.name) - 1);
+                              ImGuiInputTextFlags_AutoSelectAll);
+        if (commit) {
+            if (auto* nc = world->get_component<scene::NameComponent>(h)) {
+                const auto n = std::strlen(rename_buf_);
+                const auto cap = nc->value.size() - 1;
+                const auto cp = n < cap ? n : cap;
+                std::memcpy(nc->data(), rename_buf_, cp);
+                nc->value[cp] = '\0';
             }
             rename_target_ = kNullEntity;
         }
-        if (!ImGui::IsItemActive() && !ImGui::IsItemFocused())
+        if (!ImGui::IsItemActive() && !ImGui::IsItemFocused()) {
             rename_target_ = kNullEntity;
+        }
         return;
     }
 
-    ImGui::PushID(static_cast<int>(h.bits));
-    bool open = ImGui::TreeNodeEx(label, flags);
+    const bool is_selected = ctx.selection.is_selected(h);
+    const bool is_branch   = has_children(world, h);
 
-    // Selection on click.
+    ImGuiTreeNodeFlags flags =
+        ImGuiTreeNodeFlags_SpanFullWidth |
+        ImGuiTreeNodeFlags_OpenOnArrow;
+    if (!is_branch)  flags |= ImGuiTreeNodeFlags_Leaf;
+    if (is_selected) flags |= ImGuiTreeNodeFlags_Selected;
+
+    ImGui::PushID(static_cast<int>(h.bits));
+    const bool open = ImGui::TreeNodeEx(label, flags);
+
     if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
-        if (ImGui::GetIO().KeyCtrl)
-            ctx.selection.toggle(h);
-        else
-            ctx.selection.set(h);
+        if (ImGui::GetIO().KeyCtrl) ctx.selection.toggle(h);
+        else                         ctx.selection.set(h);
     }
 
-    // Double-click → rename.
     if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
         rename_target_ = h;
         std::strncpy(rename_buf_, label, sizeof(rename_buf_) - 1);
+        rename_buf_[sizeof(rename_buf_) - 1] = '\0';
     }
 
-    // Drag source.
     if (ImGui::BeginDragDropSource()) {
         ImGui::SetDragDropPayload("ENTITY", &h, sizeof(h));
         ImGui::Text("Move %s", label);
         ImGui::EndDragDropSource();
     }
 
-    // Drop target.
     if (ImGui::BeginDragDropTarget()) {
         if (const ImGuiPayload* p = ImGui::AcceptDragDropPayload("ENTITY")) {
-            EntityHandle dragged = *static_cast<const EntityHandle*>(p->Data);
-            ctx.cmd_stack.execute_and_push(
-                std::make_unique<commands::ReparentEntityCommand>(
-                    dragged, kNullEntity, h,
-                    [](EntityHandle /*c*/, EntityHandle /*np*/){}));
+            const EntityHandle dragged = *static_cast<const EntityHandle*>(p->Data);
+            if (dragged != h && world) {
+                gw::ecs::Entity old_parent = gw::ecs::Entity::null();
+                if (auto* ch = world->get_component<gw::ecs::HierarchyComponent>(dragged)) {
+                    old_parent = ch->parent;
+                }
+                ctx.cmd_stack.push(
+                    std::make_unique<undo::ReparentEntityCommand>(
+                        dragged, old_parent, h,
+                        [world](EntityHandle child, EntityHandle new_parent) {
+                            (void)world->reparent(child, new_parent);
+                        }));
+            }
         }
         ImGui::EndDragDropTarget();
     }
 
-    draw_context_menu(ctx, h);
+    // Right-click context menu.
+    if (ImGui::BeginPopupContextItem("##entity_ctx")) {
+        if (ImGui::MenuItem("Rename")) {
+            rename_target_ = h;
+            std::strncpy(rename_buf_, label, sizeof(rename_buf_) - 1);
+            rename_buf_[sizeof(rename_buf_) - 1] = '\0';
+        }
+        if (ImGui::MenuItem("Create Child") && world) {
+            auto child = world->create_entity();
+            world->add_component(child, scene::NameComponent{"Child"});
+            world->add_component(child, scene::TransformComponent{});
+            (void)world->reparent(child, h);
+        }
+        ImGui::Separator();
+        if (ImGui::MenuItem("Delete") && world) {
+            // Direct destroy for Phase-7. The full DestroyEntityCommand
+            // (undoable via ECS serialization snapshot) lands in Gate C.
+            world->destroy_entity(h);
+            ctx.selection.clear();
+        }
+        ImGui::EndPopup();
+    }
 
-    if (open) ImGui::TreePop();
+    if (open) {
+        if (world) {
+            for (auto c : world->children_of(h)) {
+                draw_entity_row(ctx, c);
+            }
+        }
+        ImGui::TreePop();
+    }
     ImGui::PopID();
-}
-
-void OutlinerPanel::draw_context_menu(EditorContext& ctx, EntityHandle h) {
-    if (!ImGui::BeginPopupContextItem("##entity_ctx")) return;
-
-    if (ImGui::MenuItem("Rename")) {
-        rename_target_ = h;
-        for (const auto& e : entities_)
-            if (e.handle == h) std::strncpy(rename_buf_, e.name, sizeof(rename_buf_)-1);
-    }
-    if (ImGui::MenuItem("Duplicate")) {
-        // Phase 8: real deep-clone via ECS serialization. For now, mint a
-        // distinct fake handle so the UI round-trips.
-        static uint64_t counter = 1000;
-        ++counter;
-        add_entity(gw::ecs::Entity{counter}, "Duplicate", kNullEntity);
-    }
-    ImGui::Separator();
-    if (ImGui::MenuItem("Create Child")) {
-        static uint64_t child_ctr = 2000;
-        add_entity(gw::ecs::Entity{++child_ctr}, "Child Entity", h);
-    }
-    ImGui::Separator();
-    if (ImGui::MenuItem("Delete")) {
-        ctx.cmd_stack.execute_and_push(
-            std::make_unique<commands::CreateEntityCommand>(
-                "deleted",
-                [](const char*) -> EntityHandle { return kNullEntity; },
-                [this](EntityHandle hd){ remove_entity(hd); }));
-        ctx.selection.clear();
-    }
-
-    ImGui::EndPopup();
 }
 
 // ---------------------------------------------------------------------------
 void OutlinerPanel::on_imgui_render(EditorContext& ctx) {
     ImGui::Begin(name(), &visible_);
 
-    // Search bar.
-    ImGui::SetNextItemWidth(-1.f);
+    auto* world = ctx.world;
+
+    ImGui::SetNextItemWidth(-28.f);
     ImGui::InputTextWithHint("##search", "Filter...", search_buf_, sizeof(search_buf_));
     ImGui::SameLine();
-    if (ImGui::SmallButton("+")) {
-        // Create Entity action. Until EditorContext carries a real World
-        // pointer, mint a unique fake handle so the UI round-trips.
-        static uint64_t new_entity_id = 100;
-        EntityHandle h{++new_entity_id};
-        add_entity(h, "New Entity", kNullEntity);
-        ctx.selection.set(h);
+    if (ImGui::SmallButton("+") && world) {
+        const auto e = world->create_entity();
+        world->add_component(e, scene::NameComponent{"Entity"});
+        world->add_component(e, scene::TransformComponent{});
+        ctx.selection.set(e);
     }
     ImGui::Separator();
 
-    std::string_view filter{search_buf_};
-
-    // Render root entities (those with no parent).
-    for (const auto& e : entities_) {
-        if (e.parent != kNullEntity) continue;
-        if (!filter.empty() &&
-            std::strstr(e.name, search_buf_) == nullptr) continue;
-        draw_entity_row(ctx, e.handle, e.name, false);
+    if (!world) {
+        ImGui::TextDisabled("No scene world bound.");
+        ImGui::End();
+        return;
     }
+
+    const std::string_view filter{search_buf_};
+
+    world->visit_roots([&](EntityHandle root) {
+        if (!filter.empty() &&
+            std::strstr(name_of(world, root), search_buf_) == nullptr) {
+            return;
+        }
+        draw_entity_row(ctx, root);
+    });
 
     ImGui::End();
 }

@@ -93,7 +93,7 @@ add_executable(gw_editor
     reflect/widget_drawer.cpp
     pie/gameplay_host.cpp
     bld_api/editor_bld_api.cpp
-    commands/editor_commands.cpp
+    undo/command_stack.cpp
 )
 
 target_include_directories(gw_editor PRIVATE
