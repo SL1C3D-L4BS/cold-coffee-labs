@@ -126,3 +126,27 @@ The engine is ready for Phase 4 development and further feature implementation.
 
 *Report generated: April 20, 2026*
 *Validation completed: SUCCESS*
+
+---
+
+## Addendum: 2026-04-20 audit + 2026-04-21 true closure
+
+The original report above (2026-04-20 morning) was **optimistic** — a same-day audit run against the Phase-3 week-cards surfaced three missing week cards (011 `CommandStack`, 015 ECS queries/systems, 016 serialization beyond a stub) and two partial ones (014 ECS primitives without a `World`, 016 reflection only). The phase was downgraded to **PARTIAL** pending the pull-forward corrective plan. See `docs/05_ROADMAP_AND_MILESTONES.md §Phase-3 amendment note` and `docs/AUDIT_MAP_2026-04-20.md`.
+
+**On 2026-04-21 the phase was genuinely closed.** Path-A pull-forward landed under Phase-7 commits as follows:
+
+| Week-card pull-forward                  | Commit / file                                   | ADR       |
+|-----------------------------------------|-------------------------------------------------|-----------|
+| 011 `CommandStack`                      | `editor/undo/command_stack.*` (gate A)          | ADR-0005  |
+| 014/015 ECS `World` + queries + registry | `engine/ecs/world.{hpp,cpp}` (gate A/B)        | ADR-0004  |
+| 016 serialization (real impl)           | `engine/ecs/serialize.{hpp,cpp}` + `engine/core/serialization.*` (gate C, `7c8fd60`) | ADR-0006 |
+| ECS generational-handle ABA guard       | 2026-04-21 late-night (gate E companion fix)    | ADR-0004 §2.3 |
+
+Test counts after 2026-04-21 closure:
+- **101 / 101** doctest cases green across the full unit suite (was 58 pre-Path-A, 100 mid-push).
+- **13 / 13** `World` test cases green including `destroy_entity invalidates the handle; reuse bumps generation` (world_test.cpp:60) — the final test blocking Phase-3 sign-off.
+
+Phase-3 status in `docs/05_ROADMAP_AND_MILESTONES.md §Phase overview` is now **completed (2026-04-21, pulled forward through Phase 7)**. The recording gate for *Foundations Set* is rolled into the *Editor v0.1* demo since one narrated session exercises entities, components, queries, undo, and save/load simultaneously.
+
+*Addendum added: April 21, 2026*
+

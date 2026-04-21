@@ -86,9 +86,15 @@ add_executable(gw_editor
     panels/viewport_panel.cpp
     panels/asset_browser_panel.cpp
     panels/console_panel.cpp
+    panels/stats_panel.cpp
+    panels/render_settings_panel.cpp
+    panels/lighting_panel.cpp
+    panels/render_targets_panel.cpp
     viewport/editor_camera.cpp
     viewport/debug_draw.cpp
     viewport/gizmo_system.cpp
+    scene/transform_system.cpp
+    vscript/vscript_panel.cpp
     selection/selection_context.cpp
     reflect/widget_drawer.cpp
     pie/gameplay_host.cpp

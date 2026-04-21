@@ -7,12 +7,18 @@
 #include "editor/selection/selection_context.hpp"
 #include "editor/scene/components.hpp"
 #include "editor/undo/command_stack.hpp"
+#include "engine/ecs/hierarchy.hpp"
 #include "engine/ecs/world.hpp"
+#include "engine/scene/migration.hpp"
+#include "engine/scene/scene_file.hpp"
 
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <mutex>
+#include <span>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -173,8 +179,98 @@ GW_EDITOR_API const char* gw_editor_command_stack_summary(uint32_t max_entries) 
 }
 
 // ---------------------------------------------------------------------------
-GW_EDITOR_API bool gw_editor_save_scene(const char* /*path*/) { return false; }
-GW_EDITOR_API bool gw_editor_load_scene(const char* /*path*/) { return false; }
+// Scene I/O — Phase 8 week 043. Bridges the C-ABI boundary into
+// engine/scene/scene_file so BLD and the editor menu share one code path.
+// The authoring World is the target on both sides; the caller guarantees
+// thread-exclusive access (editor tick only, BLD tools run on the same
+// thread by ADR-0007 §2.4).
+namespace {
+
+void ensure_editor_component_types(gw::ecs::World& w) {
+    // Eagerly seed the registry so load_scene can resolve stable_hash →
+    // live ComponentTypeId even in an empty editor world. Idempotent.
+    (void)w.component_registry().id_of<gw::editor::scene::NameComponent>();
+    (void)w.component_registry().id_of<gw::editor::scene::TransformComponent>();
+    (void)w.component_registry().id_of<gw::editor::scene::VisibilityComponent>();
+    (void)w.component_registry().id_of<gw::editor::scene::WorldMatrixComponent>();
+    (void)w.component_registry().id_of<gw::ecs::HierarchyComponent>();
+}
+
+// Register editor-owned component migrations once, idempotently. Invoked
+// lazily from gw_editor_load_scene so plain tests that never call load_scene
+// don't pay the cost — and so BLD plugins can override migrations *before*
+// first load by calling MigrationRegistry::global() themselves.
+//
+// v1→v2 TransformComponent: position widened from glm::vec3 (12 bytes) to
+// glm::dvec3 (24 bytes). Everything else unchanged.
+void register_editor_migrations_once() {
+    static std::once_flag done;
+    std::call_once(done, []{
+        using gw::editor::scene::TransformComponent;
+        // v1 layout was vec3+quat+vec3 = 40 bytes (no padding — vec3 has
+        // 4-byte alignment so the trailing vec3 sits flush).
+        constexpr std::uint32_t kV1Size = 12u + 16u + 12u;
+        // v2 pulls `position` up to dvec3 (8-byte alignment), which forces the
+        // whole struct to alignof(double). sizeof() therefore rounds up to the
+        // next multiple of 8 — 52 logical bytes + 4 trailing padding = 56.
+        static_assert(sizeof(TransformComponent) == 56u,
+                      "TransformComponent v2 must land at 56 bytes "
+                      "(dvec3+quat+vec3 + 4B trailing padding under 8B alignment)");
+
+        gw::scene::MigrationRegistry::global().register_fn<TransformComponent>(
+            kV1Size,
+            [](std::span<const std::uint8_t> src,
+               std::span<std::uint8_t>       dst) {
+                if (src.size() != kV1Size ||
+                    dst.size() != sizeof(TransformComponent)) {
+                    return false;
+                }
+                // v1 layout: float pos[3] | float quat[4] | float scale[3]
+                // v2 layout: double pos[3] | float quat[4] | float scale[3]
+                float pos_f[3];
+                std::memcpy(pos_f, src.data(), sizeof(pos_f));
+                const std::uint8_t* src_after_pos = src.data() + sizeof(pos_f);
+
+                TransformComponent t{};
+                t.position = glm::dvec3(
+                    static_cast<double>(pos_f[0]),
+                    static_cast<double>(pos_f[1]),
+                    static_cast<double>(pos_f[2]));
+                std::memcpy(&t.rotation, src_after_pos, sizeof(t.rotation));
+                std::memcpy(&t.scale,    src_after_pos + sizeof(t.rotation),
+                            sizeof(t.scale));
+                std::memcpy(dst.data(), &t, sizeof(t));
+                return true;
+            },
+            "TransformComponent: widen position vec3->dvec3");
+    });
+}
+
+} // namespace
+
+GW_EDITOR_API bool gw_editor_save_scene(const char* path) {
+    if (!g_globals.world || !path || path[0] == '\0') return false;
+    std::filesystem::path p{path};
+    auto r = gw::scene::save_scene(p, *g_globals.world);
+    if (!r) {
+        gw_editor_log_error(gw::scene::to_string(r.error()).data());
+        return false;
+    }
+    return true;
+}
+
+GW_EDITOR_API bool gw_editor_load_scene(const char* path) {
+    if (!g_globals.world || !path || path[0] == '\0') return false;
+    std::filesystem::path p{path};
+    ensure_editor_component_types(*g_globals.world);
+    register_editor_migrations_once();
+    auto r = gw::scene::load_scene(p, *g_globals.world);
+    if (!r) {
+        gw_editor_log_error(gw::scene::to_string(r.error()).data());
+        return false;
+    }
+    return true;
+}
 
 // ---------------------------------------------------------------------------
 GW_EDITOR_API bool gw_editor_enter_play() { return false; }

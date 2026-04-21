@@ -23,6 +23,15 @@ add_executable(gw_tests
     unit/ecs/world_test.cpp
     # Phase 7 — ECS serialization (docs/adr/0006-ecs-world-serialization.md)
     unit/ecs/serialize_test.cpp
+    # Phase 8 week 043 — `.gwscene` file format + migration (ADR-0006 + ADR-0008)
+    unit/scene/scene_file_test.cpp
+    # Phase 8 week 044 — dvec3 TransformComponent + transform_system
+    unit/scene/transform_system_test.cpp
+    "${CMAKE_SOURCE_DIR}/editor/scene/transform_system.cpp"
+    # Phase 8 week 045 — Visual Scripting IR + parser + interpreter
+    unit/vscript/vscript_ir_test.cpp
+    # Phase 8 week 046 — Visual Scripting bytecode + VM (oracle-matched against interpreter)
+    unit/vscript/vscript_vm_test.cpp
     # Phase 6 — Asset Pipeline
     unit/assets/cook_cache_test.cpp
     unit/assets/mesh_cooker_test.cpp

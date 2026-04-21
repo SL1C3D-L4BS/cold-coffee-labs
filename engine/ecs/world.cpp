@@ -53,9 +53,13 @@ Entity World::create_entity() {
         slots_.emplace_back();  // default-constructed: generation=0, archetype invalid
     }
     auto& slot = slots_[index];
-    // Bump generation on reuse; new slots transition 0 -> 1.
+    // Bump generation on every create. The destroy path also bumps, so a
+    // create → destroy → create sequence on the same slot advances the
+    // generation twice, guaranteeing strict > ordering (ADR-0004 §2.3
+    // generation-bump rule).
     ++slot.generation;
-    if (slot.generation == 0) slot.generation = 1;  // never use generation 0 for live
+    if (slot.generation == 0) slot.generation = 1;  // skip the null sentinel
+    slot.alive        = true;
     slot.archetype_id = kInvalidArchetypeId;
     slot.chunk_index  = std::numeric_limits<std::uint16_t>::max();
     slot.slot_index   = std::numeric_limits<std::uint16_t>::max();
@@ -81,10 +85,14 @@ void World::destroy_entity(Entity e) {
         }
     }
 
-    // Mark the slot free. Generation 0 means "free" per EntitySlot's doctrine;
-    // a subsequent create_entity() will bump generation back into the live
-    // range (1+), so the old handle's generation compare fails is_alive.
-    slot.generation   = 0;
+    // Mark the slot free AND bump the generation so any stale copy of the
+    // outgoing handle (same index + pre-destroy generation) is rejected
+    // immediately by is_alive, and so a subsequent create_entity() on this
+    // same slot lands on a strictly-greater generation than what the caller
+    // is still holding. ADR-0004 §2.3 generation-bump rule.
+    slot.alive        = false;
+    ++slot.generation;
+    if (slot.generation == 0) slot.generation = 1;
     slot.archetype_id = kInvalidArchetypeId;
     slot.chunk_index  = std::numeric_limits<std::uint16_t>::max();
     slot.slot_index   = std::numeric_limits<std::uint16_t>::max();
@@ -96,7 +104,7 @@ bool World::is_alive(Entity e) const noexcept {
     if (e.is_null())                    return false;
     if (e.index() >= slots_.size())     return false;
     const auto& slot = slots_[e.index()];
-    return slot.generation == e.generation();
+    return slot.alive && slot.generation == e.generation();
 }
 
 void World::visit_entities(const std::function<void(Entity)>& fn) const {
@@ -111,11 +119,11 @@ void World::visit_entities(const std::function<void(Entity)>& fn) const {
         }
     }
     // Entities with no components (archetype_id == invalid) are live too —
-    // emit them so visit_entities matches entity_count(). Freed slots have
-    // generation == 0 and are skipped.
+    // emit them so visit_entities matches entity_count(). Freed slots carry
+    // alive == false and are skipped.
     for (std::uint32_t i = 0; i < slots_.size(); ++i) {
         const auto& slot = slots_[i];
-        if (slot.generation != 0 && slot.archetype_id == kInvalidArchetypeId) {
+        if (slot.alive && slot.archetype_id == kInvalidArchetypeId) {
             fn(Entity::from_parts(i, slot.generation));
         }
     }
@@ -161,10 +169,13 @@ Entity World::restore_entity_with_bits(std::uint64_t bits) {
     }
     auto& slot = slots_[idx];
     // Must point at an empty slot — anything else would collide with a live
-    // entity and is a caller bug.
-    if (slot.generation != 0) return Entity::null();
+    // entity and is a caller bug. For deserialization, `clear()` is the
+    // contractual predecessor, so every slot we walk here is born with
+    // alive=false.
+    if (slot.alive) return Entity::null();
 
     slot.generation   = e.generation();
+    slot.alive        = true;
     slot.archetype_id = kInvalidArchetypeId;
     slot.chunk_index  = std::numeric_limits<std::uint16_t>::max();
     slot.slot_index   = std::numeric_limits<std::uint16_t>::max();
@@ -448,7 +459,7 @@ void World::visit_roots(const std::function<void(Entity)>& fn) const {
     // Archetype-less entities (no components) are also roots.
     for (std::uint32_t i = 0; i < slots_.size(); ++i) {
         const auto& slot = slots_[i];
-        if (slot.generation != 0 && slot.archetype_id == kInvalidArchetypeId) {
+        if (slot.alive && slot.archetype_id == kInvalidArchetypeId) {
             fn(Entity::from_parts(i, slot.generation));
         }
     }

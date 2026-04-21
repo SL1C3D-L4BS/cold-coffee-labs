@@ -156,6 +156,10 @@ struct ParsedPayload {
     std::vector<ComponentTypeId>            local_to_live;
     std::vector<std::uint32_t>              local_sizes;     // from blob
     std::vector<std::uint8_t>               local_trivial;   // 0/1 flag
+    std::vector<std::uint64_t>              local_stable_hash;
+    // True iff the on-disk size for this local_id differs from the live
+    // registry size — migration callback will be consulted in apply_payload.
+    std::vector<std::uint8_t>               local_needs_migration;
     std::vector<EntityRecord>               entities;
 };
 
@@ -174,6 +178,8 @@ parse_payload(const World& w, BinaryReader& br,
     out.local_to_live.resize(type_count, kInvalidComponentTypeId);
     out.local_sizes.resize(type_count, 0);
     out.local_trivial.resize(type_count, 0);
+    out.local_stable_hash.resize(type_count, 0);
+    out.local_needs_migration.resize(type_count, 0);
 
     for (std::uint16_t i = 0; i < type_count; ++i) {
         std::uint16_t local_id    = 0;
@@ -193,14 +199,18 @@ parse_payload(const World& w, BinaryReader& br,
         if (auto live = reg.lookup_by_hash(stable_hash); live) {
             const auto& live_info = reg.info(*live);
             if (trivial && live_info.size != size) {
-                return std::unexpected(SerializationError::ComponentSizeMismatch);
+                // Defer the decision: a migration callback may yet rescue
+                // this payload in apply_payload. If no callback is set, the
+                // applier will flag ComponentSizeMismatch.
+                out.local_needs_migration[local_id] = 1;
             }
             out.local_to_live[local_id] = *live;
         } else if (opts.strict_unknown_components) {
             return std::unexpected(SerializationError::UnknownComponentType);
         }
-        out.local_sizes[local_id]   = size;
-        out.local_trivial[local_id] = trivial;
+        out.local_sizes[local_id]       = size;
+        out.local_trivial[local_id]     = trivial;
+        out.local_stable_hash[local_id] = stable_hash;
     }
 
     out.entities.resize(entity_count);
@@ -232,7 +242,9 @@ parse_payload(const World& w, BinaryReader& br,
 }
 
 std::expected<void, SerializationError>
-apply_payload(World& w, const ParsedPayload& parsed, bool reuse_bits) {
+apply_payload(World& w, const ParsedPayload& parsed, bool reuse_bits,
+              const MigrateComponentFn& migrate) {
+    const auto& reg = w.component_registry();
     for (const auto& rec : parsed.entities) {
         Entity e = reuse_bits ? w.restore_entity_with_bits(rec.bits)
                                : w.create_entity();
@@ -244,8 +256,31 @@ apply_payload(World& w, const ParsedPayload& parsed, bool reuse_bits) {
         for (const auto& [local_id, bytes] : rec.components) {
             const auto tid = parsed.local_to_live[local_id];
             if (tid == kInvalidComponentTypeId) continue;   // unknown + lenient
-            if (!w.add_component_raw(e, tid, bytes.data(), bytes.size())) {
-                return std::unexpected(SerializationError::ComponentSizeMismatch);
+
+            const bool needs_mig =
+                local_id < parsed.local_needs_migration.size() &&
+                parsed.local_needs_migration[local_id] != 0;
+
+            if (needs_mig) {
+                if (!migrate) {
+                    return std::unexpected(SerializationError::ComponentSizeMismatch);
+                }
+                const auto& info = reg.info(tid);
+                auto migrated = migrate(
+                    parsed.local_stable_hash[local_id],
+                    parsed.local_sizes[local_id],
+                    static_cast<std::uint32_t>(info.size),
+                    std::span<const std::uint8_t>{bytes});
+                if (!migrated || migrated->size() != info.size) {
+                    return std::unexpected(SerializationError::ComponentSizeMismatch);
+                }
+                if (!w.add_component_raw(e, tid, migrated->data(), migrated->size())) {
+                    return std::unexpected(SerializationError::ComponentSizeMismatch);
+                }
+            } else {
+                if (!w.add_component_raw(e, tid, bytes.data(), bytes.size())) {
+                    return std::unexpected(SerializationError::ComponentSizeMismatch);
+                }
             }
         }
     }
@@ -316,7 +351,7 @@ load_world(World& out, std::span<const std::uint8_t> blob, LoadOptions opts) {
     if (!parsed) return std::unexpected(parsed.error());
 
     out.clear();
-    return apply_payload(out, *parsed, /*reuse_bits=*/true);
+    return apply_payload(out, *parsed, /*reuse_bits=*/true, opts.migrate);
 }
 
 // ---------------------------------------------------------------------------

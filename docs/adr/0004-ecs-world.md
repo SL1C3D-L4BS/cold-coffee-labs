@@ -111,14 +111,23 @@ static_assert(sizeof(Entity) == 8);
 
 ```cpp
 struct EntitySlot {
-    std::uint32_t generation   = 0;   // 0 == free
+    // Monotonically-increasing version counter. Bumped on *both* create and
+    // destroy so a handle captured pre-destroy never satisfies is_alive again,
+    // even after its slot is reused.
+    std::uint32_t generation   = 0;
     std::uint32_t archetype_id = std::numeric_limits<std::uint32_t>::max();
     std::uint16_t chunk_index  = std::numeric_limits<std::uint16_t>::max();
     std::uint16_t slot_index   = std::numeric_limits<std::uint16_t>::max();
+    // True iff the slot currently represents a live entity. Distinct from
+    // `generation` so destroy can advance generation (defeating stale handles)
+    // without reusing 0 as a "free" marker — 0 stays reserved for Entity::null().
+    bool          alive        = false;
 };
 ```
 
-That's 12 bytes per live-or-freed entity slot. `EntityTable` is a `std::vector<EntitySlot>` (grows; never shrinks). **Freed indices are re-used via a `std::vector<std::uint32_t> free_list_`** — grab from the back of the list in O(1). If the free list is empty, push a new slot.
+That's 16 bytes per live-or-freed entity slot (12 meaningful + 1 flag + 3 padding on common ABIs). `EntityTable` is a `std::vector<EntitySlot>` (grows; never shrinks). **Freed indices are re-used via a `std::vector<std::uint32_t> free_list_`** — grab from the back of the list in O(1). If the free list is empty, push a new slot.
+
+**Generation-bump rule (2026-04-21 amendment).** Both `create_entity` and `destroy_entity` bump `generation` (skipping 0 on wrap). Without destroy-side bumping, a destroy→create sequence on the same slot left the fresh handle's generation equal to the destroyed one, silently re-validating stale copies. The `alive` flag is the authoritative liveness bit; generation is the version stamp used for stale-handle rejection. See `tests/unit/ecs/world_test.cpp "destroy_entity invalidates the handle; reuse bumps generation"`.
 
 ### 2.4 `ComponentRegistry`
 

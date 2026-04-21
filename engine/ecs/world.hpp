@@ -21,10 +21,18 @@ namespace gw {
 namespace ecs {
 
 struct EntitySlot {
-    std::uint32_t generation   = 0;   // 0 == free
+    // Monotonically-increasing version counter. Bumped on every create AND on
+    // every destroy so that a handle captured before destroy never passes the
+    // is_alive check again, even after the slot is reused. Never 0 after first
+    // use — the create path skips 0 to preserve Entity::null() as "never seen".
+    std::uint32_t generation   = 0;
     ArchetypeId   archetype_id = kInvalidArchetypeId;
     std::uint16_t chunk_index  = std::numeric_limits<std::uint16_t>::max();
     std::uint16_t slot_index   = std::numeric_limits<std::uint16_t>::max();
+    // True iff this slot currently represents a live entity. Distinct from
+    // generation so destroy_entity can bump generation (defeating stale
+    // handles) without re-using 0 as "free" — see ADR-0004 §2.5.
+    bool          alive        = false;
 };
 
 class World {

@@ -25,6 +25,11 @@
 #include "editor/panels/viewport_panel.hpp"
 #include "editor/panels/asset_browser_panel.hpp"
 #include "editor/panels/console_panel.hpp"
+#include "editor/panels/stats_panel.hpp"
+#include "editor/panels/render_settings_panel.hpp"
+#include "editor/panels/lighting_panel.hpp"
+#include "editor/panels/render_targets_panel.hpp"
+#include "editor/vscript/vscript_panel.hpp"
 #include "editor/scene/components.hpp"
 #include "engine/ecs/hierarchy.hpp"
 
@@ -213,6 +218,12 @@ EditorApplication::EditorApplication()
     panels_.add(std::make_unique<InspectorPanel>());
     panels_.add(std::make_unique<AssetBrowserPanel>());
     panels_.add(std::make_unique<ConsolePanel>());
+    panels_.add(std::make_unique<StatsPanel>(&render_settings_));
+    panels_.add(std::make_unique<RenderSettingsPanel>(&render_settings_));
+    panels_.add(std::make_unique<LightingPanel>(&render_settings_));
+    panels_.add(std::make_unique<RenderTargetsPanel>());
+    // Phase 8 week 047 — Visual Scripting node-graph panel (ImNodes over IR).
+    panels_.add(std::make_unique<VScriptPanel>());
 
     // Wire BLD API globals.
     gw::editor::bld_api::g_globals.selection = &selection_;
@@ -237,13 +248,13 @@ EditorApplication::EditorApplication()
 
     scene_world_.add_component(childA, NameComponent{"Cube"});
     scene_world_.add_component(childA, TransformComponent{
-        glm::vec3{-1.5f, 0.f, 0.f}, glm::quat{1.f, 0.f, 0.f, 0.f},
+        glm::dvec3{-1.5, 0.0, 0.0}, glm::quat{1.f, 0.f, 0.f, 0.f},
         glm::vec3{1.f, 1.f, 1.f}});
     scene_world_.add_component(childA, VisibilityComponent{});
 
     scene_world_.add_component(childB, NameComponent{"Sphere"});
     scene_world_.add_component(childB, TransformComponent{
-        glm::vec3{ 1.5f, 0.f, 0.f}, glm::quat{1.f, 0.f, 0.f, 0.f},
+        glm::dvec3{ 1.5, 0.0, 0.0}, glm::quat{1.f, 0.f, 0.f, 0.f},
         glm::vec3{1.f, 1.f, 1.f}});
     scene_world_.add_component(childB, VisibilityComponent{});
 
@@ -284,6 +295,11 @@ void EditorApplication::run() {
                 create_scene_rt(w, h);
                 vpp->set_scene_texture(vk_->scene_imgui_ds, w, h);
                 vpp->apply_resize(w, h);
+                if (auto* rtp = dynamic_cast<RenderTargetsPanel*>(
+                        panels_.find("Render Targets"))) {
+                    rtp->set_scene_texture(
+                        reinterpret_cast<ImTextureID>(vk_->scene_imgui_ds));
+                }
             }
         }
 
@@ -1114,21 +1130,49 @@ void EditorApplication::build_ui() {
 }
 
 void EditorApplication::build_docking_layout() {
+    // Cockpit layout (Phase 7 gate-E). The mock-up calls for a left column of
+    // stacked cards (Scene stats → Outliner → Lighting), a right column of
+    // Inspector + Render Settings, a bottom ribbon for the Render Targets
+    // strip and tabbed Asset Browser / Console, and the Viewport fills the
+    // centre.
     const ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
     ImGui::DockBuilderRemoveNode(dockspace_id);
     ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
     ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->WorkSize);
 
-    ImGuiID left  = 0, centre = dockspace_id, right = 0, bottom = 0;
-    ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Right, 0.22f, &right,  &centre);
+    ImGuiID centre = dockspace_id;
+    ImGuiID left = 0, right = 0, bottom = 0;
+    ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Right, 0.24f, &right,  &centre);
     ImGui::DockBuilderSplitNode(centre,       ImGuiDir_Left,  0.22f, &left,   &centre);
-    ImGui::DockBuilderSplitNode(centre,       ImGuiDir_Down,  0.28f, &bottom, &centre);
+    ImGui::DockBuilderSplitNode(centre,       ImGuiDir_Down,  0.32f, &bottom, &centre);
 
-    ImGui::DockBuilderDockWindow("Outliner",      left);
-    ImGui::DockBuilderDockWindow("Viewport",      centre);
-    ImGui::DockBuilderDockWindow("Inspector",     right);
-    ImGui::DockBuilderDockWindow("Asset Browser", bottom);
-    ImGui::DockBuilderDockWindow("Console",       bottom);
+    // Split the left column into Scene (stats, top) / Outliner (mid) /
+    // Lighting (bottom).
+    ImGuiID left_top = 0, left_mid = left;
+    ImGui::DockBuilderSplitNode(left_mid,  ImGuiDir_Up,   0.28f, &left_top, &left_mid);
+    ImGuiID left_bot = 0;
+    ImGui::DockBuilderSplitNode(left_mid,  ImGuiDir_Down, 0.40f, &left_bot, &left_mid);
+
+    // Split the right column into Inspector (top) / Render Settings (bottom).
+    ImGuiID right_top = right, right_bot = 0;
+    ImGui::DockBuilderSplitNode(right_top, ImGuiDir_Down, 0.55f, &right_bot, &right_top);
+
+    // Bottom ribbon: Render Targets on top, Console/Asset Browser as tabs.
+    ImGuiID bottom_top = 0, bottom_main = bottom;
+    ImGui::DockBuilderSplitNode(bottom_main, ImGuiDir_Up, 0.50f, &bottom_top, &bottom_main);
+
+    ImGui::DockBuilderDockWindow("Scene",           left_top);
+    ImGui::DockBuilderDockWindow("Outliner",        left_mid);
+    ImGui::DockBuilderDockWindow("Lighting",        left_bot);
+    ImGui::DockBuilderDockWindow("Viewport",        centre);
+    ImGui::DockBuilderDockWindow("Inspector",       right_top);
+    ImGui::DockBuilderDockWindow("Render Settings", right_bot);
+    ImGui::DockBuilderDockWindow("Render Targets",  bottom_top);
+    ImGui::DockBuilderDockWindow("Asset Browser",   bottom_main);
+    ImGui::DockBuilderDockWindow("Console",         bottom_main);
+    // VScript docks as a tab over the viewport so users can toggle between
+    // authoring the graph and seeing the scene without losing side panels.
+    ImGui::DockBuilderDockWindow("VScript",         centre);
 
     ImGui::DockBuilderFinish(dockspace_id);
 }

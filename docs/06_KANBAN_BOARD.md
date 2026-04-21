@@ -157,7 +157,12 @@ Done at the start of every coding session, before writing any code.
 ## Milestone tracker
 
 Checkbox per milestone. Unticked until the gated demo exists as a recorded video.
-Current state note (2026-04-20): *First Light* engineering deliverables are complete and locally validated on Windows; keep the checkbox unticked until the required narrated recording evidence is captured.
+
+Current state notes
+- 2026-04-20: *First Light* engineering deliverables are complete and locally validated on Windows; keep the checkbox unticked until the required narrated recording evidence is captured.
+- 2026-04-20: *Foundation Renderer* engineering deliverables complete (commit `b191ca4`); recording gate open.
+- 2026-04-21: *Foundations Set* (Phase 3) engineering complete via the Phase-7 pull-forward (ECS `World`, `ComponentRegistry`, queries, `CommandStack`, serialization). 101/101 doctest suite green. Recording rolled into the *Editor v0.1* demo since both milestones can be exercised in a single take.
+- 2026-04-21: *Editor v0.1* (Phase 7) engineering complete across five commit gates (A–E); includes the cockpit-polish pass inspired by the Cold Coffee Labs reference mock-up (Scene / Render Settings / Lighting / Render Targets panels). Recording gate remains open.
 
 - [ ] *First Light* (week 004 · Phase 1)
 - [ ] *Foundations Set* (week 016 · Phase 3)

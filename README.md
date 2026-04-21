@@ -18,6 +18,13 @@ This repository is the monorepo for:
 
 *"For I stand on the ridge of the universe and await nothing."*
 
+**Current milestone status (2026-04-21):**
+- *First Light* (Phase 1) — engineering **complete**; recording gate open.
+- *Foundation Renderer* (Phase 5) — engineering **complete** (`b191ca4`); recording gate open.
+- *Foundations Set* (Phase 3) — engineering **complete** (pulled forward through Phase 7 per the 2026-04-20 audit; 101/101 doctest suite green, including the generational-handle ABA guard fixed today).
+- *Editor v0.1* (Phase 7) — engineering **complete** across five commit gates (A–E). Gate E wired a cockpit-polish UI inspired by the Cold Coffee Labs reference mock-up: Scene stats, Render Settings (tone-map + SSAO + exposure + histogram), Lighting, and Render Targets, all bound to a shared `editor::render::RenderSettings`. Recording gate open.
+- *Brewed Logic* (Phase 8 / `.gwscene` binary format) — **in progress**.
+
 ---
 
 ## Getting started

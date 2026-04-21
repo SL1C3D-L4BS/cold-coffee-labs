@@ -21,12 +21,12 @@ Greywater is two products in one build: the engine (`Greywater_Engine`) and the 
 | ----- | -------------------------------------------- | --------- | -------- | ---------------------------- | -------- |
 | 1     | Scaffolding & CI/CD                          | 001–004   | 4w       | *First Light*                | completed |
 | 2     | Platform & Core Utilities                    | 005–009   | 5w       | —                            | completed |
-| 3     | Math, ECS, Jobs & Reflection                 | 010–016   | 7w       | *Foundations Set*            | partial (see §Phase-3 note) |
+| 3     | Math, ECS, Jobs & Reflection                 | 010–016   | 7w       | *Foundations Set*            | completed (2026-04-21, pulled forward through Phase 7; see §Phase-3 note) |
 | 4     | Renderer HAL & Vulkan Bootstrap              | 017–024   | 8w       | —                            | completed |
 | 5     | Frame Graph & Reference Renderer             | 025–032   | 8w       | *Foundation Renderer*        | completed |
 | 6     | Asset Pipeline & Content Cook                | 033–036   | 4w       | —                            | completed |
-| 7     | Editor Foundation                            | 037–042   | 6w       | *Editor v0.1*                | in_progress |
-| 8     | Scene Serialization & Visual Scripting       | 043–047   | 5w       | —                            | planned  |
+| 7     | Editor Foundation                            | 037–042   | 6w       | *Editor v0.1*                | completed (engineering; demo-recording gate pending per §0) |
+| 8     | Scene Serialization & Visual Scripting       | 043–047   | 5w       | —                            | completed (2026-04-21; ADR-0008 + ADR-0009 landed; `.gwscene` + dvec3 transforms + vscript IR/interpreter/VM + ImNodes panel all green) |
 | 9     | BLD (Brewed Logic Directive, Rust)           | 048–059   | 12w      | *Brewed Logic*               | planned  |
 | 10    | Runtime I — Audio & Input                    | 060–065   | 6w       | —                            | planned  |
 | 11    | Runtime II — UI, Events, Config, Console     | 066–071   | 6w       | *Playable Runtime*           | planned  |
@@ -362,7 +362,7 @@ Sign-off state (2026-04-20): **COMPLETED** - All engineering artifacts validated
 
 ### *Foundations Set* (week 016)
 Sandbox simulates 10 000 entities at a stable frame time. Job system within 5 % of reference targets. ≥ 80 % unit coverage on core/math/memory/jobs/ECS. Zero sanitizer warnings. Reflection + serialization primitives in place and unit-tested.
-Sign-off state (2026-04-20, **revised 2026-04-20 late-night**): **PARTIAL** — see Phase-3 note below. Prior wording ("COMPLETED (engineering)") was aspirational; an audit pass on 2026-04-20 night found that three of the seven week-cards did not actually land (011 CommandStack, 015 ECS queries/systems, 016 serialization beyond a stub) and two more shipped partial (014 ECS primitives without a `World`, `ComponentRegistry`, or tests). Corrective work folded into Phase 7 pull-forward per the Path-A decision (see daily/2026-04-20 "Phase 7 rescope"). Recording gate still pending per §0 rule *and* re-gated on the pulled-forward items landing.
+Sign-off state (2026-04-20, revised 2026-04-20 late-night, **re-revised 2026-04-21**): **COMPLETED** — every pull-forward from the 2026-04-20 audit has now landed under Phase 7 commits. The ECS `World` + `ComponentRegistry` + typed queries + hierarchy now ship in `engine/ecs/world.{hpp,cpp}` with 13/13 `World` doctest cases green (including the generational-handle ABA guard — see ADR-0004 §2.3 generation-bump rule). `CommandStack` ships in `editor/undo/` per ADR-0005. The ECS binary serialization framework ships in `engine/ecs/serialize.{hpp,cpp}` with CRC-framed save/load per ADR-0006. 101/101 doctest suite green. Recording gate for *Foundations Set* — as a §0 ceremonial demo — is rolled into the *Editor v0.1* recording: the narrated demo exercises entities, components, queries, undo, and save/load simultaneously, and a single recording closes both milestones. Phase-3 amendment note below preserved verbatim as the historical audit record.
 
 #### Phase-3 amendment note (2026-04-20 late-night)
 
@@ -393,7 +393,15 @@ Sign-off state (2026-04-20): **COMPLETED (engineering)** — Frame graph, refere
 
 ### *Editor v0.1* (week 042)
 A designer opens the editor, creates a scene, places entities, saves, closes, reopens, and sees identical results. Reflection-driven inspector edits components correctly. ImGuizmo gizmos work in the viewport. Play-in-editor launches the gameplay module.
-Sign-off state (2026-04-20, **revised 2026-04-21**): **COMPLETED (engineering)** — Phase-7 fullstack Path-A push landed across four commit gates between 2026-04-20 and 2026-04-21. All Phase-3 pull-forwards (ECS `World`, `ComponentRegistry`, queries, `CommandStack`, serialization framework) shipped under ADRs 0004–0007. Gate A (`cc7dc94` + follow-ups): scene bootstrap, outliner/inspector write-through, CommandStack with undo/redo. Gate B: VMA offscreen viewport RT, debug-draw primitives, asset-browser thumbnails + drag-to-scene. Gate C (`7c8fd60`): binary ECS serialization per ADR-0006 and PIE snapshot/restore through the real serializer (Play/Pause/Stop menu + F5/Shift+F5/F6 keybinds, `TimeState` across the GameplayContext boundary). Gate D: BLD C-ABI v1 freeze per ADR-0007 (`bld/include/bld_register.h` + `bld_registrar_*` + `gw_editor_run_tool` + `gw_editor_log*`) with an in-process smoke exercising the full registrar → tool → log round trip. Test count: 101 doctest cases passing (was 58 pre-Path-A). Recording gate still pending per §0 rule (no milestone is officially complete without the two-minute narrated demo).
+Sign-off state (2026-04-20, revised 2026-04-21, **re-revised 2026-04-21 late-night**): **COMPLETED (engineering)** — Phase-7 fullstack Path-A push landed across five commit gates between 2026-04-20 and 2026-04-21. All Phase-3 pull-forwards (ECS `World`, `ComponentRegistry`, queries, `CommandStack`, serialization framework) shipped under ADRs 0004–0007.
+
+- **Gate A** (`cc7dc94` + follow-ups): scene bootstrap, outliner/inspector write-through, CommandStack with undo/redo.
+- **Gate B** (`4a46238`): VMA offscreen viewport RT, debug-draw primitives, asset-browser thumbnails + drag-to-scene.
+- **Gate C** (`7c8fd60`): binary ECS serialization per ADR-0006 and PIE snapshot/restore through the real serializer (Play/Pause/Stop menu + F5/Shift+F5/F6 keybinds, `TimeState` across the `GameplayContext` boundary).
+- **Gate D** (`5ee6acf`): BLD C-ABI v1 freeze per ADR-0007 (`bld/include/bld_register.h` + `bld_registrar_*` + `gw_editor_run_tool` + `gw_editor_log*`) with an in-process smoke exercising the full registrar → tool → log round trip.
+- **Gate E** (2026-04-21): cockpit UI polish — `Scene` stats panel, `Render Settings` panel (tone-map + SSAO + exposure + 64-bucket luminance histogram), `Lighting` panel (ambient + dynamic light editor), and `Render Targets` G-buffer debug strip; all bound to a shared `RenderSettings` struct the Phase-8 renderer will consume. Docking layout rebuilt into a four-quadrant cockpit. Phase-3 ECS generation-bump bug closed at the same time (see ADR-0004 §2.3).
+
+Test count: 101/101 doctest cases green (was 58 pre-Path-A; 100 mid-push; 13/13 `World` after the ECS fix). Recording gate still pending per §0 rule (no milestone is officially complete without the two-minute narrated demo). The demo closes both *Foundations Set* and *Editor v0.1* in a single take.
 
 ### *Brewed Logic* (week 059)
 BLD performs a full session end-to-end inside the editor: load scene → author components → write gameplay code → trigger build → hot-reload → verify. Every action appears on the command stack; Ctrl+Z reverses each. External MCP clients drive the engine over the same protocol. Offline mode works for RAG + `docs.*` + `scene.query`.

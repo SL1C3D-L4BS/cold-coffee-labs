@@ -20,6 +20,8 @@
 
 #include <cstdint>
 #include <expected>
+#include <functional>
+#include <optional>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -51,9 +53,21 @@ enum class SerializationError : std::uint8_t {
 
 [[nodiscard]] std::string_view to_string(SerializationError e) noexcept;
 
+// Migration callback — invoked when a component's on-disk size does not
+// match the live type's size (ADR-0006 §2.8). The callback returns the
+// migrated byte sequence (must equal `to_size`) or std::nullopt to reject
+// the load with ComponentSizeMismatch. See engine/scene/migration.hpp for
+// the scene-level registry that wraps this hook.
+using MigrateComponentFn = std::function<std::optional<std::vector<std::uint8_t>>(
+    std::uint64_t                 stable_hash,
+    std::uint32_t                 from_size,
+    std::uint32_t                 to_size,
+    std::span<const std::uint8_t> src)>;
+
 struct LoadOptions {
-    bool verify_crc                = true;
-    bool strict_unknown_components = false;
+    bool                 verify_crc                = true;
+    bool                 strict_unknown_components = false;
+    MigrateComponentFn   migrate;
 };
 
 // ---------------------------------------------------------------------------

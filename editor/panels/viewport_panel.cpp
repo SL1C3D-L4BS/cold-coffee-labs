@@ -203,8 +203,13 @@ void ViewportPanel::on_imgui_render(EditorContext& ctx) {
     debug_draw::axis(glm::mat4{1.f}, 1.0f);
     if (ctx.world) {
         for (auto e : ctx.selection.selected()) {
-            if (const auto* tc = ctx.world->get_component<scene::TransformComponent>(e))
-                debug_draw::sphere(tc->position, 0.25f, 0xFF80FFFF, 12);
+            if (const auto* tc = ctx.world->get_component<scene::TransformComponent>(e)) {
+                // `position` is float64 (floating-origin); debug lines operate in
+                // camera-relative float32 — the cast is safe because the gizmo
+                // and overlay both render near the camera, well within float32
+                // precision (CLAUDE.md non-negotiable #17).
+                debug_draw::sphere(glm::vec3(tc->position), 0.25f, 0xFF80FFFF, 12);
+            }
         }
     }
 

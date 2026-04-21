@@ -35,6 +35,8 @@ const uint32_t kTypeVec2    = gw::core::type_id<glm::vec2>();
 const uint32_t kTypeVec3    = gw::core::type_id<glm::vec3>();
 const uint32_t kTypeVec4    = gw::core::type_id<glm::vec4>();
 const uint32_t kTypeQuat    = gw::core::type_id<glm::quat>();
+// float64 world-space vectors (CLAUDE.md non-negotiable #17).
+const uint32_t kTypeDVec3   = gw::core::type_id<glm::dvec3>();
 
 // Widget helpers
 bool draw_float(const reflect::FieldInfo& fi, void* ptr) {
@@ -104,6 +106,15 @@ bool draw_vec3(const reflect::FieldInfo& fi, void* ptr) {
     return ImGui::DragFloat3(fi.name, glm::value_ptr(v), 0.01f);
 }
 
+// float64 world-space position. We draw with DragScalarN(ImGuiDataType_Double)
+// so the widget writes through the full 64-bit value directly — rather than
+// round-tripping through float32 like `draw_double` has to for scalar fields.
+bool draw_dvec3(const reflect::FieldInfo& fi, void* ptr) {
+    auto& v = *static_cast<glm::dvec3*>(ptr);
+    return ImGui::DragScalarN(fi.name, ImGuiDataType_Double,
+                              glm::value_ptr(v), 3, 0.01f);
+}
+
 bool draw_vec4(const reflect::FieldInfo& fi, void* ptr) {
     auto& v = *static_cast<glm::vec4*>(ptr);
     if (fi.flags & kFieldColor)
@@ -139,6 +150,7 @@ void WidgetDrawer::register_builtin_types() {
     table_.push_back({kTypeVec3,   draw_vec3});
     table_.push_back({kTypeVec4,   draw_vec4});
     table_.push_back({kTypeQuat,   draw_quat});
+    table_.push_back({kTypeDVec3,  draw_dvec3});
 }
 
 void WidgetDrawer::sort_and_freeze() {

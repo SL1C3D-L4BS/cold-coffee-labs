@@ -50,16 +50,47 @@ struct NameComponent {
 
 // ---------------------------------------------------------------------------
 // TransformComponent — world-local translation / rotation / scale.
-// For Phase 7 this is single-precision; Phase 8 will migrate to double for
-// world-space per CLAUDE.md non-negotiable #17 (floating origin).
+//
+// `position` is `glm::dvec3` (float64) per CLAUDE.md non-negotiable #17: all
+// world-space positions use float64 so floating origin is cheap and precision
+// does not collapse at planet scale. Rotation stays single-precision (a unit
+// quaternion's float32 round-off is well below the arc-minute scale of a
+// sensible gizmo) and scale is a local-space multiplier so single-precision
+// is more than sufficient.
+//
+// On-disk footprint grew from 40 bytes (vec3+quat+vec3) to 52 bytes
+// (dvec3+quat+vec3). Old saves are carried forward by the v1→v2 migration
+// registered in `editor/bld_api/editor_bld_api.cpp::register_editor_migrations()`.
 // ---------------------------------------------------------------------------
 struct TransformComponent {
-    glm::vec3 position{0.f, 0.f, 0.f};
-    glm::quat rotation{1.f, 0.f, 0.f, 0.f};
-    glm::vec3 scale   {1.f, 1.f, 1.f};
+    glm::dvec3 position{0.0, 0.0, 0.0};
+    glm::quat  rotation{1.f, 0.f, 0.f, 0.f};
+    glm::vec3  scale   {1.f, 1.f, 1.f};
 
     GW_REFLECT(TransformComponent, position, rotation, scale)
 };
+
+// ---------------------------------------------------------------------------
+// WorldMatrixComponent — cached absolute-world transform.
+//
+// Authored by `gw::editor::scene::update_transforms()` once per frame
+// (pre-render). Consumers (renderer, picking, gizmo, physics) must never
+// mutate it; it is purely a cached projection of
+// (hierarchy + TransformComponent) under the floating-origin convention.
+//
+// The `dirty` flag is an opt-in hint consumers can flip when they know a
+// downstream matrix needs a re-compose. The default transform system
+// recomputes every entity unconditionally; future incremental variants may
+// honour `dirty` for cheap hierarchical updates.
+// ---------------------------------------------------------------------------
+struct WorldMatrixComponent {
+    glm::dmat4 world{1.0};
+    std::uint8_t dirty = 1;
+    std::uint8_t _pad[7]{};
+};
+
+static_assert(std::is_trivially_copyable_v<WorldMatrixComponent>);
+static_assert(sizeof(WorldMatrixComponent) == sizeof(glm::dmat4) + 8);
 
 // ---------------------------------------------------------------------------
 // VisibilityComponent — simple boolean flag used by the outliner to dim rows

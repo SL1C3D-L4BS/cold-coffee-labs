@@ -10,6 +10,7 @@
 // the editor. Swapping the editor onto the HAL is a Phase C audit task.
 
 #include "editor/panels/panel_registry.hpp"
+#include "editor/render/render_settings.hpp"
 #include "editor/selection/selection_context.hpp"
 #include "editor/pie/gameplay_host.hpp"
 #include "editor/undo/command_stack.hpp"
@@ -98,6 +99,11 @@ private:
     GameplayContext        pie_ctx_{};     // lives for the session; world/time filled lazily
     gw::TimeState          pie_time_{};    // handed to gameplay through pie_ctx_.time
     gw::ecs::World         scene_world_;   // authoring world — lives for the editor session
+
+    // Cockpit render settings (Phase 7 gate-E) — shared with the cockpit
+    // panels and, once Phase 8 lands, with the frame-graph. Panels borrow a
+    // non-owning pointer into this instance.
+    gw::editor::render::RenderSettings render_settings_{};
 
     // Layout built flag — persisted via ImGui ini.
     bool layout_built_ = false;

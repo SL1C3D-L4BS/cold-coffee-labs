@@ -50,6 +50,12 @@ add_subdirectory(jobs)
 # Add core library
 add_subdirectory(core)
 
+# Phase 8 week 043 — scene file format + component migration registry.
+add_subdirectory(scene)
+
+# Phase 8 week 045 — Visual Scripting IR + parser + interpreter.
+add_subdirectory(vscript)
+
 # Project version plumbed through a generated header so release binaries
 # and diagnostics report the exact build (git SHA landed in Phase 1 CI).
 configure_file(
