@@ -65,6 +65,9 @@ add_subdirectory(console)
 # Phase 11 Waves 11D/11E — UI: RmlUi service + backends + HUD/menu templates.
 add_subdirectory(ui)
 
+# Phase 12 — Physics (ADR-0031..0038).
+add_subdirectory(physics)
+
 # Project version plumbed through a generated header so release binaries
 # and diagnostics report the exact build (git SHA landed in Phase 1 CI).
 configure_file(

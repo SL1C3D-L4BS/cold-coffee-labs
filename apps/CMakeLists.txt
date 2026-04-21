@@ -5,3 +5,4 @@
 # the *Playable Runtime* exit-demo (ADR-0029).
 
 add_subdirectory(sandbox_playable)
+add_subdirectory(sandbox_physics)

@@ -30,7 +30,7 @@ Greywater is two products in one build: the engine (`Greywater_Engine`) and the 
 | 9     | BLD (Brewed Logic Directive, Rust)           | 048–059   | 12w      | *Brewed Logic*               | completed (2026-04-21; ADR-0010 → 0016 + amended ADR-0007 all landed; full six-wave 9A–9F implementation committed; see §Phase-9 amendment) |
 | 10    | Runtime I — Audio & Input                    | 060–065   | 6w       | —                            | completed (2026-04-21; ADR-0017 → 0022 landed; handoff to Phase 11) |
 | 11    | Runtime II — UI, Events, Config, Console     | 066–071   | 6w       | *Playable Runtime*           | completed (2026-04-21; ADR-0023 → 0030 landed; all six waves 11A–11F green on dev-win with 271/271 tests, runtime_self_test + playable_sandbox exit gates passing; see §Phase-11 closeout) |
-| 12    | Physics                                      | 072–077   | 6w       | —                            | planned  |
+| 12    | Physics                                      | 072–077   | 6w       | —                            | completed (2026-04-21; ADR-0031 → 0038 landed; all six waves 12A–12F green on dev-win; physics subsystem + ECS bridge + character + constraints + queries + determinism + replay shipped with null backend by default and Jolt gated behind `GW_ENABLE_JOLT`; see §Phase-12 closeout) |
 | 13    | Animation & Game AI Framework                | 078–083   | 6w       | *Living Scene*               | planned  |
 | 14    | Networking & Multiplayer                     | 084–095   | 12w      | *Two Client Night*           | planned  |
 | 15    | Persistence & Telemetry                      | 096–101   | 6w       | —                            | planned  |
@@ -181,16 +181,18 @@ Revised 2026-04-21 to reflect the six-wave plan (11A–11F) executed phase-compl
 | 070  | 11E  | `engine/ui/backends/rml_render_hal`: RmlUi Vulkan HAL backend + frame-graph `ui_pass`; HUD + menu + rebind + settings `.rml`/`.rcss` templates; settings binder | B    | 0027      |
 | 071  | 11F  | *Playable Runtime*: `Engine::Impl` boot order, `runtime/main.cpp` rewrite, `apps/sandbox_playable/`, `playable-*` CI self-test | A/B  | 0029/0030 |
 
-### Phase 12 — Physics (weeks 072–077)
+### Phase 12 — Physics (weeks 072–077) — **completed 2026-04-21**
 
-| Week | Deliverable                                                                | Tier |
-| ---- | -------------------------------------------------------------------------- | ---- |
-| 072  | Jolt integration: rigid bodies, colliders, triggers, ECS bridge            | A    |
-| 073  | Jolt: character controller                                                 | A    |
-| 074  | Jolt: constraints, joints, vehicle                                         | A/B  |
-| 075  | Jolt: raycasts + shape queries + physics debug draw                        | A    |
-| 076  | Deterministic mode: lockstep validation, fixed-step integration            | A    |
-| 077  | Physics playground scene for regression tests                              | A    |
+Revised 2026-04-21 to reflect the six-wave plan (12A–12F) executed phase-complete per CLAUDE.md #19. Weeks remain pacing indicators; the wave is the unit of closure. The `dev-*` preset builds the **null physics backend** (stub world, deterministic by construction); `playable-*` and the new `physics-*` presets flip `GW_ENABLE_JOLT=ON` for the Jolt 5.5.0 backend. Final ctest: **328/328 green** on `dev-win` in 6.23 s (57 new physics tests). See *Phase-12 closeout* paragraph below the Milestone definitions table.
+
+| Week | Wave | Deliverable                                                                                                         | Tier | ADR       |
+| ---- | ---- | ------------------------------------------------------------------------------------------------------------------- | ---- | --------- |
+| 072  | 12A  | `engine/physics/`: `PhysicsWorld` facade (PIMPL) + null backend + ECS bridge (RigidBody/Collider/Velocity) + layers + fixed-step loop | A    | 0031 / 0032 |
+| 073  | 12B  | `engine/physics/`: `CharacterController` (capsule, step-up, slope, coyote jump) + character_system ECS bridge + `CharacterGrounded` event | A    | 0033      |
+| 074  | 12C  | `engine/physics/`: constraint catalogue (Fixed/Distance/Hinge/Slider/Cone/SixDOF) + break-force event + `VehicleHandle` surface | A/B  | 0034      |
+| 075  | 12D  | `engine/physics/`: queries (raycast/sweep/overlap, single + batched) + `physics_debug_pass` frame-graph node + `physics.debug` console command | A    | 0035 / 0036 |
+| 076  | 12E  | `engine/physics/determinism/`: FNV-1a-64 state hash + `ReplayRecorder` + `ReplayPlayer` + cross-platform CI determinism gate | A    | 0037      |
+| 077  | 12F  | *Physics playground*: `apps/sandbox_physics/` exit-demo + Engine wiring + `physics-{win,linux}` presets + Phase-12 closeout | A    | 0038      |
 
 ### Phase 13 — Animation & Game AI Framework (weeks 078–083)
 
@@ -465,6 +467,8 @@ A sandbox scene accepts controller + keyboard input through rebindable actions. 
 | 11F  | 071       | Playable Runtime: `Engine::Impl` + runtime rewrite + CI self-test       | ADR-0029 / 0030             | ✅ shipped |
 
 **Phase-11 closeout (2026-04-21):** `ctest --preset dev-win` — **271/271 green** on clang-cl 22.1.3 / Ninja / Win11.  Added `greywater::runtime` static library so `gw_runtime`, `apps/sandbox_playable`, and `gw_tests` share one `runtime::Engine` owner.  Exit gates: `runtime_self_test` (0.55 s) and `playable_sandbox` (0.54 s) both PASS with `PLAYABLE OK` marker.  Dependency gates `GW_ENABLE_{RMLUI,FREETYPE,HARFBUZZ,TOMLPP}` default OFF for CI; the `playable-{win,linux}` CMake presets flip every Phase-10 + Phase-11 dep ON for the shipping build.  Hand-off to Phase 12 — Physics.
+
+**Phase-12 closeout (2026-04-21):** ADR 0031 → 0038 landed doc-first per CLAUDE.md #20. `ctest --preset dev-win` — **328/328 green** on clang-cl 22.1.3 / Ninja / Win11 in 6.23 s (57 new physics tests, +57 above the Phase-11 baseline of 271). Waves 12A–12F all shipped: `PhysicsWorld` facade + null backend + ECS bridge (12A), character controller with capsule + slope-max + coyote jump + `CharacterGrounded` event (12B), six-primitive constraint catalogue (Fixed/Distance/Hinge/Slider/Cone/SixDOF) + `ConstraintBroken` event + vehicle surface (12C), queries (single + batched raycast / shape-sweep / overlap) + debug-draw sink + `physics_debug_pass` frame-graph seed (12D), FNV-1a-64 `determinism_hash` with canonical quat sign + quantized velocities + `ReplayRecorder`/`ReplayPlayer` + console built-ins `physics.pause|step|hash|debug` (12E), `apps/sandbox_physics` exit-demo + 18 `physics.*` CVars + `physics-{win,linux}` presets + Engine wiring (12F). `physics_sandbox` prints `PHYSICS OK` and `physics_sandbox` CTest runs it at 120 frames deterministic (`hash=51739d624c36b01e`, 1024/1024 probe hits against the floor). `engine/physics/` public headers contain **zero** `<Jolt/**>` includes — all Jolt integration quarantined behind `impl/jolt_*.{hpp,cpp}` and `GW_PHYSICS_JOLT` (OFF by default for `dev-*`, ON for `physics-*`). Hand-off to Phase 13 — Animation & Game AI Framework (*Living Scene* milestone depends on Phase-12 determinism + fixed-step contract).
 
 ### *Living Scene* (week 083)
 A character walks across a navmeshed scene driven by a BT, with animations blending and physics collisions resolving deterministically under lockstep. BT authored both via the editor graph view and via BLD chat produce identical runtime behaviour.

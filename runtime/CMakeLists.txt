@@ -23,6 +23,7 @@ target_link_libraries(greywater_runtime
         greywater::input
         greywater::ui
         greywater::console
+        greywater::physics
 )
 
 add_library(greywater::runtime ALIAS greywater_runtime)

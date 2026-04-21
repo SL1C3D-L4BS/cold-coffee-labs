@@ -11,6 +11,8 @@
 
 #include "runtime/engine.hpp"
 
+#include "engine/physics/console_commands.hpp"
+
 #include <string>
 #include <string_view>
 
@@ -75,6 +77,7 @@ void seed_english_strings(ui::LocaleBridge& lb) {
 Engine::Engine(const EngineConfig& cfg) : cfg_(cfg) {
     // --- Tier-0: standard CVars + bus wiring ---
     std_cvars_ = config::register_standard_cvars(cvars_);
+    physics_cvars_ = physics::register_physics_cvars(cvars_);
     cvars_.set_bus(&bus_cvars_);
 
     // --- Tier-1: UI substrate ---
@@ -113,6 +116,13 @@ Engine::Engine(const EngineConfig& cfg) : cfg_(cfg) {
 #endif
     console_ = std::make_unique<console::ConsoleService>(cvars_, ccfg, &bus_console_);
     register_console_commands_();
+
+    // --- Tier-3: physics (after CVar registry is fully seeded) ---
+    physics_ = std::make_unique<physics::PhysicsWorld>();
+    physics::PhysicsConfig pcfg{};
+    physics::apply_cvars_to_config(cvars_, pcfg);
+    (void)physics_->initialize(pcfg);
+    physics::register_physics_console_commands(*console_, *physics_);
 }
 
 Engine::~Engine() = default;
@@ -138,14 +148,20 @@ void Engine::tick(double dt_seconds) {
     const float now_ms = static_cast<float>(dt_seconds * 1000.0) * static_cast<float>(frame_index_);
     input_->update(now_ms);
 
-    // 2) UI update — drains keyboard events forwarded by the runtime.
+    // 2) physics — deterministic fixed-step simulation runs before gameplay
+    //    consumers so ECS systems observe a consistent post-step world.
+    if (physics_) {
+        (void)physics_->step(static_cast<float>(dt_seconds));
+    }
+
+    // 3) UI update — drains keyboard events forwarded by the runtime.
     ui_->update(dt_seconds);
 
-    // 3) Audio update — listener pose is identity in headless mode.
+    // 4) Audio update — listener pose is identity in headless mode.
     audio::ListenerState listener{};
     audio_->update(dt_seconds, listener);
 
-    // 4) UI render pass — publishes UILayoutComplete.
+    // 5) UI render pass — publishes UILayoutComplete.
     ui_->render();
 
     ++frame_index_;

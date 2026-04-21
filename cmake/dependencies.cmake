@@ -333,8 +333,41 @@ if(GW_ENABLE_TOMLPP)
     set(GW_CONFIG_TOMLPP ON CACHE BOOL "engine/core/config: prefer toml++ reader" FORCE)
 endif()
 
-# --- Phase 12+ deps below are opted in by their owning CMakeLists.txt --------
-#   Phase 12+: Jolt Physics
+# --- Phase 12 — Physics (optional/gated) ------------------------------------
+# ADR-0031 / 0038 §1 pin. Jolt default OFF so clean-checkout `dev-*` CI keeps
+# building the null physics backend (deterministic by construction). The
+# `physics-*` and `playable-*` presets flip `GW_ENABLE_JOLT=ON`.
+#
+#   GW_ENABLE_JOLT   — Jolt Physics v5.5.0, CROSS_PLATFORM_DETERMINISTIC ON.
+option(GW_ENABLE_JOLT "Fetch Jolt Physics and enable the production physics backend" OFF)
+
+if(GW_ENABLE_JOLT)
+    CPMAddPackage(
+        NAME             JoltPhysics
+        GITHUB_REPOSITORY jrouwe/JoltPhysics
+        GIT_TAG          v5.5.0
+        SOURCE_SUBDIR    Build
+        OPTIONS
+            "TARGET_HELLO_WORLD OFF"
+            "TARGET_PERFORMANCE_TEST OFF"
+            "TARGET_SAMPLES OFF"
+            "TARGET_UNIT_TESTS OFF"
+            "TARGET_VIEWER OFF"
+            "CROSS_PLATFORM_DETERMINISTIC ON"
+            "USE_SSE4_1 ON"
+            "USE_SSE4_2 ON"
+            "USE_AVX OFF"
+            "USE_AVX2 OFF"
+            "USE_AVX512 OFF"
+            "INTERPROCEDURAL_OPTIMIZATION OFF"
+            "FLOATING_POINT_EXCEPTIONS_ENABLED OFF"
+            "OBJECT_LAYER_BITS 16"
+            "USE_STD_VECTOR OFF"
+    )
+    set(GW_PHYSICS_JOLT ON CACHE BOOL "engine/physics: compile Jolt backend" FORCE)
+endif()
+
+# --- Phase 13+ deps below are opted in by their owning CMakeLists.txt --------
 #   Phase 13+: Ozz-animation, ACL, Recast/Detour
 #   Phase 14+: GameNetworkingSockets (voice chat uses Opus from Phase 10 pin)
 #   Phase 16+: ICU

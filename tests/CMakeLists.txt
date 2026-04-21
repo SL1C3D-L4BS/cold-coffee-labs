@@ -76,6 +76,19 @@ add_executable(gw_tests
     unit/ui/ui_service_test.cpp
     # Phase 11 Wave 11F — Engine boot integration (ADR-0029)
     integration/engine_boot_test.cpp
+    # Phase 12 — Physics (ADR-0031..0038)
+    unit/physics/world_lifecycle_test.cpp
+    unit/physics/rigid_body_test.cpp
+    unit/physics/fixed_step_test.cpp
+    unit/physics/layers_and_filter_test.cpp
+    unit/physics/character_test.cpp
+    unit/physics/constraints_test.cpp
+    unit/physics/queries_test.cpp
+    unit/physics/determinism_test.cpp
+    unit/physics/debug_draw_test.cpp
+    unit/physics/events_test.cpp
+    unit/physics/ecs_bridge_test.cpp
+    integration/physics/phase12_exit_gate_test.cpp
     test_main.cpp
 )
 
@@ -87,6 +100,7 @@ target_link_libraries(gw_tests
         greywater::input
         greywater::ui
         greywater::console
+        greywater::physics
         greywater::runtime
         doctest::doctest
         volk
