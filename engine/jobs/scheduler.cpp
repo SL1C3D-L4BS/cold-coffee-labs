@@ -1,44 +1,40 @@
 #include "scheduler.hpp"
-#include "worker.hpp"
-#include "job_queue.hpp"
-#include "wait_group.hpp"
 #include <algorithm>
+#include <thread>
 
 namespace gw {
 namespace jobs {
 
 Scheduler::Scheduler(uint32_t worker_count) {
-    // Create job queue
-    job_queue_ = std::make_unique<JobQueue>();
-    
-    // Create worker threads
+    if (worker_count == 0u) {
+        const uint32_t hw = static_cast<uint32_t>(std::thread::hardware_concurrency());
+        worker_count = (hw > 1u) ? (hw - 1u) : 1u;
+    }
+
     workers_.reserve(worker_count);
-    for (uint32_t i = 0; i < worker_count; ++i) {
-        auto worker = std::make_unique<WorkerThread>(i);
-        worker->start();
-        workers_.push_back(std::move(worker));
+    for (uint32_t i = 0u; i < worker_count; ++i) {
+        auto w = std::make_unique<WorkerThread>(i, queue_);
+        w->start();
+        workers_.push_back(std::move(w));
     }
 }
 
 Scheduler::~Scheduler() {
-    // Signal shutdown
-    shutdown_flag_ = true;
-    
-    // Stop all workers
-    for (auto& worker : workers_) {
-        worker->stop();
-        worker->join();
-    }
+    queue_.shutdown();
+    for (auto& w : workers_) w->join();
 }
 
-uint32_t Scheduler::worker_count() const {
-    return static_cast<uint32_t>(workers_.size());
+JobHandle Scheduler::submit(JobPriority priority, JobFn fn) {
+    return queue_.push(priority, std::move(fn));
 }
 
-// Submit job with no arguments (convenience overload)
-JobHandle Scheduler::submit(JobPriority priority, std::function<void()> job) {
-    return submit(priority, job);
+void Scheduler::wait(JobHandle handle) {
+    queue_.wait(handle);
 }
 
-}  // namespace jobs
-}  // namespace gw
+void Scheduler::wait_all() {
+    queue_.wait(kInvalidJobHandle); // waits until in_flight == 0
+}
+
+} // namespace jobs
+} // namespace gw

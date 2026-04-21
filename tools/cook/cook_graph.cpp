@@ -1,0 +1,113 @@
+#include "cook_graph.hpp"
+#include <algorithm>
+#include <queue>
+#include <unordered_set>
+
+namespace gw::tools::cook {
+
+static const std::unordered_set<std::string> kCookableExts = {
+    ".glb", ".gltf",
+    ".png", ".jpg", ".jpeg", ".tga", ".bmp", ".hdr", ".exr"
+};
+
+CookGraph::CookGraph(std::filesystem::path input_root,
+                     std::filesystem::path output_root,
+                     CookPlatform platform,
+                     CookConfig   config)
+    : input_root_(std::move(input_root))
+    , output_root_(std::move(output_root))
+    , platform_(platform)
+    , config_(config)
+{}
+
+bool CookGraph::is_cookable(const std::filesystem::path& ext) {
+    return kCookableExts.count(ext.string()) > 0;
+}
+
+std::filesystem::path CookGraph::compute_output(
+    const std::filesystem::path& source) const
+{
+    // Mirror the directory structure: content/meshes/foo.glb → assets/meshes/foo.gwmesh
+    auto rel = std::filesystem::relative(source, input_root_);
+
+    // Map extension to cooked extension.
+    const auto ext = rel.extension().string();
+    std::string out_ext;
+    if (ext == ".glb" || ext == ".gltf")  out_ext = ".gwmesh";
+    else                                   out_ext = ".gwtex";
+
+    auto out = output_root_ / rel;
+    out.replace_extension(out_ext);
+    return out;
+}
+
+void CookGraph::discover() {
+    if (!std::filesystem::exists(input_root_)) return;
+    for (const auto& entry :
+         std::filesystem::recursive_directory_iterator(input_root_))
+    {
+        if (!entry.is_regular_file()) continue;
+        if (is_cookable(entry.path().extension())) {
+            add_asset(entry.path());
+        }
+    }
+}
+
+void CookGraph::add_asset(const std::filesystem::path& source) {
+    const std::string key = std::filesystem::weakly_canonical(source).string();
+    if (source_to_index_.count(key)) return;
+
+    CookNode node{};
+    node.source = source;
+    node.output = compute_output(source);
+    node.cooked_path = std::filesystem::relative(node.output, output_root_).string();
+
+    const std::size_t idx = nodes_.size();
+    source_to_index_[key] = idx;
+    nodes_.push_back(std::move(node));
+}
+
+void CookGraph::resolve_cache(void* /*cache*/) {
+    // Phase 6 full: query CookCache DB here.  For now, all nodes need cooking.
+    for (auto& n : nodes_) n.needs_cook = true;
+}
+
+AssetResult<std::vector<std::size_t>> CookGraph::topological_order() const {
+    // Kahn's algorithm.  Since our current graph has no cross-asset deps
+    // (textures and meshes are independent), this is simply an identity
+    // permutation.  The full dependency tracking (glTF → textures) is a
+    // Phase 6 follow-up once material assets are declared.
+    const std::size_t N = nodes_.size();
+    std::vector<uint32_t> indegree(N, 0);
+    std::vector<std::vector<std::size_t>> adj(N);
+
+    for (std::size_t i = 0; i < N; ++i) {
+        for (std::size_t dep : nodes_[i].deps) {
+            adj[dep].push_back(i);
+            ++indegree[i];
+        }
+    }
+
+    std::queue<std::size_t> q;
+    for (std::size_t i = 0; i < N; ++i) {
+        if (indegree[i] == 0) q.push(i);
+    }
+
+    std::vector<std::size_t> order;
+    order.reserve(N);
+    while (!q.empty()) {
+        const std::size_t u = q.front(); q.pop();
+        order.push_back(u);
+        for (std::size_t v : adj[u]) {
+            if (--indegree[v] == 0) q.push(v);
+        }
+    }
+
+    if (order.size() != N) {
+        return std::unexpected(AssetError{AssetErrorCode::InvalidArgument,
+                                          "cook graph has a dependency cycle"});
+    }
+    return order;
+}
+
+} // namespace gw::tools::cook

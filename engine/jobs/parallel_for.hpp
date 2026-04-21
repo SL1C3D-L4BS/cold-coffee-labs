@@ -1,37 +1,19 @@
 #pragma once
+// Free-function thin wrappers around Scheduler::parallel_for.
+// Prefer using Scheduler::parallel_for directly; these exist for backwards
+// compatibility with callers that do not own a Scheduler instance.
 
 #include "scheduler.hpp"
-#include <cstdint>
-#include <cstddef>
 
 namespace gw {
 namespace jobs {
 
-// Parallel for loop implementation
-template<typename Func, typename T>
+// parallel_for(scheduler, count, func)
+// func: void(uint32_t index)
+template<typename Func>
 void parallel_for(Scheduler& scheduler, uint32_t count, Func&& func) {
-    // Split work across available workers
-    // Calculate items per worker if needed for future optimization
-    // uint32_t items_per_worker = (count + scheduler.worker_count() - 1) / scheduler.worker_count();
-    
-    std::vector<JobHandle> handles;
-    handles.reserve(count);
-    
-    // Submit jobs for each chunk
-    for (uint32_t i = 0; i < count; ++i) {
-        handles[i] = scheduler.submit(
-            JobPriority::Normal,
-            [func, i](T start, T end) {
-                for (T j = start; j < end; ++j) {
-                    func(j);
-                }
-            }
-        );
-    }
-    
-    // Wait for all jobs to complete
-    scheduler.wait_all(handles);
+    scheduler.parallel_for(count, std::forward<Func>(func));
 }
 
-}  // namespace jobs
-}  // namespace gw
+} // namespace jobs
+} // namespace gw

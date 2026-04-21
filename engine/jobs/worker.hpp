@@ -1,38 +1,36 @@
 #pragma once
 
-#include "scheduler.hpp"
+#include "job_queue.hpp"
 #include <cstdint>
-#include <cstddef>
 #include <thread>
-#include <atomic>
-#include <vector>
-#include <memory>
 
 namespace gw {
 namespace jobs {
 
-// Worker thread that processes jobs from the queue
+// WorkerThread — owns a std::thread that continuously drains from a shared
+// JobQueue.  start() must be called before any jobs are pushed; stop()/join()
+// must be called before destruction.
 class WorkerThread {
 public:
-    WorkerThread(uint32_t worker_id);
+    WorkerThread(uint32_t worker_id, JobQueue& queue);
     ~WorkerThread();
-    
-    // Worker thread control
+
+    WorkerThread(const WorkerThread&)            = delete;
+    WorkerThread& operator=(const WorkerThread&) = delete;
+
     void start();
-    void stop();
+    void stop();   // signals the worker to stop after current job
     void join();
-    
-    // Get worker ID
-    [[nodiscard]] uint32_t worker_id() const;
-    
+
+    [[nodiscard]] uint32_t worker_id() const noexcept { return worker_id_; }
+
 private:
     void worker_loop();
-    
-    uint32_t worker_id_;
+
+    uint32_t    worker_id_;
+    JobQueue&   queue_;
     std::thread thread_;
-    std::atomic<bool> running_flag_{false};
-    JobQueue* job_queue_;
 };
 
-}  // namespace jobs
-}  // namespace gw
+} // namespace jobs
+} // namespace gw

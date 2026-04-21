@@ -1,4 +1,6 @@
-#define VMA_IMPLEMENTATION
+// VMA_IMPLEMENTATION is defined exactly once in vulkan_device.cpp.
+// Do NOT redefine it here — that would trigger an ODR violation and
+// multiply-defined-symbol linker errors when both TUs are in the same target.
 #include "vulkan_memory.hpp"
 #include <volk.h>
 #include <stdexcept>

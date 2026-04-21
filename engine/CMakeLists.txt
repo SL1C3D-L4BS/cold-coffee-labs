@@ -33,6 +33,9 @@ target_link_libraries(greywater_core
 # Add render HAL
 add_subdirectory(render)
 
+# Phase 6: Asset Pipeline & Runtime DB
+add_subdirectory(assets)
+
 # Add math library
 add_subdirectory(math)
 

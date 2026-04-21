@@ -10,18 +10,32 @@ add_executable(gw_tests
     containers_test.cpp
     string_test.cpp
     unit/render/frame_graph_test.cpp
+    # Phase 6 — Asset Pipeline
+    unit/assets/cook_cache_test.cpp
+    unit/assets/mesh_cooker_test.cpp
+    unit/assets/asset_db_test.cpp
+    unit/assets/vfs_test.cpp
+    # Phase 6 — Integration
+    integration/cook_pipeline_test.cpp
     test_main.cpp
 )
+
 target_link_libraries(gw_tests
     PRIVATE
         greywater::core
+        greywater::assets
         doctest::doctest
         volk
+        xxhash
 )
-# Pull vk_mem_alloc.h for frame_graph headers (matches engine include layout; not exported by greywater::core)
+
+# Pull in Vulkan/VMA headers that asset headers need.
 target_include_directories(gw_tests PRIVATE
     "${CMAKE_BINARY_DIR}/_deps/VulkanMemoryAllocator-src/include"
+    "${CMAKE_BINARY_DIR}/_deps/volk-src"
+    "${CMAKE_SOURCE_DIR}"
 )
+
 set_target_properties(gw_tests PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
@@ -30,7 +44,7 @@ set_target_properties(gw_tests PROPERTIES
 include("${doctest_SOURCE_DIR}/scripts/cmake/doctest.cmake")
 doctest_discover_tests(gw_tests
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
-    PROPERTIES LABELS smoke
+    PROPERTIES LABELS smoke;assets
 )
 
 # Week 032 — Foundation Renderer milestone perf gate.
