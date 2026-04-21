@@ -1,6 +1,8 @@
 // editor/viewport/gizmo_system.cpp
 #include "gizmo_system.hpp"
 
+// imgui.h MUST precede ImGuizmo.h — ImGuizmo depends on ImDrawList, ImVec2, etc.
+#include <imgui.h>
 #include <ImGuizmo.h>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -45,11 +47,12 @@ glm::mat4 GizmoSystem::get_entity_matrix(EntityHandle h) const {
 bool GizmoSystem::draw(const SelectionContext& sel,
                        const float* view_mat,
                        const float* proj_mat,
-                       float vx, float vy, float vw, float vh)
+                       float vx, float vy, float vw, float vh,
+                       bool ortho)
 {
     if (sel.empty()) { using_gizmo_ = false; return false; }
 
-    ImGuizmo::SetOrthographic(false);
+    ImGuizmo::SetOrthographic(ortho);
     ImGuizmo::SetDrawlist();
     ImGuizmo::SetRect(vx, vy, vw, vh);
 

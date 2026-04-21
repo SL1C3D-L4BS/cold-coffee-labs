@@ -21,17 +21,7 @@
 
 namespace gw::editor {
 
-// Forward decl — device helpers accessed via the HAL public API.
-namespace render::hal { class VulkanDevice; }
-
 // ---------------------------------------------------------------------------
-ViewportPanel::ViewportPanel(gw::render::hal::VulkanDevice& device)
-    : device_(device) {
-    // Sensible defaults.
-    camera_.state().position = {0.f, 3.f, 8.f};
-    camera_.state().target   = {0.f, 0.f, 0.f};
-}
-
 ViewportPanel::~ViewportPanel() {
     destroy_scene_image();
 }
@@ -128,8 +118,11 @@ void ViewportPanel::draw_overlay(EditorContext& ctx) {
 
 // ---------------------------------------------------------------------------
 void ViewportPanel::on_imgui_render(EditorContext& ctx) {
-    ImGuizmo::SetOrthographic(camera_.mode() == CameraMode::Ortho);
-    ImGuizmo::BeginFrame();
+    // NOTE: ImGuizmo::BeginFrame() is called once per frame in
+    // EditorApplication::begin_frame(), next to ImGui::NewFrame().
+    // Calling it twice resets hover/ID state between docked viewports.
+    // SetOrthographic is configured below inside GizmoSystem::draw via the
+    // ortho flag threaded through draw(), so this panel no longer sets it here.
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0.f, 0.f});
     ImGui::Begin(name(), &visible_, ImGuiWindowFlags_NoScrollbar |
@@ -187,9 +180,10 @@ void ViewportPanel::on_imgui_render(EditorContext& ctx) {
         glm::mat4 view = camera_.view();
         glm::mat4 proj = camera_.projection(aspect);
         // ImGuizmo needs right-handed, reversed-Z doesn't apply here.
+        const bool ortho = (camera_.mode() == CameraMode::Ortho);
         if (gizmo_.draw(ctx.selection,
                         glm::value_ptr(view), glm::value_ptr(proj),
-                        vp_x_, vp_y_, vp_w_, vp_h_)) {
+                        vp_x_, vp_y_, vp_w_, vp_h_, ortho)) {
             // Apply delta to selected entities.
             // Phase 7 stub — Phase 8 writes through ECS.
             (void)gizmo_.delta_matrix();

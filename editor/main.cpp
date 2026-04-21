@@ -9,8 +9,8 @@
 #include "engine/core/log.hpp"
 
 int main(int /*argc*/, char** /*argv*/) {
-    gw::core::log_info("Greywater Editor {} — Cold Coffee Labs",
-                        gw::core::version_string());
+    gw::core::log_message(gw::core::LogLevel::Info, "editor",
+        "Greywater Editor — Cold Coffee Labs");
 
     gw::editor::EditorApplication app;
     app.run();

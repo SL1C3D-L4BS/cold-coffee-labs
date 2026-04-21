@@ -16,7 +16,7 @@ This document is the complete enumeration of every subsystem in Greywater_Engine
 | **C**| Stretch. Post-v1. Referenced here so we know we chose not to build it.      |
 | **G**| Hardware-gated. Ships only where `RHICapabilities` reports support.         |
 
-Every subsystem below has a **tier**, an **owning phase** (see `05_ROADMAP_AND_MILESTONES.md` — phases 1–19), an **owning module** (directory in the repo), and a **concrete library decision** or a *custom* label.
+Every subsystem below has a **tier**, an **owning phase** (see `05_ROADMAP_AND_MILESTONES.md` — phases 1–25; Phase 25 is LTS), an **owning module** (directory in the repo), and a **concrete library decision** or a *custom* label.
 
 ---
 

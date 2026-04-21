@@ -2,8 +2,10 @@
 
 #include <expected>
 #include <string>
-#include <vector>
+#include <type_traits>
+#include <utility>
 #include <variant>
+#include <vector>
 
 namespace gw::render::frame_graph {
 
@@ -32,7 +34,15 @@ struct FrameGraphError {
         : type(t), message(msg), context(ctx) {}
 };
 
-// Result type for frame graph operations
+// Result type for frame graph operations.
+//
+// NOTE: `std::expected` in C++23 is not `[[nodiscard]]` on the type itself,
+// and it cannot portably be wrapped in a derived class that still participates
+// in `std::expected::and_then` / `or_else` / `transform` (those use a
+// `_Is_specialization_v<T, std::expected>` concept that rejects subclasses —
+// verified against MSVC STL 14.44). Therefore the discard-warning is applied
+// at *function* granularity via `[[nodiscard]]` attributes on each API that
+// returns a `Result<T>`. See docs/AUDIT_MAP_2026-04-20.md finding P3-1.
 template<typename T>
 using Result = std::expected<T, FrameGraphError>;
 

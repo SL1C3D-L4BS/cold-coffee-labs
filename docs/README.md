@@ -51,11 +51,11 @@ The documents below form a single coherent system. Read them in the order given.
 ### Operational (updated frequently)
 | File | Purpose |
 | --- | --- |
-| `05_ROADMAP_AND_MILESTONES.md` | 18-phase plan + LTS Sustenance, 125-week schedule, named milestones |
+| `05_ROADMAP_AND_MILESTONES.md` | 24 build phases + LTS Sustenance (Phase 25), 162-week schedule, named milestones |
 | `06_KANBAN_BOARD.md` | Workflow, WIP limits, rituals, milestone tracker |
 | `07_DAILY_TODO_GENERATOR.py` | Generates pre-dated daily logs (Python, run once at project start) |
 | `11_HANDOFF_TO_CLAUDE_CODE.md` | Per-session cold-start protocol and CMake presets |
-| `daily/YYYY-MM-DD.md` | Daily log; one per working day across the 29-month build |
+| `daily/YYYY-MM-DD.md` | Daily log; one per working day across the ~37-month (162-week) build |
 
 ### Reference (stable, updated for clarification only)
 | File | Purpose |
@@ -98,7 +98,7 @@ The documents below form a single coherent system. Read them in the order given.
 - Numbered prefixes (`00`–`11`) indicate canonical reading order.
 - `90`–`99` indicate archival / historical.
 - `architecture/` holds the formal architecture specs (separate because they are referenced by external stakeholders).
-- `daily/` holds one file per working day across the full 29-month build.
+- `daily/` holds one file per working day across the full ~37-month (162-week) build.
 - All documents are Markdown (`.md`) except `07_DAILY_TODO_GENERATOR.py` (script) and `snippets/*.cpp|*.rs` (example code).
 
 ---

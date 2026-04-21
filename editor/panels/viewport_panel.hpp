@@ -14,15 +14,17 @@ struct VkImage_T;     using VkImage      = VkImage_T*;
 struct VkImageView_T; using VkImageView  = VkImageView_T*;
 struct VkSampler_T;   using VkSampler    = VkSampler_T*;
 struct VkDescriptorSet_T; using VkDescriptorSet = VkDescriptorSet_T*;
-struct VmaAllocation_T; using VmaAllocation = VmaAllocation_T*;
-
-namespace gw::render::hal { class VulkanDevice; }
+struct VmaAllocation_T;   using VmaAllocation   = VmaAllocation_T*;
 
 namespace gw::editor {
 
 class ViewportPanel final : public IPanel {
 public:
-    explicit ViewportPanel(gw::render::hal::VulkanDevice& device);
+    // Phase 7: offscreen render target allocation is a TODO (§6.1). The panel
+    // therefore has no Vulkan dependency at construction; it will acquire the
+    // required device + allocator handles via a setter when Phase 8 wires
+    // real scene-image creation.
+    ViewportPanel()           = default;
     ~ViewportPanel() override;
 
     void on_imgui_render(EditorContext& ctx) override;
@@ -43,8 +45,6 @@ private:
     void destroy_scene_image();
     void draw_toolbar(EditorContext& ctx);
     void draw_overlay(EditorContext& ctx);
-
-    gw::render::hal::VulkanDevice& device_;
 
     // Offscreen scene image — displayed via ImGui::Image.
     VkImage           scene_image_  = nullptr;

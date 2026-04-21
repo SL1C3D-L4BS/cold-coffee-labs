@@ -1,57 +1,38 @@
 // editor/pie/gameplay_host.cpp
-// Platform-specific dynamic-library loading isolated to this file.
-// Spec ref: Phase 7 §12 — "LoadLibrary / dlopen goes in gameplay_host_platform.cpp
-// with #ifdef _WIN32".  We keep one file here; macros guard platform code.
+// Play-in-editor lifecycle implementation.
+//
+// OS-specific dynamic-library loading and filesystem access are delegated to
+// `engine/platform/` per CLAUDE.md non-negotiable #11 (OS headers only in
+// `engine/platform/`). This translation unit contains no direct `<windows.h>`
+// or `<dlfcn.h>` includes.
+
 #include "gameplay_host.hpp"
 
-#include <cassert>
+#include "engine/platform/dll.hpp"
+#include "engine/platform/fs.hpp"
+
 #include <cstdio>
+#include <filesystem>
 #include <string>
 
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <windows.h>
-static void* platform_load(const char* path) {
-    return static_cast<void*>(LoadLibraryA(path));
-}
-static void platform_unload(void* h) { FreeLibrary(static_cast<HMODULE>(h)); }
-static void* platform_sym(void* h, const char* sym) {
-    return reinterpret_cast<void*>(
-        GetProcAddress(static_cast<HMODULE>(h), sym));
-}
-static bool platform_copy_file(const char* src, const char* dst) {
-    return CopyFileA(src, dst, FALSE) != 0;
-}
-static uint64_t platform_mtime(const char* path) {
-    WIN32_FILE_ATTRIBUTE_DATA info{};
-    if (!GetFileAttributesExA(path, GetFileExInfoStandard, &info)) return 0;
-    ULARGE_INTEGER t{};
-    t.LowPart  = info.ftLastWriteTime.dwLowDateTime;
-    t.HighPart = info.ftLastWriteTime.dwHighDateTime;
-    return t.QuadPart;
-}
-#else
-#include <dlfcn.h>
-#include <sys/stat.h>
-static void* platform_load(const char* path) {
-    return dlopen(path, RTLD_NOW | RTLD_LOCAL);
-}
-static void platform_unload(void* h) { dlclose(h); }
-static void* platform_sym(void* h, const char* sym) { return dlsym(h, sym); }
-static bool platform_copy_file(const char* src, const char* dst) {
-    char cmd[1024];
-    std::snprintf(cmd, sizeof(cmd), "cp \"%s\" \"%s\"", src, dst);
-    return system(cmd) == 0; // NOLINT — acceptable for editor-only PIE
-}
-static uint64_t platform_mtime(const char* path) {
-    struct stat st{};
-    if (stat(path, &st) != 0) return 0;
-    return static_cast<uint64_t>(st.st_mtime);
-}
-#endif
-
 namespace gw::editor {
+
+namespace {
+
+// Construct a hot-copy filename beside the source library that includes a
+// monotonically incrementing counter, preserving the OS-native shared-library
+// extension so the loader accepts it.
+std::string make_hot_copy_path(const std::string& source, std::uint32_t counter) {
+    std::filesystem::path src(source);
+    const std::filesystem::path ext = src.extension();
+    char tag[32];
+    std::snprintf(tag, sizeof(tag), "_hot_%03u", counter);
+    std::filesystem::path dst = src;
+    dst.replace_filename(src.stem().string() + tag + ext.string());
+    return dst.string();
+}
+
+}  // namespace
 
 GameplayHost::~GameplayHost() {
     if (lib_handle_) unload_dll();
@@ -60,37 +41,35 @@ GameplayHost::~GameplayHost() {
 bool GameplayHost::load_dll() {
     if (lib_source_path_.empty()) return false;
 
-    // Copy to a temp path so the linker can overwrite the original.
-    char temp[512];
-#ifdef _WIN32
-    std::snprintf(temp, sizeof(temp), "%s_hot_%03u.dll",
-                  lib_source_path_.c_str(), hot_copy_counter_++);
-#else
-    std::snprintf(temp, sizeof(temp), "%s_hot_%03u.so",
-                  lib_source_path_.c_str(), hot_copy_counter_++);
-#endif
-    lib_copy_path_ = temp;
+    lib_copy_path_ = make_hot_copy_path(lib_source_path_, hot_copy_counter_++);
 
-    if (!platform_copy_file(lib_source_path_.c_str(), lib_copy_path_.c_str()))
+    if (!gw::platform::FileSystem::copy_file_overwrite(lib_source_path_, lib_copy_path_)) {
         return false;
+    }
 
-    lib_handle_ = platform_load(lib_copy_path_.c_str());
-    if (!lib_handle_) return false;
+    auto lib = std::make_unique<gw::platform::DynamicLibrary>();
+    if (!lib->open(lib_copy_path_)) {
+        return false;
+    }
 
     gameplay_init_     = reinterpret_cast<GwGameplayInitFn>(
-        platform_sym(lib_handle_, "gw_gameplay_init"));
+        lib->find_symbol("gw_gameplay_init"));
     gameplay_update_   = reinterpret_cast<GwGameplayUpdateFn>(
-        platform_sym(lib_handle_, "gw_gameplay_update"));
+        lib->find_symbol("gw_gameplay_update"));
     gameplay_shutdown_ = reinterpret_cast<GwGameplayShutdownFn>(
-        platform_sym(lib_handle_, "gw_gameplay_shutdown"));
+        lib->find_symbol("gw_gameplay_shutdown"));
 
-    return gameplay_init_ && gameplay_update_ && gameplay_shutdown_;
+    if (!(gameplay_init_ && gameplay_update_ && gameplay_shutdown_)) {
+        return false;  // unique_ptr destructor closes the library cleanly
+    }
+
+    lib_handle_ = std::move(lib);
+    return true;
 }
 
 void GameplayHost::unload_dll() {
     if (lib_handle_) {
-        platform_unload(lib_handle_);
-        lib_handle_        = nullptr;
+        lib_handle_.reset();  // DynamicLibrary dtor closes the OS handle
         gameplay_init_     = nullptr;
         gameplay_update_   = nullptr;
         gameplay_shutdown_ = nullptr;
@@ -98,7 +77,12 @@ void GameplayHost::unload_dll() {
 }
 
 bool GameplayHost::enter_play(GameplayContext& ctx) {
-    assert(state_ == PIEState::Editor);
+    // Guard: transition is only valid from Editor → Playing. Returns false
+    // (recoverable) rather than asserting — editor code must not take the
+    // sandbox `assert-on-error` path (see docs/12 §B2: assertions are
+    // sandbox-only). The UI disables Play while already in PIE, so reaching
+    // this branch is a programming error the caller can handle.
+    if (state_ != PIEState::Editor) return false;
 
     // Snapshot the ECS world (Phase 7 stub — empty snapshot; Phase 8 serializes).
     world_snapshot_.clear();
@@ -106,6 +90,7 @@ bool GameplayHost::enter_play(GameplayContext& ctx) {
 
     if (!load_dll()) return false;
 
+    live_ctx_ = &ctx;
     gameplay_init_(&ctx);
     state_ = PIEState::Playing;
     return true;
@@ -124,7 +109,8 @@ void GameplayHost::stop(GameplayContext& ctx) {
 
     if (gameplay_shutdown_) gameplay_shutdown_();
     unload_dll();
-    state_ = PIEState::Editor;
+    state_     = PIEState::Editor;
+    live_ctx_  = nullptr;
 
     // Restore ECS world (Phase 7 stub; Phase 8 deserializes world_snapshot_).
     // TODO(Phase 8): deserialize world_snapshot_ back into ctx.world
@@ -140,17 +126,23 @@ void GameplayHost::reload_if_changed() {
     if (state_ != PIEState::Playing) return;
     if (lib_source_path_.empty() || !lib_handle_) return;
 
-    static uint64_t last_mtime = 0;
-    uint64_t mtime = platform_mtime(lib_source_path_.c_str());
-    if (mtime == 0 || mtime == last_mtime) return;
+    static std::uint64_t last_mtime = 0u;
+    const std::uint64_t mtime = gw::platform::FileSystem::last_write_stamp(lib_source_path_);
+    if (mtime == 0u || mtime == last_mtime) return;
     last_mtime = mtime;
 
-    // Hot-reload: shutdown, unload, reload, re-init.
+    // Hot-reload: shutdown, unload, reload, re-init with the cached context.
     if (gameplay_shutdown_) gameplay_shutdown_();
     unload_dll();
-    if (load_dll()) {
-        // Reinitialize with the same context (world was not destroyed).
-        // This is a stub — Phase 8 will pass the real ctx pointer.
+    if (!load_dll()) {
+        // Reload failed — fall back to Editor state rather than leaving
+        // ourselves in a "Playing but no DLL" limbo.
+        state_    = PIEState::Editor;
+        live_ctx_ = nullptr;
+        return;
+    }
+    if (live_ctx_ && gameplay_init_) {
+        gameplay_init_(live_ctx_);
     }
 }
 

@@ -64,7 +64,7 @@ See `docs/architecture/` for the formal blueprint and the narrative core archite
 19. **Phase-complete execution.** When a phase opens, *every* deliverable listed for that phase in `docs/05_ROADMAP_AND_MILESTONES.md` (and the week-by-week expansion in `docs/10_PRE_DEVELOPMENT_MASTER_PLAN.md` for Phases 1–3) is in-scope from day one. **The phase milestone is the gate — not the week row.** No deliverable is parked "for next Tuesday" or "for Friday's card." If it is described under Phase N, it lands before Phase N closes. Weekly rows remain as internal pace-markers; they are budget, not gating contracts. Kanban WIP≤2 governs *concurrency*, not *scope* — the Triaged pool on phase entry is the full phase.
 20. **Documentation never lags directive.** A change in directive — including this one — updates `CLAUDE.md` and every affected canonical/operational doc **before any code is written**. The repo's rules and the repo's code must not disagree. A session that introduces a new directive commits the doc change first and the code change second.
 
-Full rationale and the code-review rubric behind these: `docs/12_ENGINEERING_PRINCIPLES.md`. Execution-cadence rationale: `docs/00_SPECIFICATION_Claude_Opus_4.7.md` §9.
+Full rationale and the code-review rubric behind these: `docs/12_ENGINEERING_PRINCIPLES.md`. Policy/principle rationale for #1–18: `docs/00_SPECIFICATION_Claude_Opus_4.7.md` §2. Execution-cadence rationale for #19–20: `docs/00_SPECIFICATION_Claude_Opus_4.7.md` §9.
 
 ---
 

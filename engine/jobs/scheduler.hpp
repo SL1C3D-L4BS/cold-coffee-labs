@@ -1,6 +1,7 @@
 #pragma once
 
 #include "job_queue.hpp"
+#include "reserved_worker.hpp"
 #include "worker.hpp"
 #include <cstdint>
 #include <memory>
@@ -46,6 +47,15 @@ public:
     // Access the underlying queue (used by engine subsystems that need to
     // wait on specific handles themselves).
     [[nodiscard]] JobQueue& queue() noexcept { return queue_; }
+
+    // Spawn a dedicated, long-lived worker thread that runs `fn` until it
+    // returns. The returned ReservedWorker owns the std::thread and joins
+    // on destruction. Use for subsystems (asset loader, cook pool) whose
+    // work does not fit the fork-join job-queue model.
+    // See CLAUDE.md non-negotiable #10 and docs/AUDIT_MAP_2026-04-20.md P2-1/P2-2.
+    [[nodiscard]] static ReservedWorker reserve_worker(ReservedWorker::Fn fn) {
+        return ReservedWorker{std::move(fn)};
+    }
 
 private:
     JobQueue                                queue_;

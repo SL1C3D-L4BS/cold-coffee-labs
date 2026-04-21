@@ -9,6 +9,8 @@
 #include <volk.h>
 #include <vk_mem_alloc.h>
 
+#include "capabilities.hpp"
+
 namespace gw {
 namespace render {
 namespace hal {
@@ -42,6 +44,11 @@ public:
     // Feature queries
     [[nodiscard]] bool supports_anisotropy() const noexcept { return features_.samplerAnisotropy; }
 
+    // RHI capability snapshot — the canonical "what does this GPU support"
+    // feature-flag struct. Populated once at construction; read-only.
+    // See docs/adr/0003-rhi-capabilities.md.
+    [[nodiscard]] const RHICapabilities& capabilities() const noexcept { return caps_; }
+
     // Graphics command pool (one-per-frame-in-flight callers own the buffer lifetime)
     [[nodiscard]] VkCommandPool graphics_command_pool() const noexcept { return graphics_cmd_pool_; }
 
@@ -68,6 +75,8 @@ private:
     VkPhysicalDeviceFeatures         features_{};
     VkPhysicalDeviceProperties       properties_{};
     VkPhysicalDeviceMemoryProperties memory_properties_{};
+
+    RHICapabilities                  caps_{};
 };
 
 }  // namespace hal

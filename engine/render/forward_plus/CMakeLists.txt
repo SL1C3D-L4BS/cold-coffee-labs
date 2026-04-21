@@ -13,8 +13,5 @@ target_include_directories(engine_render
         ${CMAKE_CURRENT_SOURCE_DIR}/../../../math
 )
 
-# Link with required dependencies
-target_link_libraries(engine_render PRIVATE
-    Vulkan::Vulkan
-    VulkanMemoryAllocator
-)
+# Do NOT link Vulkan::Vulkan — volk owns the loader path (see render/CMakeLists.txt).
+target_link_libraries(engine_render PRIVATE VulkanMemoryAllocator)

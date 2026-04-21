@@ -35,4 +35,27 @@ GW_GAMEPLAY_API void gameplay_shutdown() noexcept {
     std::fprintf(stdout, "[gameplay] shutdown\n");
 }
 
+// ---------------------------------------------------------------------------
+// Editor Play-in-Editor ABI (gw_gameplay_*) — Phase 7 §12.
+// These wrap the Phase-1 `gameplay_*` exports with the signatures the editor
+// host expects:
+//     gw_gameplay_init     (GameplayContext*)
+//     gw_gameplay_update   (GameplayContext*, float dt)
+//     gw_gameplay_shutdown ()
+// Until Phase 8 wires a real `GameplayContext`, the context pointer is
+// accepted as opaque void* and ignored. This preserves Phase 1 ABI for
+// standalone callers while letting PIE resolve its symbols.
+// ---------------------------------------------------------------------------
+GW_GAMEPLAY_API void gw_gameplay_init(void* /*ctx*/) noexcept {
+    gameplay_init();
+}
+
+GW_GAMEPLAY_API void gw_gameplay_update(void* /*ctx*/, float dt_seconds) noexcept {
+    gameplay_tick(static_cast<double>(dt_seconds));
+}
+
+GW_GAMEPLAY_API void gw_gameplay_shutdown() noexcept {
+    gameplay_shutdown();
+}
+
 }  // extern "C"

@@ -1,39 +1,61 @@
 #pragma once
+// engine/ecs/entity.hpp
+// ECS entity handle: 64-bit generational index.
+// See docs/adr/0004-ecs-world.md §2.2.
+//
+// Layout: bits[0..31] = index, bits[32..63] = generation.
+// Generation 0 is reserved to mean "never used / destroyed", so a freshly
+// created entity starts at generation 1. Entity{0} is the unambiguous null.
 
 #include <cstdint>
-#include <cstddef>
+#include <functional>
+#include <limits>
 
 namespace gw {
 namespace ecs {
 
-// Entity handle is a generational index to avoid ABA problems
-// High bits are generation, low bits are index within generation
-using EntityHandle = uint32_t;
+struct Entity {
+    std::uint64_t bits = 0;
 
-constexpr EntityHandle INVALID_ENTITY = 0xFFFFFFFFu;
+    [[nodiscard]] constexpr std::uint32_t index() const noexcept {
+        return static_cast<std::uint32_t>(bits);
+    }
+    [[nodiscard]] constexpr std::uint32_t generation() const noexcept {
+        return static_cast<std::uint32_t>(bits >> 32);
+    }
+    [[nodiscard]] constexpr bool is_null() const noexcept { return bits == 0; }
 
-// Component type IDs - each component type gets a unique ID
-enum class ComponentType : uint32_t {
-    Transform = 0,
-    Velocity = 1,
-    Render = 2,
-    Physics = 3,
-    Animation = 4,
-    Audio = 5,
-    MAX_COMPONENTS
+    [[nodiscard]] static constexpr Entity null() noexcept { return {0}; }
+    [[nodiscard]] static constexpr Entity from_parts(std::uint32_t index,
+                                                      std::uint32_t generation) noexcept {
+        return {static_cast<std::uint64_t>(index) |
+                (static_cast<std::uint64_t>(generation) << 32)};
+    }
+
+    [[nodiscard]] friend constexpr bool operator==(Entity, Entity) noexcept = default;
 };
 
-// Component flags for queries
-enum class ComponentFlags : uint32_t {
-    None = 0,
-    Transform = 1u << static_cast<uint32_t>(ComponentType::Transform),
-    Velocity = 1u << static_cast<uint32_t>(ComponentType::Velocity),
-    Render = 1u << static_cast<uint32_t>(ComponentType::Render),
-    Physics = 1u << static_cast<uint32_t>(ComponentType::Physics),
-    Animation = 1u << static_cast<uint32_t>(ComponentType::Animation),
-    Audio = 1u << static_cast<uint32_t>(ComponentType::Audio),
-    All = (1u << static_cast<uint32_t>(ComponentType::MAX_COMPONENTS)) - 1u
-};
+static_assert(sizeof(Entity) == 8, "Entity must be 8 bytes");
 
-}  // namespace ecs
-}  // namespace gw
+// Small, stable integer type used to identify component types within a live
+// ComponentRegistry. NOT portable across builds — use ComponentTypeInfo.stable_hash
+// for anything durable (serialization).
+using ComponentTypeId = std::uint16_t;
+inline constexpr ComponentTypeId kInvalidComponentTypeId =
+    std::numeric_limits<ComponentTypeId>::max();
+
+// Maximum supported component types per registry. Matches the width of the
+// bitset we use for archetype-match queries.
+inline constexpr std::size_t kMaxComponentTypes = 256;
+
+} // namespace ecs
+} // namespace gw
+
+namespace std {
+template <>
+struct hash<gw::ecs::Entity> {
+    [[nodiscard]] size_t operator()(gw::ecs::Entity e) const noexcept {
+        return std::hash<std::uint64_t>{}(e.bits);
+    }
+};
+} // namespace std

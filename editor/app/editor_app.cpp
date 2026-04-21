@@ -1,6 +1,22 @@
 // editor/app/editor_app.cpp
-// EditorApplication — owns the GLFW window + Vulkan + ImGui frame loop.
+// EditorApplication — GLFW window + Vulkan 1.2/1.3 backend + ImGui docking
+// frame loop. Full real wiring; no stubs.
+//
 // Spec ref: Phase 7 §2, §14, §15.
+//
+// Architecture notes
+// ------------------
+// The editor creates its own VkInstance / VkDevice / VkSwapchainKHR directly
+// against volk rather than reusing engine/render/hal. The HAL device does not
+// yet request the dynamic-rendering + sync2 extensions that ImGui's Vulkan
+// backend requires, and the HAL instance does not wire surface extensions.
+// Once the HAL is extended (Phase C audit follow-up), this file can shrink to
+// the Vulkan*/HAL pattern used by future engine modules.
+//
+// Presentation model: one semaphore per frame-in-flight for acquire, one
+// semaphore per swapchain image for submit->present. Fences gate the host.
+// Dynamic rendering (VK_KHR_dynamic_rendering) drives the single swapchain
+// color attachment per frame. ImGui draw data is rendered into that attachment.
 #include "editor_app.hpp"
 #include "editor/bld_api/editor_bld_api.hpp"
 
@@ -10,47 +26,180 @@
 #include "editor/panels/asset_browser_panel.hpp"
 #include "editor/panels/console_panel.hpp"
 
-#include "engine/render/hal/vulkan_instance.hpp"
-#include "engine/render/hal/vulkan_device.hpp"
-#include "engine/render/hal/vulkan_swapchain.hpp"
+// volk must precede every Vulkan include in this TU so that imgui_impl_vulkan
+// picks up volk's dispatch tables (IMGUI_IMPL_VULKAN_USE_VOLK is set by the
+// editor CMakeLists).
+#include <volk.h>
 
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
+#include <ImGuizmo.h>
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
-#include <volk.h>
 
+#include "engine/core/log.hpp"
+
+#include <algorithm>
+#include <array>
 #include <cassert>
+#include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <optional>
 #include <string>
+#include <vector>
 
 namespace gw::editor {
+
+namespace {
+
+constexpr uint32_t kFramesInFlight = 2;
+
+[[noreturn]] void gw_fatal(const char* msg) {
+    std::fprintf(stderr, "[editor] FATAL: %s\n", msg);
+    std::exit(EXIT_FAILURE);
+}
+
+#define GW_VKCHECK(expr)                                                       \
+    do {                                                                       \
+        VkResult _r = (expr);                                                  \
+        if (_r != VK_SUCCESS) {                                                \
+            std::fprintf(stderr, "[editor] %s failed: VkResult=%d\n",          \
+                         #expr, static_cast<int>(_r));                         \
+            std::exit(EXIT_FAILURE);                                           \
+        }                                                                      \
+    } while (0)
+
+struct QueueFamilies {
+    std::optional<uint32_t> graphics;
+    std::optional<uint32_t> present;
+    [[nodiscard]] bool complete() const noexcept {
+        return graphics.has_value() && present.has_value();
+    }
+};
+
+QueueFamilies find_queue_families(VkPhysicalDevice gpu, VkSurfaceKHR surface) {
+    QueueFamilies q{};
+    uint32_t n = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(gpu, &n, nullptr);
+    std::vector<VkQueueFamilyProperties> props(n);
+    vkGetPhysicalDeviceQueueFamilyProperties(gpu, &n, props.data());
+    for (uint32_t i = 0; i < n; ++i) {
+        if (props[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
+            q.graphics = i;
+        VkBool32 present_supported = VK_FALSE;
+        vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &present_supported);
+        if (present_supported)
+            q.present = i;
+        if (q.complete()) break;
+    }
+    return q;
+}
+
+VkPhysicalDevice pick_physical_device(VkInstance instance, VkSurfaceKHR surface) {
+    uint32_t n = 0;
+    vkEnumeratePhysicalDevices(instance, &n, nullptr);
+    if (n == 0) gw_fatal("no Vulkan-capable physical devices");
+    std::vector<VkPhysicalDevice> gpus(n);
+    vkEnumeratePhysicalDevices(instance, &n, gpus.data());
+
+    for (VkPhysicalDevice gpu : gpus) {
+        VkPhysicalDeviceProperties p{};
+        vkGetPhysicalDeviceProperties(gpu, &p);
+        if (p.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU &&
+            find_queue_families(gpu, surface).complete()) {
+            std::fprintf(stdout, "[editor] selected GPU: %s (Vulkan %u.%u)\n",
+                         p.deviceName,
+                         VK_API_VERSION_MAJOR(p.apiVersion),
+                         VK_API_VERSION_MINOR(p.apiVersion));
+            return gpu;
+        }
+    }
+    for (VkPhysicalDevice gpu : gpus) {
+        if (find_queue_families(gpu, surface).complete())
+            return gpu;
+    }
+    gw_fatal("no Vulkan device exposes both graphics + present queue families");
+}
+
+[[maybe_unused]] VKAPI_ATTR VkBool32 VKAPI_CALL debug_messenger_cb(
+    VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+    VkDebugUtilsMessageTypeFlagsEXT /*type*/,
+    const VkDebugUtilsMessengerCallbackDataEXT* data,
+    void* /*user*/) {
+    if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+        std::fprintf(stderr, "[vk] %s\n", data->pMessage);
+    }
+    return VK_FALSE;
+}
+
+}  // namespace
+
+// ---------------------------------------------------------------------------
+// EditorVulkanBackend — owns every VK handle the editor uses.
+// ---------------------------------------------------------------------------
+struct EditorVulkanBackend {
+    VkInstance               instance          = VK_NULL_HANDLE;
+    VkDebugUtilsMessengerEXT messenger         = VK_NULL_HANDLE;
+    VkSurfaceKHR             surface           = VK_NULL_HANDLE;
+    VkPhysicalDevice         physical_device   = VK_NULL_HANDLE;
+    VkDevice                 device            = VK_NULL_HANDLE;
+
+    uint32_t                 graphics_family   = UINT32_MAX;
+    uint32_t                 present_family    = UINT32_MAX;
+    VkQueue                  graphics_queue    = VK_NULL_HANDLE;
+    VkQueue                  present_queue     = VK_NULL_HANDLE;
+
+    VkSwapchainKHR           swapchain         = VK_NULL_HANDLE;
+    VkFormat                 swapchain_format  = VK_FORMAT_UNDEFINED;
+    VkColorSpaceKHR          swapchain_cs      = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+    VkExtent2D               swapchain_extent  = {};
+    uint32_t                 swapchain_min_count = 0;
+    std::vector<VkImage>     swapchain_images;
+    std::vector<VkImageView> swapchain_views;
+
+    VkCommandPool            cmd_pool          = VK_NULL_HANDLE;
+    std::array<VkCommandBuffer, kFramesInFlight> cmd_buffers{};
+
+    std::array<VkSemaphore, kFramesInFlight> image_available{};
+    std::vector<VkSemaphore>                 render_finished;  // per swapchain image
+    std::array<VkFence,     kFramesInFlight> in_flight{};
+
+    VkDescriptorPool         imgui_descriptor_pool = VK_NULL_HANDLE;
+    VkFormat                 imgui_color_format = VK_FORMAT_UNDEFINED;
+
+    uint32_t                 frame_index       = 0;
+    uint32_t                 acquired_image    = 0;
+    bool                     imgui_initialised = false;
+};
 
 // ---------------------------------------------------------------------------
 // Construction / destruction
 // ---------------------------------------------------------------------------
-EditorApplication::EditorApplication() {
+EditorApplication::EditorApplication()
+    : vk_(std::make_unique<EditorVulkanBackend>()) {
     init_window();
     init_vulkan();
     init_imgui();
     apply_theme();
 
-    // Panels — order determines draw order.
-    auto* vp = new ViewportPanel(*device_);
+    // Panels — no raw new; unique_ptr owned by the registry. (Non-negotiable #5)
+    auto vp = std::make_unique<ViewportPanel>();
     vp->set_window(window_);
-    panels_.add(std::unique_ptr<ViewportPanel>(vp));
+    panels_.add(std::move(vp));
     panels_.add(std::make_unique<OutlinerPanel>());
     panels_.add(std::make_unique<InspectorPanel>());
     panels_.add(std::make_unique<AssetBrowserPanel>());
     panels_.add(std::make_unique<ConsolePanel>());
 
     // Wire BLD API globals.
-    gw::editor::bld_api::g_globals.selection  = &selection_;
-    gw::editor::bld_api::g_globals.cmd_stack  = &cmd_stack_;
+    gw::editor::bld_api::g_globals.selection = &selection_;
+    gw::editor::bld_api::g_globals.cmd_stack = &cmd_stack_;
 }
 
 EditorApplication::~EditorApplication() {
@@ -68,26 +217,25 @@ void EditorApplication::run() {
     while (!glfwWindowShouldClose(window_) && running_) {
         glfwPollEvents();
 
-        double now = glfwGetTime();
-        float  dt  = static_cast<float>(now - last_time);
-        last_time  = now;
+        const double now = glfwGetTime();
+        const float  dt  = static_cast<float>(now - last_time);
+        last_time = now;
 
-        // Handle deferred swapchain resize.
         if (swapchain_resize_pending_) {
-            // wait_idle + recreate swapchain + viewport resize handled here.
+            recreate_swapchain();
             swapchain_resize_pending_ = false;
         }
 
-        // Handle viewport resize.
         if (auto* vpp = dynamic_cast<ViewportPanel*>(panels_.find("Viewport"))) {
             if (vpp->resize_pending_) {
-                // wait_idle before destroying old image.
-                // vkDeviceWaitIdle(device_->vk_device());  // wired when device exposes handle
+                vkDeviceWaitIdle(vk_->device);
                 vpp->apply_resize(vpp->pending_w_, vpp->pending_h_);
             }
         }
 
-        begin_frame();
+        if (!begin_frame()) {
+            continue;  // swapchain out-of-date; retry next iteration
+        }
 
         EditorContext ctx{
             .selection    = selection_,
@@ -105,22 +253,23 @@ void EditorApplication::run() {
 
         pie_.reload_if_changed();
     }
+
+    if (vk_->device)
+        vkDeviceWaitIdle(vk_->device);
 }
 
 // ---------------------------------------------------------------------------
 // Init: Window
 // ---------------------------------------------------------------------------
 void EditorApplication::init_window() {
-    if (!glfwInit()) {
-        std::fputs("glfwInit failed\n", stderr);
-        return;
-    }
+    if (!glfwInit()) gw_fatal("glfwInit failed");
+
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
     window_ = glfwCreateWindow(win_w_, win_h_,
         "Greywater Editor  |  Cold Coffee Labs", nullptr, nullptr);
-    assert(window_);
+    if (!window_) gw_fatal("glfwCreateWindow failed");
 
     glfwSetWindowUserPointer(window_, this);
     glfwSetKeyCallback(window_, on_key_callback);
@@ -129,16 +278,278 @@ void EditorApplication::init_window() {
 }
 
 // ---------------------------------------------------------------------------
-// Init: Vulkan (stubs — full wiring when VulkanDevice API is complete)
+// Init: Vulkan
 // ---------------------------------------------------------------------------
 void EditorApplication::init_vulkan() {
-    volkInitialize();
+    GW_VKCHECK(volkInitialize());
 
-    // Phase 7: HAL objects are constructed here.
-    // For now we allocate placeholders; the render path is wired in the
-    // EditorScenePass (Phase 7 §6.2) once VulkanDevice exposes create_image().
-    // Full device init path mirrors the existing sandbox/main.cpp.
-    // TODO: replace with real VulkanInstance/Device/Swapchain construction.
+    // --- Instance ----------------------------------------------------------
+    VkApplicationInfo app{};
+    app.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    app.pApplicationName   = "Greywater Editor";
+    app.applicationVersion = VK_MAKE_VERSION(0, 0, 1);
+    app.pEngineName        = "Greywater_Engine";
+    app.engineVersion      = VK_MAKE_VERSION(0, 0, 1);
+    app.apiVersion         = VK_API_VERSION_1_3;  // RX 580 exposes 1.3
+
+    uint32_t glfw_ext_count = 0;
+    const char** glfw_exts = glfwGetRequiredInstanceExtensions(&glfw_ext_count);
+    std::vector<const char*> instance_extensions(glfw_exts, glfw_exts + glfw_ext_count);
+
+    std::vector<const char*> instance_layers;
+#if GW_VK_VALIDATION
+    instance_layers.push_back("VK_LAYER_KHRONOS_validation");
+    instance_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+#endif
+
+    VkInstanceCreateInfo ici{};
+    ici.sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    ici.pApplicationInfo        = &app;
+    ici.enabledLayerCount       = static_cast<uint32_t>(instance_layers.size());
+    ici.ppEnabledLayerNames     = instance_layers.data();
+    ici.enabledExtensionCount   = static_cast<uint32_t>(instance_extensions.size());
+    ici.ppEnabledExtensionNames = instance_extensions.data();
+    GW_VKCHECK(vkCreateInstance(&ici, nullptr, &vk_->instance));
+    volkLoadInstance(vk_->instance);
+
+#if GW_VK_VALIDATION
+    VkDebugUtilsMessengerCreateInfoEXT dmi{};
+    dmi.sType           = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    dmi.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                          VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    dmi.messageType     = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                          VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                          VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    dmi.pfnUserCallback = debug_messenger_cb;
+    GW_VKCHECK(vkCreateDebugUtilsMessengerEXT(vk_->instance, &dmi, nullptr, &vk_->messenger));
+#endif
+
+    // --- Surface -----------------------------------------------------------
+    GW_VKCHECK(glfwCreateWindowSurface(vk_->instance, window_, nullptr, &vk_->surface));
+
+    // --- Physical device + queue families ---------------------------------
+    vk_->physical_device = pick_physical_device(vk_->instance, vk_->surface);
+    QueueFamilies q = find_queue_families(vk_->physical_device, vk_->surface);
+    vk_->graphics_family = *q.graphics;
+    vk_->present_family  = *q.present;
+
+    // --- Logical device ----------------------------------------------------
+    const float qp = 1.0f;
+    std::vector<VkDeviceQueueCreateInfo> qcis;
+    std::vector<uint32_t> unique_families{vk_->graphics_family};
+    if (vk_->present_family != vk_->graphics_family)
+        unique_families.push_back(vk_->present_family);
+    for (uint32_t fam : unique_families) {
+        VkDeviceQueueCreateInfo qci{};
+        qci.sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        qci.queueFamilyIndex = fam;
+        qci.queueCount       = 1;
+        qci.pQueuePriorities = &qp;
+        qcis.push_back(qci);
+    }
+
+    const char* device_exts[] = {
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
+        VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
+    };
+
+    VkPhysicalDeviceSynchronization2Features sync2{};
+    sync2.sType            = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES;
+    sync2.synchronization2 = VK_TRUE;
+
+    VkPhysicalDeviceDynamicRenderingFeatures dyn_rendering{};
+    dyn_rendering.sType            = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
+    dyn_rendering.pNext            = &sync2;
+    dyn_rendering.dynamicRendering = VK_TRUE;
+
+    VkDeviceCreateInfo dci{};
+    dci.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    dci.pNext                   = &dyn_rendering;
+    dci.queueCreateInfoCount    = static_cast<uint32_t>(qcis.size());
+    dci.pQueueCreateInfos       = qcis.data();
+    dci.enabledExtensionCount   = static_cast<uint32_t>(std::size(device_exts));
+    dci.ppEnabledExtensionNames = device_exts;
+    GW_VKCHECK(vkCreateDevice(vk_->physical_device, &dci, nullptr, &vk_->device));
+    volkLoadDevice(vk_->device);
+
+    vkGetDeviceQueue(vk_->device, vk_->graphics_family, 0, &vk_->graphics_queue);
+    vkGetDeviceQueue(vk_->device, vk_->present_family,  0, &vk_->present_queue);
+
+    // --- Swapchain ---------------------------------------------------------
+    recreate_swapchain();
+
+    // --- Command pool + buffers -------------------------------------------
+    VkCommandPoolCreateInfo cpi{};
+    cpi.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    cpi.flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    cpi.queueFamilyIndex = vk_->graphics_family;
+    GW_VKCHECK(vkCreateCommandPool(vk_->device, &cpi, nullptr, &vk_->cmd_pool));
+
+    VkCommandBufferAllocateInfo cbai{};
+    cbai.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    cbai.commandPool        = vk_->cmd_pool;
+    cbai.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    cbai.commandBufferCount = kFramesInFlight;
+    GW_VKCHECK(vkAllocateCommandBuffers(vk_->device, &cbai, vk_->cmd_buffers.data()));
+
+    // --- Sync primitives ---------------------------------------------------
+    VkSemaphoreCreateInfo sci{};
+    sci.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    VkFenceCreateInfo fci{};
+    fci.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fci.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+    for (uint32_t i = 0; i < kFramesInFlight; ++i) {
+        GW_VKCHECK(vkCreateSemaphore(vk_->device, &sci, nullptr, &vk_->image_available[i]));
+        GW_VKCHECK(vkCreateFence(vk_->device, &fci, nullptr, &vk_->in_flight[i]));
+    }
+    vk_->render_finished.resize(vk_->swapchain_images.size());
+    for (size_t i = 0; i < vk_->render_finished.size(); ++i) {
+        GW_VKCHECK(vkCreateSemaphore(vk_->device, &sci, nullptr, &vk_->render_finished[i]));
+    }
+
+    // --- ImGui descriptor pool --------------------------------------------
+    // ImGui uses one combined-image-sampler per texture; 1000 should comfortably
+    // cover editor icons + panel images for the v0.1 deliverable.
+    const VkDescriptorPoolSize pool_sizes[] = {
+        { VK_DESCRIPTOR_TYPE_SAMPLER,                1000 },
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,          1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          1000 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,         1000 },
+    };
+    VkDescriptorPoolCreateInfo dpi{};
+    dpi.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    dpi.flags         = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    dpi.maxSets       = 1000 * static_cast<uint32_t>(std::size(pool_sizes));
+    dpi.poolSizeCount = static_cast<uint32_t>(std::size(pool_sizes));
+    dpi.pPoolSizes    = pool_sizes;
+    GW_VKCHECK(vkCreateDescriptorPool(vk_->device, &dpi, nullptr, &vk_->imgui_descriptor_pool));
+}
+
+void EditorApplication::recreate_swapchain() {
+    // Wait until window is non-zero (minimised).
+    int w = 0, h = 0;
+    glfwGetFramebufferSize(window_, &w, &h);
+    while (w == 0 || h == 0) {
+        glfwWaitEvents();
+        glfwGetFramebufferSize(window_, &w, &h);
+    }
+
+    if (vk_->device)
+        vkDeviceWaitIdle(vk_->device);
+
+    // Destroy old views first, keep old swapchain to pass as oldSwapchain.
+    for (VkImageView v : vk_->swapchain_views) {
+        vkDestroyImageView(vk_->device, v, nullptr);
+    }
+    vk_->swapchain_views.clear();
+    VkSwapchainKHR old_swapchain = vk_->swapchain;
+
+    VkSurfaceCapabilitiesKHR caps{};
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk_->physical_device, vk_->surface, &caps);
+
+    uint32_t fmt_n = 0;
+    vkGetPhysicalDeviceSurfaceFormatsKHR(vk_->physical_device, vk_->surface, &fmt_n, nullptr);
+    std::vector<VkSurfaceFormatKHR> fmts(fmt_n);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(vk_->physical_device, vk_->surface, &fmt_n, fmts.data());
+    VkSurfaceFormatKHR chosen = fmts[0];
+    for (const auto& f : fmts) {
+        if (f.format == VK_FORMAT_B8G8R8A8_UNORM &&
+            f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+            chosen = f;
+            break;
+        }
+    }
+
+    VkExtent2D extent = caps.currentExtent;
+    if (extent.width == UINT32_MAX) {
+        extent.width  = static_cast<uint32_t>(w);
+        extent.height = static_cast<uint32_t>(h);
+    }
+    extent.width  = std::clamp(extent.width,  caps.minImageExtent.width,  caps.maxImageExtent.width);
+    extent.height = std::clamp(extent.height, caps.minImageExtent.height, caps.maxImageExtent.height);
+
+    uint32_t image_count = caps.minImageCount + 1;
+    if (caps.maxImageCount > 0 && image_count > caps.maxImageCount)
+        image_count = caps.maxImageCount;
+
+    VkSwapchainCreateInfoKHR sci{};
+    sci.sType            = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    sci.surface          = vk_->surface;
+    sci.minImageCount    = image_count;
+    sci.imageFormat      = chosen.format;
+    sci.imageColorSpace  = chosen.colorSpace;
+    sci.imageExtent      = extent;
+    sci.imageArrayLayers = 1;
+    sci.imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                           VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+
+    uint32_t fams[2] = {vk_->graphics_family, vk_->present_family};
+    if (vk_->graphics_family != vk_->present_family) {
+        sci.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
+        sci.queueFamilyIndexCount = 2;
+        sci.pQueueFamilyIndices   = fams;
+    } else {
+        sci.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    }
+    sci.preTransform   = caps.currentTransform;
+    sci.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    sci.presentMode    = VK_PRESENT_MODE_FIFO_KHR;
+    sci.clipped        = VK_TRUE;
+    sci.oldSwapchain   = old_swapchain;
+
+    GW_VKCHECK(vkCreateSwapchainKHR(vk_->device, &sci, nullptr, &vk_->swapchain));
+
+    if (old_swapchain != VK_NULL_HANDLE)
+        vkDestroySwapchainKHR(vk_->device, old_swapchain, nullptr);
+
+    vk_->swapchain_format    = chosen.format;
+    vk_->swapchain_cs        = chosen.colorSpace;
+    vk_->swapchain_extent    = extent;
+    // imgui_impl_vulkan asserts MinImageCount >= 2. caps.minImageCount can be 1
+    // on some drivers (or on e.g. MAILBOX), so clamp to at least 2. We also
+    // guarantee the actual swapchain has >= 2 images via image_count above.
+    vk_->swapchain_min_count = std::max(caps.minImageCount, 2u);
+
+    // Keep ImGui's stored format pointer in sync — ImGui_ImplVulkan_Init
+    // captures &vk_->imgui_color_format, so overwriting the value here is
+    // enough for pipeline recreation to see the new format.
+    vk_->imgui_color_format  = chosen.format;
+
+    uint32_t img_n = 0;
+    vkGetSwapchainImagesKHR(vk_->device, vk_->swapchain, &img_n, nullptr);
+    vk_->swapchain_images.resize(img_n);
+    vkGetSwapchainImagesKHR(vk_->device, vk_->swapchain, &img_n, vk_->swapchain_images.data());
+
+    vk_->swapchain_views.resize(img_n);
+    for (uint32_t i = 0; i < img_n; ++i) {
+        VkImageViewCreateInfo ivi{};
+        ivi.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        ivi.image                           = vk_->swapchain_images[i];
+        ivi.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
+        ivi.format                          = vk_->swapchain_format;
+        ivi.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+        ivi.subresourceRange.levelCount     = 1;
+        ivi.subresourceRange.layerCount     = 1;
+        GW_VKCHECK(vkCreateImageView(vk_->device, &ivi, nullptr, &vk_->swapchain_views[i]));
+    }
+
+    // Re-create render-finished semaphores if the image count changed.
+    for (VkSemaphore s : vk_->render_finished)
+        vkDestroySemaphore(vk_->device, s, nullptr);
+    vk_->render_finished.clear();
+    vk_->render_finished.resize(img_n);
+    VkSemaphoreCreateInfo sem_ci{};
+    sem_ci.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    for (uint32_t i = 0; i < img_n; ++i) {
+        GW_VKCHECK(vkCreateSemaphore(vk_->device, &sem_ci, nullptr, &vk_->render_finished[i]));
+    }
+
+    if (vk_->imgui_initialised)
+        ImGui_ImplVulkan_SetMinImageCount(vk_->swapchain_min_count);
 }
 
 // ---------------------------------------------------------------------------
@@ -152,27 +563,29 @@ void EditorApplication::init_imgui() {
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
-    // Disable auto-save — we manage ini explicitly to avoid mid-frame corruption.
-    // Spec ref: Phase 7 §14.
+    // Disable auto-save — we manage ini explicitly.
     io.IniFilename = nullptr;
 
     // Load saved layout.
     namespace fs = std::filesystem;
     fs::path ini_path;
 #ifdef _WIN32
-    const char* appdata = std::getenv("APPDATA");
-    ini_path = appdata ? fs::path{appdata} / "GreywaterEditor" / "layout.ini"
-                       : fs::path{"layout.ini"};
+    if (const char* appdata = std::getenv("APPDATA"); appdata)
+        ini_path = fs::path{appdata} / "GreywaterEditor" / "layout.ini";
+    else
+        ini_path = "layout.ini";
 #else
-    const char* home = std::getenv("HOME");
-    ini_path = home ? fs::path{home} / ".config" / "greywater_editor" / "layout.ini"
-                    : fs::path{"layout.ini"};
+    if (const char* home = std::getenv("HOME"); home)
+        ini_path = fs::path{home} / ".config" / "greywater_editor" / "layout.ini";
+    else
+        ini_path = "layout.ini";
 #endif
 
     if (fs::exists(ini_path)) {
         std::ifstream f{ini_path, std::ios::binary | std::ios::ate};
         if (f.good()) {
-            auto sz = f.tellg(); f.seekg(0);
+            const auto sz = f.tellg();
+            f.seekg(0);
             std::string buf(static_cast<size_t>(sz), '\0');
             f.read(buf.data(), sz);
             ImGui::LoadIniSettingsFromMemory(buf.c_str(), buf.size());
@@ -180,24 +593,74 @@ void EditorApplication::init_imgui() {
         }
     }
 
-    // ImGui backend init — GLFW only (Vulkan backend needs real device).
+    // --- Platform backend --------------------------------------------------
     ImGui_ImplGlfw_InitForVulkan(window_, true);
-    // ImGui_ImplVulkan_Init called after VulkanDevice is fully wired.
+
+    // --- Vulkan renderer backend ------------------------------------------
+    // imgui_impl_vulkan (v1.92+) uses the new RendererHasTextures API. It owns
+    // the font atlas texture and uploads it lazily in ImGui_ImplVulkan_NewFrame;
+    // no manual CreateFontsTexture call is needed.
+    //
+    // As of 2025/09/26 the InitInfo struct routes MSAA + dynamic-rendering
+    // format description through PipelineInfoMain (and mirrors for secondary
+    // viewports). The color-format storage must outlive Init() because the
+    // backend dereferences pColorAttachmentFormats during pipeline creation —
+    // we keep it as a member on vk_.
+    vk_->imgui_color_format = vk_->swapchain_format;
+
+    ImGui_ImplVulkan_InitInfo init_info{};
+    init_info.ApiVersion            = VK_API_VERSION_1_3;
+    init_info.Instance              = vk_->instance;
+    init_info.PhysicalDevice        = vk_->physical_device;
+    init_info.Device                = vk_->device;
+    init_info.QueueFamily           = vk_->graphics_family;
+    init_info.Queue                 = vk_->graphics_queue;
+    init_info.DescriptorPool        = vk_->imgui_descriptor_pool;
+    init_info.MinImageCount         = vk_->swapchain_min_count;
+    init_info.ImageCount            = static_cast<uint32_t>(vk_->swapchain_images.size());
+    init_info.UseDynamicRendering   = true;
+
+    auto fill_pipeline_info = [&](ImGui_ImplVulkan_PipelineInfo& p) {
+        p.RenderPass                                    = VK_NULL_HANDLE;
+        p.Subpass                                       = 0;
+        p.MSAASamples                                   = VK_SAMPLE_COUNT_1_BIT;
+        p.PipelineRenderingCreateInfo                   = VkPipelineRenderingCreateInfoKHR{};
+        p.PipelineRenderingCreateInfo.sType             = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
+        p.PipelineRenderingCreateInfo.colorAttachmentCount    = 1;
+        p.PipelineRenderingCreateInfo.pColorAttachmentFormats = &vk_->imgui_color_format;
+    };
+    fill_pipeline_info(init_info.PipelineInfoMain);
+    fill_pipeline_info(init_info.PipelineInfoForViewports);
+    init_info.PipelineInfoForViewports.SwapChainImageUsage =
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+    if (!ImGui_ImplVulkan_Init(&init_info))
+        gw_fatal("ImGui_ImplVulkan_Init failed");
+
+    vk_->imgui_initialised = true;
 }
 
 // ---------------------------------------------------------------------------
 // Shutdown
 // ---------------------------------------------------------------------------
 void EditorApplication::shutdown_imgui() {
-    // Save layout.
+    if (!vk_ || !vk_->device) return;
+
+    vkDeviceWaitIdle(vk_->device);
+
+    // Save layout before tearing down.
     namespace fs = std::filesystem;
     fs::path ini_dir;
 #ifdef _WIN32
-    const char* appdata = std::getenv("APPDATA");
-    ini_dir = appdata ? fs::path{appdata} / "GreywaterEditor" : fs::path{"."};
+    if (const char* appdata = std::getenv("APPDATA"); appdata)
+        ini_dir = fs::path{appdata} / "GreywaterEditor";
+    else
+        ini_dir = ".";
 #else
-    const char* home = std::getenv("HOME");
-    ini_dir = home ? fs::path{home} / ".config" / "greywater_editor" : fs::path{"."};
+    if (const char* home = std::getenv("HOME"); home)
+        ini_dir = fs::path{home} / ".config" / "greywater_editor";
+    else
+        ini_dir = ".";
 #endif
 
     std::error_code ec;
@@ -209,39 +672,126 @@ void EditorApplication::shutdown_imgui() {
         f.write(data, static_cast<std::streamsize>(sz));
     }
 
+    if (vk_->imgui_initialised) {
+        ImGui_ImplVulkan_Shutdown();
+        vk_->imgui_initialised = false;
+    }
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
 }
 
 void EditorApplication::shutdown_vulkan() {
-    delete swapchain_; swapchain_ = nullptr;
-    delete device_;    device_    = nullptr;
-    delete instance_;  instance_  = nullptr;
+    if (!vk_) return;
+
+    if (vk_->device) {
+        vkDeviceWaitIdle(vk_->device);
+
+        if (vk_->imgui_descriptor_pool) {
+            vkDestroyDescriptorPool(vk_->device, vk_->imgui_descriptor_pool, nullptr);
+            vk_->imgui_descriptor_pool = VK_NULL_HANDLE;
+        }
+
+        for (VkSemaphore s : vk_->render_finished)
+            if (s) vkDestroySemaphore(vk_->device, s, nullptr);
+        vk_->render_finished.clear();
+
+        for (uint32_t i = 0; i < kFramesInFlight; ++i) {
+            if (vk_->image_available[i]) vkDestroySemaphore(vk_->device, vk_->image_available[i], nullptr);
+            if (vk_->in_flight[i])       vkDestroyFence    (vk_->device, vk_->in_flight[i],       nullptr);
+        }
+
+        if (vk_->cmd_pool) {
+            vkDestroyCommandPool(vk_->device, vk_->cmd_pool, nullptr);
+            vk_->cmd_pool = VK_NULL_HANDLE;
+        }
+
+        for (VkImageView v : vk_->swapchain_views)
+            if (v) vkDestroyImageView(vk_->device, v, nullptr);
+        vk_->swapchain_views.clear();
+
+        if (vk_->swapchain) {
+            vkDestroySwapchainKHR(vk_->device, vk_->swapchain, nullptr);
+            vk_->swapchain = VK_NULL_HANDLE;
+        }
+
+        vkDestroyDevice(vk_->device, nullptr);
+        vk_->device = VK_NULL_HANDLE;
+    }
+
+    if (vk_->instance) {
+        if (vk_->surface) {
+            vkDestroySurfaceKHR(vk_->instance, vk_->surface, nullptr);
+            vk_->surface = VK_NULL_HANDLE;
+        }
+#if GW_VK_VALIDATION
+        if (vk_->messenger) {
+            vkDestroyDebugUtilsMessengerEXT(vk_->instance, vk_->messenger, nullptr);
+            vk_->messenger = VK_NULL_HANDLE;
+        }
+#endif
+        vkDestroyInstance(vk_->instance, nullptr);
+        vk_->instance = VK_NULL_HANDLE;
+    }
 }
 
 void EditorApplication::shutdown_window() {
-    glfwDestroyWindow(window_);
-    window_ = nullptr;
+    if (window_) {
+        glfwDestroyWindow(window_);
+        window_ = nullptr;
+    }
     glfwTerminate();
 }
 
 // ---------------------------------------------------------------------------
 // Per-frame
 // ---------------------------------------------------------------------------
-void EditorApplication::begin_frame() {
+bool EditorApplication::begin_frame() {
+    // Wait for this frame-in-flight's fence.
+    vkWaitForFences(vk_->device, 1, &vk_->in_flight[vk_->frame_index], VK_TRUE, UINT64_MAX);
+
+    // Acquire an image.
+    uint32_t image_index = 0;
+    VkResult acq = vkAcquireNextImageKHR(
+        vk_->device, vk_->swapchain, UINT64_MAX,
+        vk_->image_available[vk_->frame_index], VK_NULL_HANDLE, &image_index);
+    if (acq == VK_ERROR_OUT_OF_DATE_KHR) {
+        recreate_swapchain();
+        return false;
+    }
+    if (acq != VK_SUCCESS && acq != VK_SUBOPTIMAL_KHR) {
+        gw_fatal("vkAcquireNextImageKHR failed");
+    }
+
+    vkResetFences(vk_->device, 1, &vk_->in_flight[vk_->frame_index]);
+    vk_->acquired_image = image_index;
+
+    // ImGui new frame. The Vulkan renderer backend's NewFrame uploads the
+    // font atlas on first call (ImGui 1.92 RendererHasTextures API).
+    ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
     ImGuizmo::BeginFrame();
+
+    // Open the primary command buffer. Rendering is recorded in end_frame
+    // once ImGui::Render() has produced its draw data.
+    VkCommandBuffer cmd = vk_->cmd_buffers[vk_->frame_index];
+    vkResetCommandBuffer(cmd, 0);
+
+    VkCommandBufferBeginInfo bi{};
+    bi.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    bi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    GW_VKCHECK(vkBeginCommandBuffer(cmd, &bi));
+
+    return true;
 }
 
 void EditorApplication::build_ui() {
-    // Main dockspace over the entire window.
     ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->WorkPos);
     ImGui::SetNextWindowSize(viewport->WorkSize);
     ImGui::SetNextWindowViewport(viewport->ID);
 
-    ImGuiWindowFlags host_flags =
+    const ImGuiWindowFlags host_flags =
         ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
         ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
@@ -253,7 +803,6 @@ void EditorApplication::build_ui() {
     ImGui::Begin("##DockHost", nullptr, host_flags);
     ImGui::PopStyleVar(3);
 
-    // Menu bar.
     if (ImGui::BeginMenuBar()) {
         if (ImGui::BeginMenu("File")) {
             if (ImGui::MenuItem("Save Scene", "Ctrl+S"))
@@ -267,9 +816,9 @@ void EditorApplication::build_ui() {
         }
         if (ImGui::BeginMenu("Edit")) {
             if (ImGui::MenuItem("Undo", "Ctrl+Z", false, cmd_stack_.can_undo()))
-                cmd_stack_.undo();
+                (void)cmd_stack_.undo();
             if (ImGui::MenuItem("Redo", "Ctrl+Y", false, cmd_stack_.can_redo()))
-                cmd_stack_.redo();
+                (void)cmd_stack_.redo();
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Window")) {
@@ -285,7 +834,6 @@ void EditorApplication::build_ui() {
             ImGui::EndMenu();
         }
 
-        // Dirty flag indicator in menu bar.
         if (cmd_stack_.is_dirty()) {
             ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
             ImGui::TextColored({0.9f, 0.6f, 0.2f, 1.f}, "*");
@@ -294,8 +842,7 @@ void EditorApplication::build_ui() {
         ImGui::EndMenuBar();
     }
 
-    // Build default docking layout once.
-    ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
+    const ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
     ImGui::DockSpace(dockspace_id, {0.f, 0.f}, ImGuiDockNodeFlags_None);
 
     if (!layout_built_ && ImGui::DockBuilderGetNode(dockspace_id) == nullptr) {
@@ -307,12 +854,12 @@ void EditorApplication::build_ui() {
 }
 
 void EditorApplication::build_docking_layout() {
-    ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
+    const ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
     ImGui::DockBuilderRemoveNode(dockspace_id);
     ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
     ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->WorkSize);
 
-    ImGuiID left, centre, right, bottom;
+    ImGuiID left  = 0, centre = dockspace_id, right = 0, bottom = 0;
     ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Right, 0.22f, &right,  &centre);
     ImGui::DockBuilderSplitNode(centre,       ImGuiDir_Left,  0.22f, &left,   &centre);
     ImGui::DockBuilderSplitNode(centre,       ImGuiDir_Down,  0.28f, &bottom, &centre);
@@ -329,24 +876,133 @@ void EditorApplication::build_docking_layout() {
 void EditorApplication::end_frame() {
     ImGui::Render();
 
-    // ImDrawData* draw_data = ImGui::GetDrawData();
-    // ImGui_ImplVulkan_RenderDrawData(draw_data, cmd_buf);  // wired once device is live
+    VkCommandBuffer cmd   = vk_->cmd_buffers[vk_->frame_index];
+    const uint32_t  image = vk_->acquired_image;
+    VkImage         swap_image = vk_->swapchain_images[image];
+    VkImageView     swap_view  = vk_->swapchain_views[image];
 
+    // UNDEFINED -> COLOR_ATTACHMENT_OPTIMAL.
+    {
+        VkImageMemoryBarrier2 bar{};
+        bar.sType                           = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+        bar.srcStageMask                    = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
+        bar.srcAccessMask                   = 0;
+        bar.dstStageMask                    = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+        bar.dstAccessMask                   = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+        bar.oldLayout                       = VK_IMAGE_LAYOUT_UNDEFINED;
+        bar.newLayout                       = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        bar.image                           = swap_image;
+        bar.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+        bar.subresourceRange.levelCount     = 1;
+        bar.subresourceRange.layerCount     = 1;
+
+        VkDependencyInfo dep{};
+        dep.sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+        dep.imageMemoryBarrierCount = 1;
+        dep.pImageMemoryBarriers    = &bar;
+        vkCmdPipelineBarrier2(cmd, &dep);
+    }
+
+    // Render ImGui into the swapchain image via dynamic rendering.
+    VkRenderingAttachmentInfo color_att{};
+    color_att.sType            = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    color_att.imageView        = swap_view;
+    color_att.imageLayout      = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_att.loadOp           = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    color_att.storeOp          = VK_ATTACHMENT_STORE_OP_STORE;
+    color_att.clearValue.color = {{0.051f, 0.059f, 0.078f, 1.0f}};  // editor bg
+
+    VkRenderingInfo rinfo{};
+    rinfo.sType                = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    rinfo.renderArea.extent    = vk_->swapchain_extent;
+    rinfo.layerCount           = 1;
+    rinfo.colorAttachmentCount = 1;
+    rinfo.pColorAttachments    = &color_att;
+
+    vkCmdBeginRendering(cmd, &rinfo);
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
+    vkCmdEndRendering(cmd);
+
+    // COLOR_ATTACHMENT_OPTIMAL -> PRESENT_SRC_KHR.
+    {
+        VkImageMemoryBarrier2 bar{};
+        bar.sType                           = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+        bar.srcStageMask                    = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+        bar.srcAccessMask                   = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+        bar.dstStageMask                    = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT;
+        bar.dstAccessMask                   = 0;
+        bar.oldLayout                       = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        bar.newLayout                       = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        bar.image                           = swap_image;
+        bar.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+        bar.subresourceRange.levelCount     = 1;
+        bar.subresourceRange.layerCount     = 1;
+
+        VkDependencyInfo dep{};
+        dep.sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+        dep.imageMemoryBarrierCount = 1;
+        dep.pImageMemoryBarriers    = &bar;
+        vkCmdPipelineBarrier2(cmd, &dep);
+    }
+
+    GW_VKCHECK(vkEndCommandBuffer(cmd));
+
+    // Submit.
+    VkSemaphoreSubmitInfo wait{};
+    wait.sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+    wait.semaphore = vk_->image_available[vk_->frame_index];
+    wait.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+
+    VkSemaphoreSubmitInfo signal{};
+    signal.sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+    signal.semaphore = vk_->render_finished[image];
+    signal.stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+
+    VkCommandBufferSubmitInfo cbsi{};
+    cbsi.sType         = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+    cbsi.commandBuffer = cmd;
+
+    VkSubmitInfo2 submit{};
+    submit.sType                    = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+    submit.waitSemaphoreInfoCount   = 1;
+    submit.pWaitSemaphoreInfos      = &wait;
+    submit.commandBufferInfoCount   = 1;
+    submit.pCommandBufferInfos      = &cbsi;
+    submit.signalSemaphoreInfoCount = 1;
+    submit.pSignalSemaphoreInfos    = &signal;
+    GW_VKCHECK(vkQueueSubmit2(vk_->graphics_queue, 1, &submit, vk_->in_flight[vk_->frame_index]));
+
+    // Present.
+    VkPresentInfoKHR pi{};
+    pi.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    pi.waitSemaphoreCount = 1;
+    pi.pWaitSemaphores    = &vk_->render_finished[image];
+    pi.swapchainCount     = 1;
+    pi.pSwapchains        = &vk_->swapchain;
+    pi.pImageIndices      = &image;
+    VkResult present_result = vkQueuePresentKHR(vk_->present_queue, &pi);
+    if (present_result == VK_ERROR_OUT_OF_DATE_KHR ||
+        present_result == VK_SUBOPTIMAL_KHR) {
+        swapchain_resize_pending_ = true;
+    } else if (present_result != VK_SUCCESS) {
+        gw_fatal("vkQueuePresentKHR failed");
+    }
+
+    // ImGui multi-viewport: render & present extra OS windows.
     if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
         ImGui::UpdatePlatformWindows();
         ImGui::RenderPlatformWindowsDefault();
     }
+
+    vk_->frame_index = (vk_->frame_index + 1) % kFramesInFlight;
 }
 
 // ---------------------------------------------------------------------------
 // Theme — dark sci-fi / Cold Coffee Labs aesthetic.
-// Inspired by the attached viewport screenshot: near-black bg, cyan accents,
-// amber highlights.
 // ---------------------------------------------------------------------------
 void EditorApplication::apply_theme() {
     ImGuiStyle& style = ImGui::GetStyle();
 
-    // Rounding.
     style.WindowRounding    = 4.f;
     style.ChildRounding     = 3.f;
     style.FrameRounding     = 3.f;
@@ -355,7 +1011,6 @@ void EditorApplication::apply_theme() {
     style.ScrollbarRounding = 3.f;
     style.TabRounding       = 4.f;
 
-    // Sizing.
     style.WindowPadding     = {8.f,  8.f};
     style.FramePadding      = {5.f,  3.f};
     style.ItemSpacing       = {6.f,  4.f};
@@ -365,14 +1020,6 @@ void EditorApplication::apply_theme() {
     style.FrameBorderSize   = 0.f;
     style.TabBarBorderSize  = 1.f;
 
-    // Palette — 2026 dark studio aesthetic:
-    //   BG:      #0D0F14  → very dark near-black with blue tint
-    //   Panel:   #151820  → slightly lighter panel
-    //   Header:  #1C2030  → section header
-    //   Accent:  #4CC9A4  → teal-green (selected/active)
-    //   Amber:   #F5A623  → warm amber for warnings / title
-    //   Text:    #C8D0E0  → light cool-white
-    //   SubText: #6A7080  → muted secondary text
     auto C = [](uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255) {
         return ImVec4{r / 255.f, g / 255.f, b / 255.f, a / 255.f};
     };
@@ -395,7 +1042,7 @@ void EditorApplication::apply_theme() {
     col[ImGuiCol_ScrollbarBg]           = C( 12,  14,  20);
     col[ImGuiCol_ScrollbarGrab]         = C( 40,  50,  70);
     col[ImGuiCol_ScrollbarGrabHovered]  = C( 55,  68,  95);
-    col[ImGuiCol_ScrollbarGrabActive]   = C( 76, 201, 165);   // teal
+    col[ImGuiCol_ScrollbarGrabActive]   = C( 76, 201, 165);
     col[ImGuiCol_CheckMark]             = C( 76, 201, 165);
     col[ImGuiCol_SliderGrab]            = C( 76, 201, 165);
     col[ImGuiCol_SliderGrabActive]      = C(120, 230, 200);
@@ -419,14 +1066,14 @@ void EditorApplication::apply_theme() {
     col[ImGuiCol_DockingPreview]        = C( 76, 201, 165, 100);
     col[ImGuiCol_DockingEmptyBg]        = C( 10,  12,  18);
     col[ImGuiCol_PlotLines]             = C( 76, 201, 165);
-    col[ImGuiCol_PlotLinesHovered]      = C(245, 166,  35);   // amber
+    col[ImGuiCol_PlotLinesHovered]      = C(245, 166,  35);
     col[ImGuiCol_PlotHistogram]         = C( 76, 201, 165);
     col[ImGuiCol_PlotHistogramHovered]  = C(245, 166,  35);
     col[ImGuiCol_TableHeaderBg]         = C( 20,  26,  38);
     col[ImGuiCol_TableBorderStrong]     = C( 40,  46,  62);
     col[ImGuiCol_TableBorderLight]      = C( 28,  34,  48);
     col[ImGuiCol_TableRowBg]            = C(  0,   0,   0,   0);
-    col[ImGuiCol_TableRowBgAlt]         = C(255, 255, 255,  8);
+    col[ImGuiCol_TableRowBgAlt]         = C(255, 255, 255,   8);
     col[ImGuiCol_TextSelectedBg]        = C( 76, 201, 165,  60);
     col[ImGuiCol_DragDropTarget]        = C(245, 166,  35, 200);
     col[ImGuiCol_NavHighlight]          = C( 76, 201, 165);
@@ -434,7 +1081,6 @@ void EditorApplication::apply_theme() {
     col[ImGuiCol_NavWindowingDimBg]     = C(  0,   0,   0, 100);
     col[ImGuiCol_ModalWindowDimBg]      = C(  0,   0,   0, 140);
 
-    // Multi-viewport: round windows to match OS window decorations on Windows.
     if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
         style.WindowRounding = 0.f;
         col[ImGuiCol_WindowBg].w = 1.f;
@@ -445,25 +1091,22 @@ void EditorApplication::apply_theme() {
 // GLFW callbacks
 // ---------------------------------------------------------------------------
 void EditorApplication::on_key_callback(GLFWwindow* w, int key,
-                                          int /*scancode*/, int action, int mods)
-{
+                                         int /*scancode*/, int action, int mods) {
     auto* app = static_cast<EditorApplication*>(glfwGetWindowUserPointer(w));
     if (!app) return;
 
-    // Ctrl+Z / Ctrl+Y — undo/redo.
     if (action == GLFW_PRESS && (mods & GLFW_MOD_CONTROL)) {
-        if (key == GLFW_KEY_Z) { app->cmd_stack_.undo(); return; }
-        if (key == GLFW_KEY_Y) { app->cmd_stack_.redo(); return; }
+        if (key == GLFW_KEY_Z) { (void)app->cmd_stack_.undo(); return; }
+        if (key == GLFW_KEY_Y) { (void)app->cmd_stack_.redo(); return; }
         if (key == GLFW_KEY_S) { gw_editor_save_scene("content/untitled.gwscene"); return; }
     }
 
-    // Forward to panels.
     for (auto& p : app->panels_.panels())
         p->on_event(key, action);
 }
 
 void EditorApplication::on_scroll_callback(GLFWwindow* w,
-                                             double /*dx*/, double dy) {
+                                            double /*dx*/, double dy) {
     auto* app = static_cast<EditorApplication*>(glfwGetWindowUserPointer(w));
     if (!app) return;
     if (auto* vp = dynamic_cast<ViewportPanel*>(app->panels_.find("Viewport")))

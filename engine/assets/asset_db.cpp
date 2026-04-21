@@ -2,9 +2,11 @@
 #include "asset_db.hpp"
 #include "mesh_asset.hpp"
 #include "texture_asset.hpp"
+#include "engine/jobs/scheduler.hpp"
 
 #include <algorithm>
 #include <chrono>
+#include <thread>
 
 namespace gw::assets {
 
@@ -15,8 +17,9 @@ AssetDatabase::AssetDatabase(render::hal::VulkanDevice& device,
 {
     slots_.reserve(4096);
     loaders_ = make_default_registry();
-    // TODO(Phase 10): replace std::thread with engine/jobs/ scheduler.
-    loader_thread_ = std::thread(&AssetDatabase::loader_thread_fn, this);
+    // Long-lived loader lives on a jobs-owned worker thread (NN #10, P2-1).
+    loader_thread_ = gw::jobs::Scheduler::reserve_worker(
+        [this]() { loader_thread_fn(); });
 }
 
 AssetDatabase::~AssetDatabase() {

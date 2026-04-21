@@ -352,7 +352,11 @@ Result<std::monostate> FrameGraph::execute_pass(PassHandle           pass_handle
     const size_t pass_idx = static_cast<size_t>(
         std::distance(execution_order_.begin(), it));
 
-    // Emit pipeline barriers via sync2
+    // Emit pipeline barriers via sync2. Sync2 is a Tier-A baseline per the
+    // ADR-0003 amendment (promoted from Tier-B on 2026-04-20 late-night) —
+    // VulkanDevice refuses to construct without it, so this branch can assume
+    // sync2 presence unconditionally. A real sync1 fallback is a Phase-8+
+    // Tier-G task gated on cross-hardware CI expansion (lavapipe / MoltenVK).
     if (pass_idx < compiled_barriers_.size()) {
         PassBarriers barriers = compiled_barriers_[pass_idx];
 

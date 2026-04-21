@@ -1,4 +1,6 @@
 #include "cook_worker.hpp"
+#include "engine/jobs/scheduler.hpp"
+#include "engine/jobs/reserved_worker.hpp"
 #include <algorithm>
 #include <chrono>
 #include <mutex>
@@ -48,9 +50,10 @@ CookStats CookWorker::execute(CookGraph&                            graph,
 
     std::mutex manifest_mutex;
 
-    // Partition nodes into batches of roughly equal size.
+    // Fork N reserved workers; NN #10 routes all raw std::thread ownership
+    // through engine/jobs/. See docs/AUDIT_MAP_2026-04-20.md (P2-2).
     const uint32_t n_threads = std::min(cfg_.thread_count, total);
-    std::vector<std::thread> threads;
+    std::vector<gw::jobs::ReservedWorker> threads;
     threads.reserve(n_threads);
 
     std::atomic<uint32_t> next_idx{0};
@@ -134,7 +137,9 @@ CookStats CookWorker::execute(CookGraph&                            graph,
         }
     };
 
-    for (uint32_t t = 0; t < n_threads; ++t) threads.emplace_back(worker);
+    for (uint32_t t = 0; t < n_threads; ++t) {
+        threads.emplace_back(gw::jobs::Scheduler::reserve_worker(worker));
+    }
     for (auto& t : threads) t.join();
 
     const auto wall_end = std::chrono::steady_clock::now();

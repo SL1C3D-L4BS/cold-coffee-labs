@@ -4,6 +4,7 @@
 // Spec ref: Phase 7 §2 — "registered in PanelRegistry but renders nothing".
 
 #include "panel.hpp"
+#include <imgui.h>
 
 namespace gw::editor {
 

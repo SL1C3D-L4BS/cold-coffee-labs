@@ -12,6 +12,8 @@ add_executable(gw_tests
     unit/render/frame_graph_test.cpp
     # Phase 3 — Core systems (command stack fixed in Phase 7 gap-fill)
     unit/core/command_stack_test.cpp
+    # Phase 7 gap-fill — ECS World (docs/adr/0004-ecs-world.md)
+    unit/ecs/world_test.cpp
     # Phase 6 — Asset Pipeline
     unit/assets/cook_cache_test.cpp
     unit/assets/mesh_cooker_test.cpp

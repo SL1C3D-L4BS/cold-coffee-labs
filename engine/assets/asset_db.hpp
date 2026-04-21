@@ -10,12 +10,12 @@
 #include "mesh_asset.hpp"
 #include "texture_asset.hpp"
 #include "vfs/virtual_fs.hpp"
+#include "engine/jobs/reserved_worker.hpp"
 #include <atomic>
 #include <cstdint>
 #include <functional>
 #include <mutex>
 #include <string>
-#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -105,9 +105,11 @@ private:
     std::vector<LoadRequest> completed_queue_;
     mutable std::mutex       queue_mutex_;
 
-    // TODO(Phase 10): replace std::thread with engine/jobs/ scheduler.
-    std::thread              loader_thread_;
+    // Long-lived async-load worker. Managed by engine/jobs/ (NN #10);
+    // destruction order: set stop_loader_ → loader_thread_.join() runs
+    // in ~ReservedWorker. See docs/AUDIT_MAP_2026-04-20.md (P2-1).
     std::atomic<bool>        stop_loader_{false};
+    gw::jobs::ReservedWorker loader_thread_;
 
     ReadyCallback            ready_cb_;
 };

@@ -37,5 +37,19 @@ bool FileSystem::write_bytes(const std::filesystem::path& path, const std::vecto
     return static_cast<bool>(output);
 }
 
+bool FileSystem::copy_file_overwrite(const std::filesystem::path& src,
+                                     const std::filesystem::path& dst) noexcept {
+    std::error_code ec;
+    std::filesystem::copy_file(src, dst, std::filesystem::copy_options::overwrite_existing, ec);
+    return !ec;
+}
+
+std::uint64_t FileSystem::last_write_stamp(const std::filesystem::path& path) noexcept {
+    std::error_code ec;
+    auto t = std::filesystem::last_write_time(path, ec);
+    if (ec) return 0u;
+    return static_cast<std::uint64_t>(t.time_since_epoch().count());
+}
+
 }  // namespace platform
 }  // namespace gw

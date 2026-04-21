@@ -1,20 +1,19 @@
 #pragma once
 // engine/assets/vfs/watcher.hpp
-// FSWatcher — OS file-change notification, drainable each frame.
-// Windows: ReadDirectoryChangesW with 200ms debounce.
-// Linux:   inotify.
+// FSWatcher — thin facade over gw::platform::FileWatch.
+// Non-negotiable #11: OS headers live only in engine/platform/. This class
+// keeps the historical AssetOk / asset-error surface for the editor and
+// asset-db callers while delegating all OS work to FileWatch.
 // Phase 6 spec §8.4.
 
 #include "../asset_error.hpp"
-#include <functional>
-#include <string>
+#include "engine/platform/file_watch.hpp"
+
 #include <string_view>
-#include <vector>
 
 namespace gw::assets::vfs {
 
-// Callback type: receives the changed absolute host path.
-using WatchCallback = std::function<void(std::string_view changed_path)>;
+using WatchCallback = gw::platform::FileChangeCallback;
 
 class FSWatcher {
 public:
@@ -31,24 +30,11 @@ public:
     void remove_watch(std::string_view host_dir);
 
     // Drain OS change queue and invoke callbacks for changed paths.
-    // Must be called from a single thread (typically the main/update thread).
+    // Single-thread contract — typically called from the editor/update loop.
     void poll();
 
 private:
-    struct WatchEntry {
-        std::string    host_dir;
-        WatchCallback  callback;
-
-#if defined(_WIN32)
-        void*          dir_handle = nullptr; // HANDLE
-        std::vector<uint8_t> notify_buf;
-#else
-        int            wd = -1;
-        int            inotify_fd = -1;
-#endif
-    };
-
-    std::vector<WatchEntry> entries_;
+    gw::platform::FileWatch watch_;
 };
 
 } // namespace gw::assets::vfs

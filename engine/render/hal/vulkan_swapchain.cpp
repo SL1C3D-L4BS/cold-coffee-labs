@@ -71,9 +71,14 @@ VulkanSwapchain::VulkanSwapchain(
                                capabilities.minImageExtent.height,
                                capabilities.maxImageExtent.height);
     
-    // Determine image count (triple buffering for RX 580)
-    uint32_t image_count = std::min(capabilities.maxImageCount,
-                                        std::max(3u, capabilities.minImageCount));
+    // Determine image count (triple buffering for RX 580).
+    // Spec: VkSurfaceCapabilitiesKHR::maxImageCount == 0 means "no maximum
+    // except memory" — NOT "zero maximum". Clamp only when a real max exists.
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceCapabilitiesKHR.html
+    const uint32_t desired = std::max(3u, capabilities.minImageCount + 1u);
+    uint32_t image_count = (capabilities.maxImageCount == 0u)
+                               ? desired
+                               : std::min(desired, capabilities.maxImageCount);
     
     // Create swapchain
     VkSwapchainCreateInfoKHR create_info{};

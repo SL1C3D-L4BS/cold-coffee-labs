@@ -49,10 +49,22 @@ public:
     
     // Get or create timeline semaphore for queue type
     Result<VkSemaphore> get_timeline_semaphore(QueueType queue_type);
-    
-    // Get next timeline value for queue
-    uint64_t get_next_value(QueueType queue_type);
-    
+
+    // Non-mutating: the value most recently reserved / signaled on this queue.
+    // Used for wait payloads when you need to chain onto a prior producer.
+    [[nodiscard]] uint64_t current_value(QueueType queue_type) const noexcept;
+
+    // Mutating: reserve the next value this queue will signal, and return it.
+    // Caller MUST emit a matching signal for this value in the same batch, or
+    // waits chained against it will deadlock.
+    uint64_t reserve_next_signal_value(QueueType queue_type);
+
+    // Backwards-compat alias (deprecated — prefer the two above).
+    [[deprecated("Use current_value() or reserve_next_signal_value()")]]
+    uint64_t get_next_value(QueueType queue_type) {
+        return reserve_next_signal_value(queue_type);
+    }
+
     // Signal timeline semaphore
     Result<std::monostate> signal_timeline(QueueType queue_type, uint64_t value);
     

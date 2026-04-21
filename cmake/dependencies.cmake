@@ -174,24 +174,25 @@ CPMAddPackage(
 CPMAddPackage(
     NAME imgui
     GITHUB_REPOSITORY ocornut/imgui
-    GIT_TAG          9aae45eb4a05a5a1f96be1ef37eb503a12ceb889  # docking branch 2025-12
+    GIT_TAG          docking  # Dear ImGui docking branch — DockSpace, multi-viewport
     DOWNLOAD_ONLY    YES
 )
 
-# ImGuizmo 1.83 — 3D gizmo overlay built on imgui draw lists.
+# ImGuizmo — 3D gizmo overlay built on imgui draw lists.
+# Using master: 1.83 uses deprecated ImGui::CaptureMouseFromApp (removed in imgui 1.89+).
 CPMAddPackage(
     NAME ImGuizmo
     GITHUB_REPOSITORY CedricGuillemet/ImGuizmo
-    GIT_TAG          1.83
+    GIT_TAG          master
     DOWNLOAD_ONLY    YES
 )
 
-# imnodes 0.5 — node graph editor widget for visual scripting (Phase 8+).
-# Included now so the CMake target is available without a re-configure.
+# imnodes — node graph editor widget for visual scripting (Phase 8+).
+# Using master: v0.5 accesses removed imgui internals (_TextureIdStack, TextureId).
 CPMAddPackage(
     NAME imnodes
     GITHUB_REPOSITORY Nelarius/imnodes
-    GIT_TAG          v0.5
+    GIT_TAG          master
     DOWNLOAD_ONLY    YES
 )
 

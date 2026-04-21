@@ -4,7 +4,7 @@
 
 #include <imgui.h>
 #include <algorithm>
-#include <cassert>
+#include <cstdio>
 
 // GLM for vec2/vec3/vec4/quat widgets.
 #define GLM_FORCE_RADIANS
@@ -15,6 +15,13 @@
 #include <glm/gtx/euler_angles.hpp>
 
 namespace gw::editor {
+
+// kField* flag constants live in gw::core — pull them into this TU.
+using gw::core::kFieldReadOnly;
+using gw::core::kFieldRange;
+using gw::core::kFieldAngle;
+using gw::core::kFieldColor;
+using gw::core::kFieldHidden;
 
 namespace {
 
@@ -32,13 +39,13 @@ const uint32_t kTypeQuat    = gw::core::type_id<glm::quat>();
 // Widget helpers
 bool draw_float(const reflect::FieldInfo& fi, void* ptr) {
     auto& v = *static_cast<float*>(ptr);
-    if (fi.flags & reflect::kFieldReadOnly) {
+    if (fi.flags & kFieldReadOnly) {
         ImGui::Text("%s: %.4f", fi.name, static_cast<double>(v));
         return false;
     }
-    if (fi.flags & reflect::kFieldRange)
+    if (fi.flags & kFieldRange)
         return ImGui::SliderFloat(fi.name, &v, fi.min_val, fi.max_val);
-    if (fi.flags & reflect::kFieldAngle) {
+    if (fi.flags & kFieldAngle) {
         float deg = glm::degrees(v);
         if (ImGui::DragFloat(fi.name, &deg, 0.5f)) {
             v = glm::radians(deg);
@@ -61,11 +68,11 @@ bool draw_double(const reflect::FieldInfo& fi, void* ptr) {
 
 bool draw_int32(const reflect::FieldInfo& fi, void* ptr) {
     auto& v = *static_cast<int32_t*>(ptr);
-    if (fi.flags & reflect::kFieldReadOnly) {
+    if (fi.flags & kFieldReadOnly) {
         ImGui::Text("%s: %d", fi.name, v);
         return false;
     }
-    if (fi.flags & reflect::kFieldRange)
+    if (fi.flags & kFieldRange)
         return ImGui::SliderInt(fi.name, &v,
             static_cast<int>(fi.min_val), static_cast<int>(fi.max_val));
     return ImGui::DragInt(fi.name, &v);
@@ -92,14 +99,14 @@ bool draw_vec2(const reflect::FieldInfo& fi, void* ptr) {
 
 bool draw_vec3(const reflect::FieldInfo& fi, void* ptr) {
     auto& v = *static_cast<glm::vec3*>(ptr);
-    if (fi.flags & reflect::kFieldColor)
+    if (fi.flags & kFieldColor)
         return ImGui::ColorEdit3(fi.name, glm::value_ptr(v));
     return ImGui::DragFloat3(fi.name, glm::value_ptr(v), 0.01f);
 }
 
 bool draw_vec4(const reflect::FieldInfo& fi, void* ptr) {
     auto& v = *static_cast<glm::vec4*>(ptr);
-    if (fi.flags & reflect::kFieldColor)
+    if (fi.flags & kFieldColor)
         return ImGui::ColorEdit4(fi.name, glm::value_ptr(v));
     return ImGui::DragFloat4(fi.name, glm::value_ptr(v), 0.01f);
 }
@@ -140,12 +147,26 @@ void WidgetDrawer::sort_and_freeze() {
 }
 
 void WidgetDrawer::register_type(uint32_t type_id, DrawFn fn) {
-    assert(!frozen_ && "register_type called after freeze — call before EditorApplication starts");
+    // Silently no-op after freeze — registration is editor startup-only and
+    // any late caller is a programming error, but the editor must not take
+    // the sandbox `assert-on-error` path (see docs/12 §B2 — assertions are
+    // sandbox-only). The misuse is visible via the developer console
+    // (we log once) instead.
+    if (frozen_) {
+        static bool logged_once = false;
+        if (!logged_once) {
+            std::fprintf(stderr,
+                "[widget_drawer] register_type(%u) called after freeze — ignored.\n",
+                type_id);
+            logged_once = true;
+        }
+        return;
+    }
     table_.push_back({type_id, std::move(fn)});
 }
 
 bool WidgetDrawer::draw_field(const reflect::FieldInfo& fi, void* ptr) const {
-    if (fi.flags & reflect::kFieldHidden) return false;
+    if (fi.flags & kFieldHidden) return false;
 
     ImGui::PushID(fi.name);
 

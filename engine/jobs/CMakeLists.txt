@@ -18,4 +18,5 @@ target_sources(greywater_core
             job_queue.hpp
             wait_group.hpp
             parallel_for.hpp
+            reserved_worker.hpp
 )

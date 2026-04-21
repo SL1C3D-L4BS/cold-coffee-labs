@@ -3,6 +3,10 @@
 // Spec ref: Phase 7 §13.
 #include "editor_bld_api.hpp"
 
+// Full type definitions required — the header only forward-declares these.
+#include "editor/selection/selection_context.hpp"
+#include "engine/core/command.hpp"
+
 #include <cstdlib>
 #include <cstring>
 
@@ -20,7 +24,7 @@ GW_EDITOR_API const char* gw_editor_version() {
 // ---------------------------------------------------------------------------
 GW_EDITOR_API uint64_t gw_editor_get_primary_selection() {
     if (!g_globals.selection) return 0u;
-    return g_globals.selection->primary();
+    return g_globals.selection->primary().bits;
 }
 
 GW_EDITOR_API uint32_t gw_editor_get_selection_count() {
@@ -33,7 +37,7 @@ GW_EDITOR_API void gw_editor_set_selection(const uint64_t* handles,
     if (!g_globals.selection || !handles || count == 0) return;
     g_globals.selection->clear();
     for (uint32_t i = 0; i < count; ++i)
-        g_globals.selection->toggle(handles[i]);
+        g_globals.selection->toggle(gw::ecs::Entity{handles[i]});
 }
 
 // ---------------------------------------------------------------------------

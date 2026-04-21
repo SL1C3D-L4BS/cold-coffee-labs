@@ -54,7 +54,7 @@ void OutlinerPanel::draw_entity_row(EditorContext& ctx, EntityHandle h,
         return;
     }
 
-    ImGui::PushID(static_cast<int>(h));
+    ImGui::PushID(static_cast<int>(h.bits));
     bool open = ImGui::TreeNodeEx(label, flags);
 
     // Selection on click.
@@ -105,15 +105,16 @@ void OutlinerPanel::draw_context_menu(EditorContext& ctx, EntityHandle h) {
             if (e.handle == h) std::strncpy(rename_buf_, e.name, sizeof(rename_buf_)-1);
     }
     if (ImGui::MenuItem("Duplicate")) {
-        // Phase 8: deep-clone entity.
+        // Phase 8: real deep-clone via ECS serialization. For now, mint a
+        // distinct fake handle so the UI round-trips.
         static uint64_t counter = 1000;
         ++counter;
-        add_entity(counter, "Duplicate", kNullEntity);
+        add_entity(gw::ecs::Entity{counter}, "Duplicate", kNullEntity);
     }
     ImGui::Separator();
     if (ImGui::MenuItem("Create Child")) {
         static uint64_t child_ctr = 2000;
-        add_entity(++child_ctr, "Child Entity", h);
+        add_entity(gw::ecs::Entity{++child_ctr}, "Child Entity", h);
     }
     ImGui::Separator();
     if (ImGui::MenuItem("Delete")) {
@@ -137,9 +138,10 @@ void OutlinerPanel::on_imgui_render(EditorContext& ctx) {
     ImGui::InputTextWithHint("##search", "Filter...", search_buf_, sizeof(search_buf_));
     ImGui::SameLine();
     if (ImGui::SmallButton("+")) {
-        // Create Entity action.
+        // Create Entity action. Until EditorContext carries a real World
+        // pointer, mint a unique fake handle so the UI round-trips.
         static uint64_t new_entity_id = 100;
-        EntityHandle h = ++new_entity_id;
+        EntityHandle h{++new_entity_id};
         add_entity(h, "New Entity", kNullEntity);
         ctx.selection.set(h);
     }

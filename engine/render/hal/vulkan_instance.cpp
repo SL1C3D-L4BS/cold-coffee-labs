@@ -25,12 +25,16 @@ VulkanInstance::VulkanInstance(const std::string& app_name) {
 #endif
     };
     
-    // RX 580 supports these 1.3 features we want (if available)
-    std::vector<const char*> optional_extensions = {
-        VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
-        VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
-        "VK_EXT_dynamic_rendering",
-    };
+    // Instance-level optional extensions only.
+    //
+    // VK_KHR_synchronization2, VK_KHR_dynamic_rendering, and VK_EXT_descriptor_indexing
+    // are **device** extensions — they do not appear in vkEnumerateInstanceExtensionProperties.
+    // They are enabled in VulkanDevice where they actually apply.
+    //
+    // The list below is intentionally empty; add true instance-level optional
+    // extensions (e.g. VK_EXT_debug_utils, VK_KHR_portability_enumeration) here
+    // as they become relevant. See AUDIT_MAP_2026-04-20 finding P1-3.
+    std::vector<const char*> optional_extensions = {};
     
     // Filter required extensions to only those supported
     for (const auto& req_ext : required_extensions) {
@@ -193,22 +197,16 @@ void VulkanInstance::release() noexcept {
     }
 }
 
-#ifdef _DEBUG
-    static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
+VKAPI_ATTR VkBool32 VKAPI_CALL VulkanInstance::debug_callback(
         VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
         VkDebugUtilsMessageTypeFlagsEXT /*message_type*/,
         const VkDebugUtilsMessengerCallbackDataEXT* callback_data,
         void* /*user_data*/) {
-    
-    // Suppress certain noisy messages in release
     if (message_severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-        // Log errors - in real implementation would use engine logger
         printf("Vulkan Validation Error: %s\n", callback_data->pMessage);
     }
-    
     return VK_FALSE;
 }
-#endif
 
 }  // namespace hal
 }  // namespace render

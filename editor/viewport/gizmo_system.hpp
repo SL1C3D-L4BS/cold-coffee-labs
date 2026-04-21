@@ -7,11 +7,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include "selection_context.hpp"
-#include "editor_camera.hpp"
-
-// Forward declarations.
-struct ImGuiKey;
+#include "editor/selection/selection_context.hpp"
+#include "editor/viewport/editor_camera.hpp"
 
 namespace gw::editor {
 
@@ -26,12 +23,15 @@ public:
 
     // Call inside the viewport BeginChild/EndChild block.
     // `view_mat` and `proj_mat` are column-major floats (glm layout).
+    // `ortho` must match the projection actually in use (ImGuizmo requires
+    //   SetOrthographic() to match the camera or handles are wrong).
     // Returns true if a transform was applied this frame (triggers a command).
     [[nodiscard]] bool draw(const SelectionContext& sel,
                             const float* view_mat,
                             const float* proj_mat,
                             float viewport_x, float viewport_y,
-                            float viewport_w, float viewport_h);
+                            float viewport_w, float viewport_h,
+                            bool ortho = false);
 
     // Query / set the current operation.
     void set_op(GizmoOp op)       noexcept { current_op_    = op; }

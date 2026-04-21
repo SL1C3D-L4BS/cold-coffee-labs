@@ -37,7 +37,12 @@ Result<VkSemaphore> TimelineSemaphoreManager::get_timeline_semaphore(QueueType q
     return timeline_semaphores_[queue_type];
 }
 
-uint64_t TimelineSemaphoreManager::get_next_value(QueueType queue_type) {
+uint64_t TimelineSemaphoreManager::current_value(QueueType queue_type) const noexcept {
+    auto it = current_values_.find(queue_type);
+    return (it != current_values_.end()) ? it->second : 0u;
+}
+
+uint64_t TimelineSemaphoreManager::reserve_next_signal_value(QueueType queue_type) {
     return ++current_values_[queue_type];
 }
 
@@ -172,55 +177,79 @@ Result<FrameGraphSubmitInfo> MultiQueueScheduler::schedule(
 }
 
 Result<std::monostate> MultiQueueScheduler::submit(const FrameGraphSubmitInfo& submit_info) {
-    // Group submissions by queue type
+    // P0 fix — `VkSubmitInfo2::pWaitSemaphoreInfos` / `pSignalSemaphoreInfos` /
+    // `pCommandBufferInfos` must point at memory that stays valid until
+    // `vkQueueSubmit2` returns. Previously the per-iteration `wait_infos` and
+    // `cmd_submit_info` vectors/locals were destroyed before the outer submit
+    // loop ran, creating dangling pointers (Vulkan spec valid-usage,
+    // VK_KHR_synchronization2 — https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_synchronization2.html).
+    //
+    // Fix: accumulate all per-submission semaphore and command-buffer arrays
+    // into parallel outer-scope vectors keyed by the submission index. `.data()`
+    // from any of those vectors stays valid for the remainder of this function
+    // because none of them is resized after the reserve().
+
+    const size_t n = submit_info.submissions.size();
+    if (n == 0) return std::monostate{};
+
+    // Grouping: per queue, the list of VkSubmitInfo2 to submit.
     std::unordered_map<QueueType, std::vector<VkSubmitInfo2>> submit_infos;
-    
-    for (const auto& submission : submit_info.submissions) {
-        VkSubmitInfo2 submit_info2{};
-        submit_info2.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-        
-        // Timeline semaphore waits
-        std::vector<VkSemaphoreSubmitInfo> wait_infos;
+
+    // Backing storage — one entry per submission. Reserved upfront so no
+    // reallocation happens after we take .data() pointers.
+    std::vector<std::vector<VkSemaphoreSubmitInfo>> wait_storage(n);
+    std::vector<std::vector<VkSemaphoreSubmitInfo>> signal_storage(n);
+    std::vector<VkCommandBufferSubmitInfo>          cmd_storage(n);
+
+    for (size_t idx = 0; idx < n; ++idx) {
+        const auto& submission = submit_info.submissions[idx];
+
+        auto& wait_infos   = wait_storage[idx];
+        auto& signal_infos = signal_storage[idx];
+
+        wait_infos.reserve(submission.wait_semaphores.size());
         for (size_t i = 0; i < submission.wait_semaphores.size(); ++i) {
             VkSemaphoreSubmitInfo wait_info{};
-            wait_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+            wait_info.sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
             wait_info.semaphore = submission.wait_semaphores[i];
-            wait_info.value = submission.wait_values[i];
+            wait_info.value     = submission.wait_values[i];
             wait_info.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
             wait_infos.push_back(wait_info);
         }
-        
-        // Timeline semaphore signals
-        std::vector<VkSemaphoreSubmitInfo> signal_infos;
+
+        signal_infos.reserve(submission.signal_semaphores.size());
         for (size_t i = 0; i < submission.signal_semaphores.size(); ++i) {
             VkSemaphoreSubmitInfo signal_info{};
-            signal_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+            signal_info.sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
             signal_info.semaphore = submission.signal_semaphores[i];
-            signal_info.value = submission.signal_values[i];
+            signal_info.value     = submission.signal_values[i];
             signal_info.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
             signal_infos.push_back(signal_info);
         }
-        
-        submit_info2.waitSemaphoreInfoCount = static_cast<uint32_t>(wait_infos.size());
-        submit_info2.pWaitSemaphoreInfos = wait_infos.data();
+
+        VkCommandBufferSubmitInfo& cmd_info = cmd_storage[idx];
+        cmd_info             = {};
+        cmd_info.sType       = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+        cmd_info.commandBuffer = submission.command_buffer;
+
+        VkSubmitInfo2 submit_info2{};
+        submit_info2.sType                    = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+        submit_info2.waitSemaphoreInfoCount   = static_cast<uint32_t>(wait_infos.size());
+        submit_info2.pWaitSemaphoreInfos      = wait_infos.data();
         submit_info2.signalSemaphoreInfoCount = static_cast<uint32_t>(signal_infos.size());
-        submit_info2.pSignalSemaphoreInfos = signal_infos.data();
+        submit_info2.pSignalSemaphoreInfos    = signal_infos.data();
+        submit_info2.commandBufferInfoCount   = 1;
+        submit_info2.pCommandBufferInfos      = &cmd_info;
 
-        VkCommandBufferSubmitInfo cmd_submit_info{};
-        cmd_submit_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
-        cmd_submit_info.commandBuffer = submission.command_buffer;
-
-        submit_info2.commandBufferInfoCount = 1;
-        submit_info2.pCommandBufferInfos = &cmd_submit_info;
-        
         submit_infos[submission.queue_type].push_back(submit_info2);
     }
-    
-    // Submit to each queue
+
+    // Submit to each queue while wait_storage / signal_storage / cmd_storage
+    // are still alive in this scope.
     for (const auto& [queue_type, submits] : submit_infos) {
         VkQueue queue = get_queue(queue_type);
-        VkResult result = vkQueueSubmit2(queue, static_cast<uint32_t>(submits.size()), 
-                                       submits.data(), VK_NULL_HANDLE);
+        VkResult result = vkQueueSubmit2(queue, static_cast<uint32_t>(submits.size()),
+                                         submits.data(), VK_NULL_HANDLE);
         if (result != VK_SUCCESS) {
             return std::unexpected(FrameGraphError{
                 FrameGraphErrorType::ExecutionFailed,
@@ -228,30 +257,33 @@ Result<std::monostate> MultiQueueScheduler::submit(const FrameGraphSubmitInfo& s
             });
         }
     }
-    
+
     return std::monostate{};
 }
 
 Result<std::monostate> MultiQueueScheduler::wait_for_completion() {
-    // Wait for all timeline semaphores to reach their current values
+    // Wait for the most recently reserved value on each queue. `current_value`
+    // is a non-mutating read — previously this function called `get_next_value`
+    // which bumped the counter on every idle-wait and desynchronised subsequent
+    // build_submissions calls.
     auto graphics_result = timeline_manager_->wait_for_timeline(
-        QueueType::Graphics, timeline_manager_->get_next_value(QueueType::Graphics) - 1);
+        QueueType::Graphics, timeline_manager_->current_value(QueueType::Graphics));
     if (!graphics_result) {
         return std::unexpected(graphics_result.error());
     }
-    
+
     auto compute_result = timeline_manager_->wait_for_timeline(
-        QueueType::Compute, timeline_manager_->get_next_value(QueueType::Compute) - 1);
+        QueueType::Compute, timeline_manager_->current_value(QueueType::Compute));
     if (!compute_result) {
         return std::unexpected(compute_result.error());
     }
-    
+
     auto transfer_result = timeline_manager_->wait_for_timeline(
-        QueueType::Transfer, timeline_manager_->get_next_value(QueueType::Transfer) - 1);
+        QueueType::Transfer, timeline_manager_->current_value(QueueType::Transfer));
     if (!transfer_result) {
         return std::unexpected(transfer_result.error());
     }
-    
+
     return std::monostate{};
 }
 
@@ -269,17 +301,18 @@ Result<std::vector<QueueSubmission>> MultiQueueScheduler::build_submissions(
         const auto& pass_barriers = barriers[i];
         
         QueueSubmission submission(pass.desc.queue);
-        
+
         // Get timeline semaphore for this queue
         auto timeline_result = timeline_manager_->get_timeline_semaphore(pass.desc.queue);
         if (!timeline_result) {
             return std::unexpected(timeline_result.error());
         }
-        
-        // Set timeline values
-        submission.wait_timeline_value = timeline_manager_->get_next_value(pass.desc.queue) - 1;
-        submission.signal_timeline_value = timeline_manager_->get_next_value(pass.desc.queue);
-        
+
+        // Set timeline values: wait on the most recent prior signal value
+        // (pure read), then reserve exactly one new value for this submission.
+        submission.wait_timeline_value   = timeline_manager_->current_value(pass.desc.queue);
+        submission.signal_timeline_value = timeline_manager_->reserve_next_signal_value(pass.desc.queue);
+
         // Add timeline semaphore to wait/signal lists
         submission.wait_semaphores.push_back(timeline_result.value());
         submission.wait_values.push_back(submission.wait_timeline_value);
@@ -299,23 +332,31 @@ Result<std::monostate> MultiQueueScheduler::add_cross_queue_dependencies(
     std::vector<QueueSubmission>& submissions,
     const std::vector<PassData>& passes,
     const std::vector<PassHandle>& execution_order) {
-    
+
+    // Map pass handle → its submission index (so we can look up the producer's
+    // reserved signal value when adding cross-queue waits).
+    std::unordered_map<PassHandle, size_t> submission_index_of;
+    submission_index_of.reserve(execution_order.size());
+    for (size_t i = 0; i < execution_order.size(); ++i) {
+        submission_index_of.emplace(execution_order[i], i);
+    }
+
     // Build dependency map between passes on different queues
     std::unordered_map<PassHandle, std::vector<PassHandle>> cross_queue_deps;
-    
+
     for (size_t i = 0; i < execution_order.size(); ++i) {
         PassHandle current_pass = execution_order[i];
         const auto& current_data = passes[current_pass];
-        
+
         // Check all later passes for resource dependencies
         for (size_t j = i + 1; j < execution_order.size(); ++j) {
             PassHandle later_pass = execution_order[j];
             const auto& later_data = passes[later_pass];
-            
+
             // If they're on different queues and have resource dependencies
             if (current_data.desc.queue != later_data.desc.queue) {
                 bool has_dependency = false;
-                
+
                 // Check if current pass writes something later pass reads
                 for (ResourceHandle write_res : current_data.desc.writes) {
                     for (ResourceHandle read_res : later_data.desc.reads) {
@@ -326,37 +367,42 @@ Result<std::monostate> MultiQueueScheduler::add_cross_queue_dependencies(
                     }
                     if (has_dependency) break;
                 }
-                
+
                 if (has_dependency) {
                     cross_queue_deps[later_pass].push_back(current_pass);
                 }
             }
         }
     }
-    
-    // Add timeline semaphore dependencies to submissions
+
+    // Add timeline semaphore dependencies to submissions. The consumer's wait
+    // value must equal the producer's reserved signal value — which was set
+    // in build_submissions(). We do NOT call reserve_next_signal_value here;
+    // that would create waits on values nobody ever signals.
     for (size_t i = 0; i < execution_order.size(); ++i) {
         PassHandle pass_handle = execution_order[i];
         auto& submission = submissions[i];
-        
-        if (cross_queue_deps.count(pass_handle)) {
-            // This pass depends on other queues
-            for (PassHandle dep_pass : cross_queue_deps[pass_handle]) {
-                const auto& dep_data = passes[dep_pass];
-                
-                // Get timeline semaphore for dependency queue
-                auto timeline_result = timeline_manager_->get_timeline_semaphore(dep_data.desc.queue);
-                if (!timeline_result) {
-                    return std::unexpected(timeline_result.error());
-                }
-                
-                // Add wait for dependency queue's timeline
-                submission.wait_semaphores.push_back(timeline_result.value());
-                submission.wait_values.push_back(timeline_manager_->get_next_value(dep_data.desc.queue) - 1);
+
+        auto deps_it = cross_queue_deps.find(pass_handle);
+        if (deps_it == cross_queue_deps.end()) continue;
+
+        for (PassHandle dep_pass : deps_it->second) {
+            const auto& dep_data = passes[dep_pass];
+
+            auto timeline_result = timeline_manager_->get_timeline_semaphore(dep_data.desc.queue);
+            if (!timeline_result) {
+                return std::unexpected(timeline_result.error());
             }
+
+            auto producer_it = submission_index_of.find(dep_pass);
+            if (producer_it == submission_index_of.end()) continue;
+            const auto& producer_submission = submissions[producer_it->second];
+
+            submission.wait_semaphores.push_back(timeline_result.value());
+            submission.wait_values.push_back(producer_submission.signal_timeline_value);
         }
     }
-    
+
     return std::monostate{};
 }
 

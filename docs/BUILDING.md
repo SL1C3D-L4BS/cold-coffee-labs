@@ -14,7 +14,7 @@
 | Ninja | **1.11+** | `apt install ninja-build` · https://github.com/ninja-build/ninja/releases |
 | Rust (stable) | **1.80+** | https://rustup.rs/ |
 | Python | **3.10+** | (for `docs/07_DAILY_TODO_GENERATOR.py`) |
-| Vulkan SDK | **1.3.290+** (we target 1.2 core; 1.3 features opportunistic) | https://vulkan.lunarg.com/sdk/home |
+| Vulkan SDK | **1.4.341.1** (CI-pinned; engine targets 1.2 core + opportunistic 1.3) | https://vulkan.lunarg.com/sdk/home |
 | Git | any | |
 
 On Windows we use **clang-cl** (LLVM's MSVC-compatible driver). MSVC and GCC are not supported (`docs/00` §2.2).

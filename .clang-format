@@ -3,7 +3,7 @@
 # Applied by CI; non-conforming PRs are blocked.
 BasedOnStyle: LLVM
 Language: Cpp
-Standard: c++20
+Standard: c++23
 IndentWidth: 4
 TabWidth: 4
 UseTab: Never

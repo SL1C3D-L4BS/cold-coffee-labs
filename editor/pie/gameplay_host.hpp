@@ -5,8 +5,11 @@
 //
 // Platform-specific LoadLibrary/dlopen lives in gameplay_host_platform.cpp.
 
+#include "engine/platform/dll.hpp"
+
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -68,7 +71,7 @@ private:
     void unload_dll();
 
     PIEState    state_             = PIEState::Editor;
-    void*       lib_handle_        = nullptr;
+    std::unique_ptr<gw::platform::DynamicLibrary> lib_handle_;
     std::string lib_source_path_;
     std::string lib_copy_path_;
     uint32_t    hot_copy_counter_  = 0;
@@ -76,6 +79,12 @@ private:
     GwGameplayInitFn     gameplay_init_     = nullptr;
     GwGameplayUpdateFn   gameplay_update_   = nullptr;
     GwGameplayShutdownFn gameplay_shutdown_ = nullptr;
+
+    // Cached pointer to the last GameplayContext handed to enter_play().
+    // Used by reload_if_changed() so hot-reloaded code can be re-initialised
+    // against the same context the original load saw. The context is owned
+    // by EditorApplication; this is a non-owning reference.
+    GameplayContext* live_ctx_ = nullptr;
 
     // ECS world snapshot taken at enter_play — restored at stop.
     // Phase 7 stores a raw byte snapshot; Phase 8 uses the real serializer.

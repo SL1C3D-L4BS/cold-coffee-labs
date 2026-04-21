@@ -36,7 +36,7 @@ void InspectorPanel::on_imgui_render(EditorContext& ctx) {
     }
 
     // Header: entity name + handle.
-    ImGui::Text("Entity  0x%llx", static_cast<unsigned long long>(primary));
+    ImGui::Text("Entity  0x%llx", static_cast<unsigned long long>(primary.bits));
     ImGui::Separator();
 
     // Phase 7 demonstration: show a fake transform component.

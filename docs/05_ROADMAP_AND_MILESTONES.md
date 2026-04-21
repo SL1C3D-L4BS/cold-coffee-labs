@@ -21,11 +21,11 @@ Greywater is two products in one build: the engine (`Greywater_Engine`) and the 
 | ----- | -------------------------------------------- | --------- | -------- | ---------------------------- | -------- |
 | 1     | Scaffolding & CI/CD                          | 001–004   | 4w       | *First Light*                | completed |
 | 2     | Platform & Core Utilities                    | 005–009   | 5w       | —                            | completed |
-| 3     | Math, ECS, Jobs & Reflection                 | 010–016   | 7w       | *Foundations Set*            | completed |
+| 3     | Math, ECS, Jobs & Reflection                 | 010–016   | 7w       | *Foundations Set*            | partial (see §Phase-3 note) |
 | 4     | Renderer HAL & Vulkan Bootstrap              | 017–024   | 8w       | —                            | completed |
-| 5     | Frame Graph & Reference Renderer             | 025–032   | 8w       | *Foundation Renderer*        | in_progress |
-| 6     | Asset Pipeline & Content Cook                | 033–036   | 4w       | —                            | planned  |
-| 7     | Editor Foundation                            | 037–042   | 6w       | *Editor v0.1*                | planned  |
+| 5     | Frame Graph & Reference Renderer             | 025–032   | 8w       | *Foundation Renderer*        | completed |
+| 6     | Asset Pipeline & Content Cook                | 033–036   | 4w       | —                            | completed |
+| 7     | Editor Foundation                            | 037–042   | 6w       | *Editor v0.1*                | in_progress |
 | 8     | Scene Serialization & Visual Scripting       | 043–047   | 5w       | —                            | planned  |
 | 9     | BLD (Brewed Logic Directive, Rust)           | 048–059   | 12w      | *Brewed Logic*               | planned  |
 | 10    | Runtime I — Audio & Input                    | 060–065   | 6w       | —                            | planned  |
@@ -362,14 +362,38 @@ Sign-off state (2026-04-20): **COMPLETED** - All engineering artifacts validated
 
 ### *Foundations Set* (week 016)
 Sandbox simulates 10 000 entities at a stable frame time. Job system within 5 % of reference targets. ≥ 80 % unit coverage on core/math/memory/jobs/ECS. Zero sanitizer warnings. Reflection + serialization primitives in place and unit-tested.
-Sign-off state (2026-05-01): **COMPLETED** - All core systems validated, ECS framework operational, job system optimized, unit coverage achieved, reflection primitives functional.
+Sign-off state (2026-04-20, **revised 2026-04-20 late-night**): **PARTIAL** — see Phase-3 note below. Prior wording ("COMPLETED (engineering)") was aspirational; an audit pass on 2026-04-20 night found that three of the seven week-cards did not actually land (011 CommandStack, 015 ECS queries/systems, 016 serialization beyond a stub) and two more shipped partial (014 ECS primitives without a `World`, `ComponentRegistry`, or tests). Corrective work folded into Phase 7 pull-forward per the Path-A decision (see daily/2026-04-20 "Phase 7 rescope"). Recording gate still pending per §0 rule *and* re-gated on the pulled-forward items landing.
+
+#### Phase-3 amendment note (2026-04-20 late-night)
+
+A point-in-time audit of the `engine/` tree against the Phase-3 week-cards (§Phase 3 schedule above) found the following reality:
+
+| Week | Deliverable | Status | Evidence |
+|------|-------------|--------|----------|
+| 010  | Math (Vec/Mat/Quat/Transform, SIMD flag) | shipped | `engine/math/`, used project-wide |
+| 011  | `engine/core/command/`: `ICommand`, `CommandStack`, transaction brackets | **missing** | `engine/core/command/` contains only `.gitkeep` |
+| 012  | `engine/jobs/`: work-stealing scheduler skeleton | shipped | `engine/jobs/scheduler.*`, used by asset-db + cook worker |
+| 013  | `engine/jobs/`: submission, wait, parallel_for | shipped | `engine/jobs/parallel_for.hpp`, tests |
+| 014  | `engine/ecs/`: generational entity handles, archetype chunk storage | **partial** | `Chunk` + archetype bitmask only; no `World`, no component registry, no multi-chunk management, no tests; `EntityHandle` is `uint32_t` here but `uint64_t` in `editor/` |
+| 015  | `engine/ecs/`: typed queries, system registration | **missing** | `SystemRegistry::register_system` has an inverted `static_assert` that would not compile if instantiated; `ComponentStorage::for_each` declared, never defined; no query API |
+| 016  | Reflection + serialization-framework primitives | **partial** | Reflection shipped (`editor/reflect/reflect.hpp`, `engine/core/field_reflection.hpp`); `engine/core/serialization.cpp` is a 10-line stub with `serialize_fields`/`deserialize_fields` referenced but never defined |
+
+**Rationale for the drift.** Phase 3 was marked provisionally complete on the strength of week-010/012/013's landing, and the label was never re-examined after Phases 4–6 (which did not need ECS queries or a CommandStack) made the gaps effectively invisible. The Phase-7 *Editor v0.1* push is the first subsystem that genuinely *requires* the missing pieces, which is what surfaced them.
+
+**Corrective action.** Path-A decision (2026-04-20 late-night) pulls the following Phase-3 deliverables forward into Phase 7:
+- Week 011 `CommandStack` → becomes editor `CommandStack` per ADR-0006; lives initially under `editor/undo/` with `engine/core/command/` kept empty pending a future ADR if we ever need an engine-side one.
+- Week 014/015 ECS `World` + queries + `ComponentRegistry` + multi-archetype → designed in ADR-0004; lands in `engine/ecs/world.{hpp,cpp}` alongside the existing primitives.
+- Week 016 serialization → designed in ADR-0007 (ECS-world focus, not a generic framework); `engine/core/serialization.{hpp,cpp}` stays as the low-level buffer primitive and gains a real implementation.
+
+No Phase-3 week-card is being rewritten — the deliveries happen under Phase 7 commits and the audit map cross-references this amendment as the source of the drift record.
 
 ### *Foundation Renderer* (week 032)
 The reference scene (a canonical indoor-outdoor test scene internal to Greywater) renders at ≥ 60 FPS @ 1080p on RX 580 with directional + point lights, cascaded shadows, IBL, tonemapping. Frame graph barriers inserted automatically; validation layers clean; async-compute path active.
-Sign-off state: **IN PROGRESS** — Phase 5 opened 2026-04-20. Target gate: week 032 (~2026-06-15). Scaffolding committed (`05c2813`); `execute_pass` and rendering passes pending.
+Sign-off state (2026-04-20): **COMPLETED (engineering)** — Frame graph, reference renderer, milestone validator landed in commit `b191ca4` ("Phase 5 (weeks 025–032): Frame Graph + Reference Renderer — all green, 24/24 CTest"). Recording gate still pending per §0 rule (no milestone is officially complete without the two-minute narrated demo).
 
 ### *Editor v0.1* (week 042)
 A designer opens the editor, creates a scene, places entities, saves, closes, reopens, and sees identical results. Reflection-driven inspector edits components correctly. ImGuizmo gizmos work in the viewport. Play-in-editor launches the gameplay module.
+Sign-off state (2026-04-20, **revised 2026-04-20 late-night**): **IN PROGRESS — fullstack Path-A push**. Phase 7 opened at commit `cc7dc94`; scaffolding + gap-fills green, editor boots against Vulkan 1.3 + ImGui 1.92 dynamic rendering. A ground-truth survey on 2026-04-20 night found *Editor v0.1* is blocked not only on the known remaining items (viewport RT, inspector write-through, PIE launch) but also on unshipped Phase-3 deliverables (ECS `World`, `ComponentRegistry`, queries, `CommandStack`, serialization framework — see Phase-3 amendment note above). Path-A chosen: pull the Phase-3 gaps forward into Phase 7, design-first via ADRs 0004–0007, then implement end-to-end. Revised target gate: ~3–4 weeks of engineering from 2026-04-20 (not the original week-042 date). Recording gate tracked separately per §0 rule.
 
 ### *Brewed Logic* (week 059)
 BLD performs a full session end-to-end inside the editor: load scene → author components → write gameplay code → trigger build → hot-reload → verify. Every action appears on the command stack; Ctrl+Z reverses each. External MCP clients drive the engine over the same protocol. Offline mode works for RAG + `docs.*` + `scene.query`.

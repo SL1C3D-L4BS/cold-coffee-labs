@@ -3,20 +3,20 @@
 // Multi-entity selection set.
 // Spec ref: Phase 7 §4 — "selection is UI state, not scene state" (no undo stack).
 
+#include "engine/ecs/entity.hpp"
+
 #include <cstdint>
 #include <functional>
 #include <span>
 #include <vector>
 
-// Forward-declare instead of pulling in the full ECS world.
-namespace gw::ecs { struct EntityHandle; }
-
 namespace gw::editor {
 
-// Opaque 64-bit entity handle matching engine/ecs (forwards-compatible).
-// Phase 7 uses uint64_t; Phase 8 will replace with ecs::EntityHandle directly.
-using EntityHandle = uint64_t;
-inline constexpr EntityHandle kNullEntity = 0u;
+// Editor-facing alias for the engine's 64-bit generational entity handle
+// (ADR-0004 §2.2). Kept as `EntityHandle` so all the Phase-7 editor code
+// that already spells the type this way continues to compile.
+using EntityHandle = gw::ecs::Entity;
+inline constexpr EntityHandle kNullEntity = gw::ecs::Entity::null();
 
 class SelectionContext {
 public:
@@ -44,10 +44,9 @@ public:
         return static_cast<uint32_t>(selected_.size());
     }
 
-    // Pivot for gizmo: simple arithmetic mean of entity indices.
-    // A real implementation queries world positions (Phase 8+).
-    // Phase 7: pivot = mean of entity handle values cast to a placeholder.
-    [[nodiscard]] uint64_t pivot_entity() const noexcept {
+    // Pivot for gizmo: primary selection's entity (real world-position lookup
+    // is the gizmo's job; this just returns which entity to query).
+    [[nodiscard]] EntityHandle pivot_entity() const noexcept {
         return selected_.empty() ? kNullEntity : selected_.front();
     }
 

@@ -20,11 +20,18 @@ if(imgui_ADDED)
         ${imgui_SOURCE_DIR}
         ${imgui_SOURCE_DIR}/backends
     )
-    target_link_libraries(gw_imgui PUBLIC volk glfw VulkanMemoryAllocator)
+    # volk_headers: include paths only — no compiled .obj duplication.
+    # The volk implementation (volkInitialize, function pointer tables) lives
+    # in engine_render which gw_editor already links. Using the full volk static
+    # lib here would cause duplicate symbol errors at link time.
+    target_link_libraries(gw_imgui PUBLIC volk_headers glfw VulkanMemoryAllocator)
     target_compile_definitions(gw_imgui PUBLIC
         IMGUI_ENABLE_DOCKING
         IMGUI_ENABLE_VIEWPORTS
         IMGUI_USE_WCHAR32
+        # Enable ImVec2/ImVec4 arithmetic operators (+=, -=, *, etc.)
+        # Required by ImGuizmo and imnodes — MUST be set before the first imgui.h include.
+        IMGUI_DEFINE_MATH_OPERATORS
         # Vulkan loader via volk — imgui Vulkan backend needs the dispatch tables.
         IMGUI_IMPL_VULKAN_USE_VOLK
     )
@@ -129,6 +136,11 @@ endif()
 
 set_target_properties(gw_editor PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
+
+# Vulkan validation layers in Debug builds — mirrors sandbox.
+target_compile_definitions(gw_editor PRIVATE
+    $<$<CONFIG:Debug>:GW_VK_VALIDATION=1>
 )
 
 # Strict compile flags inherit from root; silence nothing in editor code.

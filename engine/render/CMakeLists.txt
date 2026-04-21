@@ -6,11 +6,11 @@ add_library(engine_render)
 
 target_sources(engine_render
     PRIVATE
+        hal/capabilities.cpp
         hal/vulkan_instance.cpp
         hal/vulkan_device.cpp
         hal/vulkan_queue.cpp
         hal/vulkan_command_buffer.cpp
-        hal/vulkan_memory.cpp
         hal/vulkan_buffer.cpp
         hal/vulkan_swapchain.cpp
         hal/vulkan_descriptor.cpp
@@ -26,10 +26,13 @@ target_include_directories(engine_render
         ${CMAKE_BINARY_DIR}/_deps/volk-src
 )
 
-# Link with required dependencies
+# Link with required dependencies.
+# NOTE: Do NOT link Vulkan::Vulkan (vulkan-1.lib) — volk owns the loader path.
+# Linking both causes duplicate vkXXX symbol errors at link time for any target
+# that also uses volk (e.g. gw_editor).  All Vulkan headers come via volk.h
+# which includes vulkan/vulkan.h from the Vulkan-Headers CPM package.
 target_link_libraries(engine_render PRIVATE
     volk
-    Vulkan::Vulkan
     VulkanMemoryAllocator
 )
 
