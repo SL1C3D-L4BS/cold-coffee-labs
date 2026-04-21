@@ -5,10 +5,20 @@ edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license-file.workspace = true
-description = "Rust-side of the cxx bridge. Orchestrates bld-ffi exposure and the generated C header. Phase 9."
+description = "Rust-side of the BLD bridge: re-exports bld-ffi and drives the host-callback table. Ships the C header generator."
 
 [lib]
 crate-type = ["staticlib", "rlib"]
 
 [dependencies]
 bld_ffi = { package = "bld-ffi", path = "../bld-ffi" }
+
+[build-dependencies]
+# cbindgen is gated behind a feature flag (not default). When off, the
+# hand-maintained bld/include/bld_register.h + bld/include/bld_ffi.h are the
+# source of truth. Flip on for CI drift detection:
+#     cargo build -p bld-bridge --features gen-headers
+
+[features]
+default = []
+gen-headers = []

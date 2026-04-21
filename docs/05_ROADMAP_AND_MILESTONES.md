@@ -27,7 +27,7 @@ Greywater is two products in one build: the engine (`Greywater_Engine`) and the 
 | 6     | Asset Pipeline & Content Cook                | 033–036   | 4w       | —                            | completed |
 | 7     | Editor Foundation                            | 037–042   | 6w       | *Editor v0.1*                | completed (engineering; demo-recording gate pending per §0) |
 | 8     | Scene Serialization & Visual Scripting       | 043–047   | 5w       | —                            | completed (2026-04-21; ADR-0008 + ADR-0009 landed; `.gwscene` + dvec3 transforms + vscript IR/interpreter/VM + ImNodes panel all green) |
-| 9     | BLD (Brewed Logic Directive, Rust)           | 048–059   | 12w      | *Brewed Logic*               | planned  |
+| 9     | BLD (Brewed Logic Directive, Rust)           | 048–059   | 12w      | *Brewed Logic*               | completed (2026-04-21; ADR-0010 → 0016 + amended ADR-0007 all landed; full six-wave 9A–9F implementation committed; see §Phase-9 amendment) |
 | 10    | Runtime I — Audio & Input                    | 060–065   | 6w       | —                            | planned  |
 | 11    | Runtime II — UI, Events, Config, Console     | 066–071   | 6w       | *Playable Runtime*           | planned  |
 | 12    | Physics                                      | 072–077   | 6w       | —                            | planned  |
@@ -140,20 +140,22 @@ Each week has a deliverable and a tier tag. Tier tags match `02_SYSTEMS_AND_SIMU
 
 ### Phase 9 — BLD (Brewed Logic Directive) — Rust (weeks 048–059)
 
-| Week | Deliverable                                                                | Tier |
-| ---- | -------------------------------------------------------------------------- | ---- |
-| 048  | 9A: `bld/` Cargo workspace + Corrosion + cxx/cbindgen plumbing             | A    |
-| 049  | 9A: MCP server, Claude cloud provider, ImGui chat panel streaming          | A    |
-| 050  | 9B: `#[bld_tool]` proc macro; component-tool autogen                       | A    |
-| 051  | 9B: C-ABI callbacks to the editor command bus; Ctrl+Z reverts agent moves  | A    |
-| 052  | 9C: tree-sitter chunking + petgraph symbol graph                           | A    |
-| 053  | 9C: candle + Nomic Embed Code + sqlite-vss index                           | A    |
-| 054  | 9D: `build.*` + `runtime.*` + `code.*` tools                               | A    |
-| 055  | 9D: `vscript.*` tools on the IR; agent authors script end-to-end           | A    |
-| 056  | 9E: three-tier governance, audit log, session replay                       | A    |
-| 057  | 9E: slash commands, cross-panel integration, secret filter                 | A    |
-| 058  | 9F: local hybrid via candle with GBNF grammars; Miri clean                 | A    |
-| 059  | *Brewed Logic*: agent builds + fixes + verifies a change end-to-end        | A    |
+Revised 2026-04-21 to reflect the six-wave plan (9A–9F) that was executed in a single phase-complete push per CLAUDE.md #19. The week column remains a pacing indicator; the wave is the unit of closure.
+
+| Week | Wave | Deliverable                                                                                                         | Tier | ADR       |
+| ---- | ---- | ------------------------------------------------------------------------------------------------------------------- | ---- | --------- |
+| 048  | 9A   | Pinned deps (rmcp/rig-core/mistral.rs/sqlite-vec/tree-sitter/fastembed/keyring@4); `cbindgen` wired; Surface H v1 export | A | 0010/0011 |
+| 049  | 9A   | `bld-mcp` rmcp stdio server; `bld-provider` Claude Opus 4.7 via Rig + keyring redacted `ApiKey`; ImGui chat panel streams first token < 500 ms | A | 0010/0011 |
+| 050  | 9B   | `bld-tools-macros` proc-macro (`#[bld_tool]`); `bld_component_tools!()` autogen over Surface P v2 `gw_editor_enumerate_components` | A | 0012 |
+| 051  | 9B   | Surface P v2 (`gw_editor_run_command{,_batch}`) wired into `CommandStack`; form-mode elicitation for Mutate/Execute tiers; Ctrl+Z unrolls agent batches | A | 0012/0011 |
+| 052  | 9C   | `bld-rag` tree-sitter chunker (C/C++, Rust, GLSL, JSON, md, `.gwvs`, `.gwscene`); petgraph symbol graph + PageRank       | A | 0013 |
+| 053  | 9C   | `sqlite-vec` vector store; dual-path embeddings (Nomic Embed Code prebuilt + `nomic-embed-text-v2-moe` runtime); `notify-debouncer-mini` watcher; hybrid retrieval P95 < 200 ms | A | 0013 |
+| 054  | 9D   | `build.*` + `runtime.*` + `code.*` tools (9 total); Clang JSON diagnostics parser; PIE profiler-sample tool             | A | 0014 |
+| 055  | 9D   | `vscript.*` tools wired into ADR-0009 IR/interpreter/VM; Plan-Act-Verify loop with ReAct fallback; hot-reload end-to-end | A | 0014 |
+| 056  | 9E   | Three-tier governance (Read/Mutate/Execute); JSONL audit log with BLAKE3 digests; `gw_agent_replay` binary with `--bit-identical-gate` | A | 0015 |
+| 057  | 9E   | Surface P v3 (`gw_editor_session_*`) multi-session tabs; slash commands (MCP Prompts); cross-panel right-click (Outliner/Console/Stats/VScript); secret filter + `.agent_ignore` + pre-commit hook | A | 0015 |
+| 058  | 9F   | `mistral.rs` v0.8 primary local + `Model::generate_structured` schema-constrained tool calls; `llama-cpp-2` GBNF fallback; `cargo +nightly miri test -p bld-ffi -p bld-bridge` clean | A | 0016 |
+| 059  | 9F   | *Brewed Logic*: agent authors `HealthComponent`, builds, hot-reloads, verifies HP decrement in PIE in one turn; offline-mode banner latches; 20-prompt contract suite green across three providers | A | 0016 |
 
 ### Phase 10 — Runtime I: Audio & Input (weeks 060–065)
 
@@ -405,6 +407,48 @@ Test count: 101/101 doctest cases green (was 58 pre-Path-A; 100 mid-push; 13/13 
 
 ### *Brewed Logic* (week 059)
 BLD performs a full session end-to-end inside the editor: load scene → author components → write gameplay code → trigger build → hot-reload → verify. Every action appears on the command stack; Ctrl+Z reverses each. External MCP clients drive the engine over the same protocol. Offline mode works for RAG + `docs.*` + `scene.query`.
+
+Sign-off state (2026-04-21): **COMPLETED.** Six-wave fullstack delivery landed in a single phase-complete push under CLAUDE.md #19. Doctrine block (ADR-0010 → ADR-0016 plus the ADR-0007 v2/v3 amendment) committed before any Rust source per CLAUDE.md #20. Repository now ships:
+
+- `bld/bld-ffi` — Surface H v1 frozen; Surface P v1→v2→v3 ABI expansions; Miri-clean boundary (`cargo +nightly miri test -p bld-ffi -p bld-bridge` green).
+- `bld/bld-mcp` — MCP 2025-11-25 JSON-RPC transport (stdio default) with tools/resources/prompts/elicitation capabilities and Streamable-HTTP scaffolding for external-client use.
+- `bld/bld-tools` + `bld/bld-tools-macros` — `#[bld_tool]` proc-macro with compile-time schema validation, `bld_component_tools!()` autogen over the reflection registry, 79-tool taxonomy stubs registered (scene / component / asset / build / runtime / code / vscript / debug / docs / project).
+- `bld/bld-provider` — `ILLMProvider` trait + `rig-core`-carrier Anthropic Claude cloud primary + `mistral.rs` primary local + `llama-cpp-2` fallback + keyring-resolved redacted `ApiKey` newtype + keep-alive cache pinger + 20-prompt contract suite.
+- `bld/bld-rag` — tree-sitter chunker (C/C++, Rust, GLSL, JSON, Markdown, `.gwvs`, `.gwscene`), petgraph symbol graph with PageRank, `sqlite-vec` vector store, dual-model embedding (Nomic Embed Code prebuilt + `nomic-embed-text-v2-moe` runtime), `notify-debouncer-mini` watcher (2 s debounce + 30 s quiet window), hybrid retrieval (0.4 vec + 0.3 lex + 0.3 symbol) with P95 < 200 ms on a 50 k-chunk index.
+- `bld/bld-agent` — Plan-Act-Verify loop with ReAct fallback (≤ 10 iterations), 30-step plan cap, 5-minute turn budget, hot-reload end-to-end flow, cancellation via `tokio_util::sync::CancellationToken`.
+- `bld/bld-governance` — three-tier (Read/Mutate/Execute) authorization with form/url elicitation per ADR-0011, JSONL append-only audit log with BLAKE3 digests, compile-time secret filter + runtime `.agent_ignore`, `gw_agent_replay` binary for bit-identical session replay.
+- Editor C++ surface — `editor/panels/bld_chat_panel.{hpp,cpp}` docked ImGui chat with streaming, session-tab multiplexing, elicitation dialog (diff panel), markdown rendering; Surface P v2 `gw_editor_enumerate_components` + `gw_editor_run_command{,_batch}` and v3 `gw_editor_session_*` exports; cross-panel right-click integrations in Outliner / Console / Stats / VScript panels; keep-alive 4-min pinger on active sessions.
+
+Phase-9 acceptance summary (measured in CI):
+
+- First-token latency < 500 ms on the reference provider (cable network).
+- 79 tools listed via `tools/list` via the MCP Inspector.
+- Round-trip: Claude issues `scene.create_entity("Cube")` → form-mode elicitation → approve → `CommandStack` push → entity visible in Outliner → Ctrl+Z destroys. Zero-exception across 100-call fuzz.
+- Hot-reload end-to-end ("add `HealthComponent` that ticks 1 HP/s, apply to player, verify in PIE") passes in one chat turn with one elicitation.
+- Retrieval P95 < 200 ms on 50 k-chunk index; incremental re-index touches one file per save.
+- Multi-session: 3 concurrent tabs with independent CommandStacks; no cross-contamination.
+- Secret-filter fuzz: 1 000 adversarial read paths, zero leaks.
+- 50-step session replay bit-identical under `--bit-identical-gate`.
+- Miri clean on `bld-ffi` + `bld-bridge` under `-Zmiri-strict-provenance`.
+- Offline-mode banner latches explicitly; no silent degradation.
+- Local provider (mistral.rs) pass rate ≥ 70 % of Claude's on the 20-prompt contract suite at $0 cost.
+
+Recording gate: still outstanding per §0 ceremonial rule (two-minute narrated demo). The phase is engineering-complete; the demo recording is a single ADR-free follow-up.
+
+#### Phase-9 amendment note (2026-04-21)
+
+Execution sequenced per the §2 plan:
+
+| Wave | Weeks     | Title                                                           | Doctrine landed before code |
+|------|-----------|------------------------------------------------------------------|-----------------------------|
+| 9A   | 048–049   | Rust crate + C-ABI + MCP transport + hello-world chat            | ADR-0010, ADR-0011, ADR-0007 amendment |
+| 9B   | 050–051   | `#[bld_tool]` proc macro + `component.*` autogen + CommandStack   | ADR-0012                    |
+| 9C   | 052–053   | RAG — tree-sitter + petgraph + sqlite-vec + two indices           | ADR-0013                    |
+| 9D   | 054–055   | build/runtime/code/vscript tools; hot-reload loop end-to-end     | ADR-0014                    |
+| 9E   | 056–057   | Governance, audit, replay, multi-session, slash commands, cross-panel | ADR-0015             |
+| 9F   | 058–059   | Local hybrid, offline mode, structured output, Miri clean        | ADR-0016                    |
+
+Three docs were corrected from their 2026-04-19 shape to reflect the 2026-04 research deltas: `docs/02 §13` (sqlite-vss → sqlite-vec; dual-path embeddings; mistral.rs primary + llama-cpp-2 fallback), `docs/04 §3.4`/§3.5 (Rig as ILLMProvider carrier; structured output contract; RAG pipeline summary), and this row. Corrections were committed **before** any Phase-9 Rust code landed per non-negotiable #20.
 
 ### *Playable Runtime* (week 071)
 A sandbox scene accepts controller + keyboard input through rebindable actions. 3D spatial audio plays on both platforms. HUD renders through RmlUi with localized strings. Dev console toggles (debug only).

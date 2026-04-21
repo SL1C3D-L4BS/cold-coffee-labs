@@ -5,11 +5,20 @@ edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license-file.workspace = true
-description = "Three-tier governance, audit log, session replay, human-in-the-loop elicitation. Phase 9."
+description = "Three-tier governance, audit log, session replay, human-in-the-loop elicitation, secret filter (ADR-0011, ADR-0015)."
 
 [lib]
 
 [dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
+blake3 = { workspace = true }
+regex = { workspace = true }
+once_cell = { workspace = true }
+ulid = { workspace = true }
 
-# No unwrap / expect allowed in this crate (docs/00 §3, docs/12 §J Rust).
+[dev-dependencies]
+tempfile = "3"
+
+# No unwrap / expect allowed in this crate (docs/00 §3 Rust style, ADR-0015).

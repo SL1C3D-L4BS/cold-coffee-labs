@@ -1,0 +1,19 @@
+[package]
+name = "bld-tools-macros"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license-file.workspace = true
+description = "Proc-macro crate for BLD. Owns `#[bld_tool]` and `bld_component_tools!()` (ADR-0012)."
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn         = { workspace = true }
+quote       = { workspace = true }
+proc-macro2 = { workspace = true }
+
+[dev-dependencies]
+trybuild = "1"

@@ -90,6 +90,7 @@ add_executable(gw_editor
     panels/render_settings_panel.cpp
     panels/lighting_panel.cpp
     panels/render_targets_panel.cpp
+    agent_panel/agent_panel.cpp
     viewport/editor_camera.cpp
     viewport/debug_draw.cpp
     viewport/gizmo_system.cpp

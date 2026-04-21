@@ -1,0 +1,23 @@
+[package]
+name = "bld-replay"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license-file.workspace = true
+description = "Deterministic replay of BLD audit logs (`gw_agent_replay`) — ADR-0015 §2.3."
+
+[[bin]]
+name = "gw_agent_replay"
+path = "src/main.rs"
+
+[dependencies]
+bld-governance = { path = "../bld-governance" }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+thiserror    = { workspace = true }
+anyhow       = { workspace = true }
+blake3       = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

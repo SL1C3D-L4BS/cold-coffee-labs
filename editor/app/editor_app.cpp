@@ -30,6 +30,7 @@
 #include "editor/panels/lighting_panel.hpp"
 #include "editor/panels/render_targets_panel.hpp"
 #include "editor/vscript/vscript_panel.hpp"
+#include "editor/agent_panel/agent_panel.hpp"
 #include "editor/scene/components.hpp"
 #include "engine/ecs/hierarchy.hpp"
 
@@ -224,6 +225,8 @@ EditorApplication::EditorApplication()
     panels_.add(std::make_unique<RenderTargetsPanel>());
     // Phase 8 week 047 — Visual Scripting node-graph panel (ImNodes over IR).
     panels_.add(std::make_unique<VScriptPanel>());
+    // Phase 9 week 048 — Brewed Logic Directive chat panel.
+    panels_.add(std::make_unique<gw::editor::agent::AgentPanel>());
 
     // Wire BLD API globals.
     gw::editor::bld_api::g_globals.selection = &selection_;
@@ -1173,6 +1176,9 @@ void EditorApplication::build_docking_layout() {
     // VScript docks as a tab over the viewport so users can toggle between
     // authoring the graph and seeing the scene without losing side panels.
     ImGui::DockBuilderDockWindow("VScript",         centre);
+    // BLD Copilot docks as a tab next to the Inspector so users can keep
+    // the agent visible alongside selection state.
+    ImGui::DockBuilderDockWindow("BLD Copilot",     right_top);
 
     ImGui::DockBuilderFinish(dockspace_id);
 }

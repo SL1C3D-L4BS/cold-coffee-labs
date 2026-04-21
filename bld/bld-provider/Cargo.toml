@@ -5,10 +5,41 @@ edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license-file.workspace = true
-description = "LLM provider abstraction — Claude cloud primary, local candle/llama-cpp-rs fallback. Phase 9."
+description = "LLM provider abstraction (ADR-0010). Claude cloud primary, mistral.rs/llama-cpp local."
 
 [lib]
 
+[features]
+default = []
+# `cloud-claude` enables Anthropic Claude via reqwest + SSE streaming.
+# Off by default so the base build never needs reqwest / rustls.
+cloud-claude = ["dep:reqwest", "dep:eventsource-stream", "dep:futures-util", "dep:tokio"]
+# `rig-carrier` switches to rig-core for provider routing. Additive.
+rig-carrier = ["dep:rig-core", "dep:tokio"]
+# `local-mistralrs` adds mistral.rs as the primary local engine (9F).
+local-mistralrs = ["dep:mistralrs", "dep:tokio"]
+# `local-llama` adds llama-cpp-2 as the fallback local engine (9F).
+local-llama = ["dep:llama-cpp-2", "dep:tokio"]
+# `keyring` gates OS-native secret storage for API keys.
+keyring = ["dep:keyring"]
+
 [dependencies]
-serde = { workspace = true }
-thiserror = { workspace = true }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+thiserror    = { workspace = true }
+anyhow       = { workspace = true }
+async-trait  = { workspace = true }
+tracing      = { workspace = true }
+futures      = { workspace = true }
+
+tokio              = { workspace = true, optional = true }
+futures-util       = { workspace = true, optional = true }
+reqwest            = { workspace = true, optional = true }
+eventsource-stream = { workspace = true, optional = true }
+rig-core           = { workspace = true, optional = true }
+mistralrs          = { workspace = true, optional = true }
+llama-cpp-2        = { workspace = true, optional = true }
+keyring            = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

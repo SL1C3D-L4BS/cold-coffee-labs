@@ -5,8 +5,43 @@ edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license-file.workspace = true
-description = "Agent plan/act/verify loop. Phase 9."
+description = "Agent Plan-Act-Verify loop. ADR-0014."
 
 [lib]
 
 [dependencies]
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+thiserror    = { workspace = true }
+anyhow       = { workspace = true }
+tracing      = { workspace = true }
+async-trait  = { workspace = true }
+tokio        = { workspace = true }
+ulid         = { workspace = true }
+futures      = { workspace = true }
+
+bld-tools       = { path = "../bld-tools" }
+bld-governance  = { path = "../bld-governance" }
+bld-provider    = { path = "../bld-provider" }
+bld-rag         = { path = "../bld-rag" }
+bld-mcp         = { path = "../bld-mcp" }
+
+tracing-subscriber = { workspace = true, optional = true }
+
+[[bin]]
+name = "gw_bld_server"
+path = "src/bin/gw_bld_server.rs"
+required-features = ["server"]
+
+[features]
+default = []
+# `server` enables the MCP-over-stdio binary + the tokio runtime hop.
+server = ["bld-mcp/runtime", "dep:tracing-subscriber"]
+
+[target.'cfg(any())'.dependencies]
+# Placeholder — stops cargo from inlining dead target cfg sections.
+
+[dev-dependencies]
+tokio = { workspace = true }
+tempfile = "3"
+# tempfile already pulled in for existing tests — reused by secret_filter test.

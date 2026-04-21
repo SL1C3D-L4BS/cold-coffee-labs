@@ -5,10 +5,24 @@ edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license-file.workspace = true
-description = "Tool registry and the #[bld_tool] proc-macro facade. Phase 9."
+description = "Tool registry and the #[bld_tool] proc-macro facade. Phase 9 (ADR-0012)."
 
 [lib]
 
+[features]
+default = []
+# The `macros` feature pulls in bld-tools-macros. Off by default so the
+# base build never pays the proc-macro compile cost in tests. Downstream
+# crates (bld-agent) enable it.
+macros = ["dep:bld-tools-macros"]
+
 [dependencies]
-serde = { workspace = true }
-serde_json = { workspace = true }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+schemars     = { workspace = true }
+thiserror    = { workspace = true }
+tracing      = { workspace = true }
+inventory    = "0.3"
+
+bld-governance   = { path = "../bld-governance" }
+bld-tools-macros = { path = "../bld-tools-macros", optional = true }

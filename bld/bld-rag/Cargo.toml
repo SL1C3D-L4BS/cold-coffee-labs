@@ -5,8 +5,37 @@ edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license-file.workspace = true
-description = "RAG subsystem — tree-sitter chunking, petgraph symbol graph, sqlite-vss vector store. Phase 9."
+description = "RAG subsystem — chunker, symbol graph, vector store, hybrid retrieval (ADR-0013)."
 
 [lib]
 
+[features]
+default = []
+# tree-sitter chunking. Off by default — unit tests use the hand-rolled chunker.
+ts-chunk = ["dep:tree-sitter"]
+# sqlite-vec embedded vector store.
+vec-store = ["dep:rusqlite"]
+# Full fastembed-rs embedding pipeline. Pulls tokenizers + ort.
+embed = ["dep:fastembed"]
+# `notify` adapter for the watcher — real filesystem event stream.
+fs-notify = ["dep:notify", "dep:notify-debouncer-mini"]
+
 [dependencies]
+serde      = { workspace = true }
+serde_json = { workspace = true }
+thiserror  = { workspace = true }
+anyhow     = { workspace = true }
+tracing    = { workspace = true }
+blake3     = { workspace = true }
+regex      = { workspace = true }
+once_cell  = { workspace = true }
+petgraph   = { workspace = true }
+
+tree-sitter           = { workspace = true, optional = true }
+rusqlite              = { workspace = true, optional = true }
+fastembed             = { workspace = true, optional = true }
+notify                = { workspace = true, optional = true }
+notify-debouncer-mini = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile = "3"

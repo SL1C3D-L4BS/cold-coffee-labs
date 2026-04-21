@@ -9,12 +9,32 @@ description = "MCP (Model Context Protocol 2025-11-25) transport for BLD. Wire p
 
 [lib]
 
-[dependencies]
-serde = { workspace = true }
-serde_json = { workspace = true }
-tokio = { workspace = true, optional = true }
-thiserror = { workspace = true }
-
 [features]
 default = []
-runtime = ["dep:tokio"]
+# `runtime` pulls in the tokio stdio server. Off by default so pure-logic
+# unit tests stay fast.
+runtime = ["dep:tokio", "dep:tokio-util", "dep:futures"]
+# `rmcp` will switch the transport to the official rmcp crate. Defined but
+# feature-gated off until Phase 9B drops — the pure-Rust transport here
+# conforms to the same wire protocol (ADR-0011 §2.1).
+rmcp-transport = ["dep:rmcp", "runtime"]
+
+[dependencies]
+serde      = { workspace = true }
+serde_json = { workspace = true }
+thiserror  = { workspace = true }
+tracing    = { workspace = true }
+schemars   = { workspace = true }
+async-trait = { workspace = true }
+
+tokio       = { workspace = true, optional = true }
+tokio-util  = { workspace = true, optional = true }
+futures     = { workspace = true, optional = true }
+rmcp        = { workspace = true, optional = true }
+
+bld-tools       = { path = "../bld-tools" }
+bld-governance  = { path = "../bld-governance" }
+
+[dev-dependencies]
+tokio = { workspace = true }
+futures = { workspace = true }

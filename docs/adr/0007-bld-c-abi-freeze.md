@@ -229,4 +229,66 @@ That single test covers: symbol resolution, version negotiation, registrar round
 
 ---
 
-*Drafted by Claude Opus 4.7 on 2026-04-20 late-night as part of the Phase-7 fullstack Path-A push. Doctrine lands before code per `CLAUDE.md` non-negotiable #20.*
+## Amendment 2026-04-21 — Phase 9 ABI version trail
+
+Phase 9 waves 9B and 9E add additive-only entries to Surface P. Per §2.2 versioning policy ("every additive change bumps the version; removals and signature changes are forbidden without a version bump and a migration plan"), the planned ABI version trail is:
+
+### v2 — introduced in Phase 9 wave 9B (ADR-0012)
+
+Added to Surface P:
+
+```c
+/* Introduced in v2. Walks the editor's reflection registry once, invoking
+ * cb() for each registered component. BLD uses this to autogenerate
+ * component.<name>.{get,set,add,remove} tools at registration time. */
+typedef void (*BldComponentEnumFn)(const char* name,
+                                    uint64_t    stable_hash,
+                                    const char* fields_json,  /* [ {name,type,offset}, ... ] */
+                                    void*       user);
+GW_EDITOR_API void gw_editor_enumerate_components(BldComponentEnumFn cb, void* user);
+
+/* Introduced in v2. Enqueue a single serialised ICommand. Payload shape is
+ * opcode-specific; see bld/docs/opcodes.md. Returns a command id the caller
+ * can pair with gw_editor_command_result for async completion. */
+GW_EDITOR_API uint64_t gw_editor_run_command(uint32_t opcode,
+                                              const void* payload,
+                                              uint32_t payload_bytes);
+
+/* Introduced in v2. Transaction bracket: N opcodes collapse to a single
+ * undo entry. `payload_offsets[N+1]` — the last slot is the total bytes. */
+GW_EDITOR_API uint64_t gw_editor_run_command_batch(uint32_t opcode_count,
+                                                    const uint32_t* opcodes,
+                                                    const void* payloads,
+                                                    const uint32_t* payload_offsets);
+```
+
+ADR-0012 defines opcode semantics; `bld-tools::component_autogen` consumes the enumerator.
+
+### v3 — introduced in Phase 9 wave 9E (ADR-0015)
+
+Added to Surface P:
+
+```c
+/* Introduced in v3. Opaque session handle owned by the editor. */
+typedef struct BldSession BldSession;
+
+GW_EDITOR_API BldSession*  gw_editor_session_create(const char* display_name);
+GW_EDITOR_API void         gw_editor_session_destroy(BldSession* session);
+GW_EDITOR_API const char*  gw_editor_session_id(BldSession* session); /* ULID string, caller-free */
+GW_EDITOR_API const char*  gw_editor_session_request(BldSession* session,
+                                                      const char* request_json); /* caller-free */
+```
+
+Multi-session tabs in the chat panel; audit streams per-session.
+
+### Policy
+
+- No v1 symbol is removed, renamed, or has its signature altered by either v2 or v3.
+- Surface H (BLD → host exports) stays at v1 through Phase 9. The BLD plugin implementation added in Phase 9 is v1-complete; hot-reload-of-BLD-itself is explicitly deferred (§2.8); the pending `bld_on_reload_*` additions remain a v2 Surface-H concern handled in a future ADR.
+- A host at v3 continues to load a v1 BLD plugin in compat mode per §2.2; v3 additions are detected at resolve time and skipped when the plugin predates them.
+
+This amendment is the versioning trail recorded per CLAUDE.md #20 so the phase's ABI bumps are documented before the code lands.
+
+---
+
+*Drafted by Claude Opus 4.7 on 2026-04-20 late-night as part of the Phase-7 fullstack Path-A push. Doctrine lands before code per `CLAUDE.md` non-negotiable #20. Amended 2026-04-21 for Phase 9.*

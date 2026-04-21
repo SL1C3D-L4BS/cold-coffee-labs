@@ -14,5 +14,8 @@ crate-type = ["staticlib", "rlib"]
 
 [dev-dependencies]
 
-# No unwrap / expect allowed in this crate per docs/00 §3 Rust style.
-# Miri runs nightly on this crate: cargo miri test -p bld-ffi
+# No unwrap / expect allowed in this crate per docs/00 3 Rust style.
+# Miri runs nightly on this crate:  cargo +nightly miri test -p bld-ffi
+#
+# This crate deliberately has zero external dependencies. Everything that
+# crosses the boundary is core::ffi / libc-equivalent POD.

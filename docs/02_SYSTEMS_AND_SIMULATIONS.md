@@ -216,19 +216,30 @@ These systems are built for the Greywater game specifically, but use the engine'
 
 ## 13. BLD — Brewed Logic Directive (Tier A, Rust)
 
-| System              | Module                     | Library                                       | Phase | Tier |
-| ------------------- | -------------------------- | --------------------------------------------- | ----- | ---- |
-| MCP transport       | `bld/bld-mcp/`             | rmcp                                          | 9     | A    |
-| Tool registry       | `bld/bld-tools/`           | Custom `#[bld_tool]` proc macro               | 9     | A    |
-| LLM providers       | `bld/bld-provider/`        | Claude cloud + alt-cloud via reqwest + SSE    | 9     | A    |
-| Local inference     | `bld/bld-provider/`        | candle (primary), llama-cpp-rs (fallback)     | 9     | A    |
-| RAG — chunking      | `bld/bld-rag/`             | tree-sitter                                   | 9     | A    |
-| RAG — symbol graph  | `bld/bld-rag/`             | petgraph + PageRank                           | 9     | A    |
-| RAG — vectors       | `bld/bld-rag/`             | rusqlite + sqlite-vss                         | 9     | A    |
-| Embeddings          | `bld/bld-rag/`             | Nomic Embed Code via candle                   | 9     | A    |
-| Agent loop          | `bld/bld-agent/`           | Custom plan/act/verify                        | 9     | A    |
-| Governance          | `bld/bld-governance/`      | Custom tier system + elicitation              | 9     | A    |
-| C-ABI bridge        | `bld/bld-bridge/`, `bld-ffi/`| cxx + cbindgen                              | 9     | A    |
+Revised 2026-04-21 for Phase 9 opening. Earlier rows (`candle` primary, `llama-cpp-rs` fallback, `sqlite-vss`, `Nomic Embed Code` runtime) are superseded by the three ADRs cited below. Rationale captured inline.
+
+| System              | Module                         | Library                                                      | Phase | Tier | ADR |
+| ------------------- | ------------------------------ | ------------------------------------------------------------ | ----- | ---- | --- |
+| MCP transport       | `bld/bld-mcp/`                 | `rmcp` 1.x (stdio default; Streamable HTTP in 9E)            | 9     | A    | 0011 |
+| Provider abstraction| `bld/bld-provider/`            | Own `ILLMProvider` trait; `rig-core` as carrier              | 9     | A    | 0010 |
+| Primary cloud       | `bld/bld-provider/`            | Anthropic Claude Opus 4.7 via `rig-core`; `reqwest` + SSE    | 9     | A    | 0010 |
+| Primary local       | `bld/bld-provider/`            | `mistral.rs` v0.8 + Qwen 2.5 Coder 7B Q4K + structured output| 9     | A    | 0016 |
+| Fallback local      | `bld/bld-provider/`            | `llama-cpp-2` + GBNF from JSON Schema                        | 9     | A    | 0016 |
+| Tool registry       | `bld/bld-tools/`, `bld-tools-macros/` | `#[bld_tool]` proc-macro + `schemars` + component autogen | 9     | A    | 0012 |
+| RAG — chunking      | `bld/bld-rag/`                 | `tree-sitter-cpp`, `-rust`, `-glsl`, `-json`, `-md` + custom `.gwvs`, `.gwscene` | 9 | A | 0013 |
+| RAG — symbol graph  | `bld/bld-rag/`                 | `petgraph` + PageRank (α=0.85, 64 iters)                     | 9     | A    | 0013 |
+| RAG — vector store  | `bld/bld-rag/`                 | `rusqlite` + **`sqlite-vec`** (sqlite-vss deprecated upstream)| 9    | A    | 0013 |
+| RAG — embeddings (prebuilt) | `bld/bld-rag/`         | Nomic Embed Code via `candle` — **dev-box build only**, ships as blob | 9 | A | 0013 |
+| RAG — embeddings (runtime)  | `bld/bld-rag/`         | `fastembed-rs` + `nomic-embed-text-v2-moe` (fits RX 580 8 GB)| 9     | A    | 0013 |
+| RAG — watcher       | `bld/bld-rag/`                 | `notify` + `notify-debouncer-mini` (2 s debounce, 30 s quiet)| 9     | A    | 0013 |
+| Agent loop          | `bld/bld-agent/`               | Plan-Act-Verify with ReAct fallback; 30-step cap             | 9     | A    | 0014 |
+| Governance          | `bld/bld-governance/`          | Three-tier (Read/Mutate/Execute) + form/url elicitation      | 9     | A    | 0011, 0015 |
+| Audit log + replay  | `bld/bld-governance/`, `tools/bld_replay/` | JSONL per session; BLAKE3 digests; `gw_agent_replay` binary | 9 | A | 0015 |
+| Secret filter       | `bld/bld-governance/`          | Compile-time deny-list + runtime `.agent_ignore` + pre-commit | 9    | A    | 0015 |
+| Keyring secrets     | `bld/bld-provider/`            | `keyring` 4.0.x + platform-native features                   | 9     | A    | 0010 |
+| C-ABI bridge        | `bld/bld-bridge/`, `bld-ffi/`  | `cxx` + `cbindgen`; Surface H v1, Surface P v1→v2→v3         | 9     | A    | 0007 |
+| Hybrid retrieval    | `bld/bld-rag/`                 | Lexical (`grep`) + vector (`sqlite-vec`) + symbol graph       | 9     | A    | 0013 |
+| Offline mode        | `bld/bld-provider/`            | Explicit non-dismissable banner; Read-tier only with no cloud | 9    | A    | 0016 |
 
 ## 14. Game AI (Tier B — distinct from BLD)
 
