@@ -203,6 +203,41 @@ TEST_CASE("vscript parser — unknown keyword produces ParseError with line #") 
     CHECK(g.error().message.find("wat") != std::string::npos);
 }
 
+TEST_CASE("vscript parser — tolerates UTF-8 BOM + zero-width paste artifacts") {
+    // UTF-8 BOM (EF BB BF) followed by a valid graph. Clipboard pastes from
+    // Notepad / rich-text editors commonly prepend this.
+    std::string text;
+    text.push_back(static_cast<char>(0xEF));
+    text.push_back(static_cast<char>(0xBB));
+    text.push_back(static_cast<char>(0xBF));
+    text += "graph demo {\n";
+    // Zero-width space (U+200B = E2 80 8B) in the middle of whitespace.
+    text += "  ";
+    text.push_back(static_cast<char>(0xE2));
+    text.push_back(static_cast<char>(0x80));
+    text.push_back(static_cast<char>(0x8B));
+    text += "output x : int\n}\n";
+
+    auto g = parse(text);
+    REQUIRE(g.has_value());
+    CHECK(g->name == "demo");
+    CHECK(g->outputs.size() == 1);
+    CHECK(g->outputs.front().name == "x");
+}
+
+TEST_CASE("vscript parser — unexpected character error includes byte hex") {
+    // A random control byte (0x07 BEL) on line 1 should surface in the
+    // diagnostic so an editor user can tell _what_ is wrong without
+    // opening a hex editor.
+    std::string text;
+    text.push_back(static_cast<char>(0x07));
+    text += "graph x { }\n";
+    auto g = parse(text);
+    REQUIRE_FALSE(g.has_value());
+    CHECK(g.error().line == 1);
+    CHECK(g.error().message.find("0x07") != std::string::npos);
+}
+
 TEST_CASE("vscript parser — type mismatch caught by validate()") {
     constexpr std::string_view kText = R"(graph bad {
   output n : int

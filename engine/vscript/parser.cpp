@@ -51,7 +51,17 @@ struct Token {
 
 class Lexer {
 public:
-    explicit Lexer(std::string_view s) : src_(s) {}
+    explicit Lexer(std::string_view s) : src_(s) {
+        // Strip a leading UTF-8 BOM (EF BB BF) if present. Users pasting text
+        // out of a GUI editor or a Windows Notepad save will commonly carry
+        // a BOM, and we do not want the first lex step to fail on it.
+        if (src_.size() >= 3 &&
+            static_cast<unsigned char>(src_[0]) == 0xEFu &&
+            static_cast<unsigned char>(src_[1]) == 0xBBu &&
+            static_cast<unsigned char>(src_[2]) == 0xBFu) {
+            pos_ = 3;
+        }
+    }
 
     std::expected<Token, ParseError> next() {
         skip_ws_and_comments();
@@ -79,8 +89,24 @@ public:
         if (c == '_' || std::isalpha(static_cast<unsigned char>(c))) {
             return lex_ident();
         }
-        return std::unexpected(ParseError{ln,
-            std::string{"unexpected character '"} + c + "'"});
+        // Build a diagnostic that prints both the glyph (if printable) and
+        // the raw byte value. This turns "unexpected character 'X'" into
+        // something actionable when X is a stray control byte, a BOM frag,
+        // or a high-ASCII character pasted from rich-text.
+        const auto uc = static_cast<unsigned char>(c);
+        char hex[8];
+        std::snprintf(hex, sizeof(hex), "0x%02X", uc);
+        std::string msg = "unexpected character ";
+        if (std::isprint(uc)) {
+            msg.push_back('\'');
+            msg.push_back(c);
+            msg += "' (";
+            msg += hex;
+            msg.push_back(')');
+        } else {
+            msg += hex;
+        }
+        return std::unexpected(ParseError{ln, std::move(msg)});
     }
 
 private:
@@ -89,6 +115,26 @@ private:
             const char c = src_[pos_];
             if (c == '\n') { ++line_; ++pos_; continue; }
             if (std::isspace(static_cast<unsigned char>(c))) { ++pos_; continue; }
+            // Tolerate zero-width / non-breaking spaces that commonly sneak
+            // in via clipboard paste (U+200B, U+200C, U+200D, U+FEFF,
+            // U+00A0 as UTF-8 C2 A0). These are not useful as tokens.
+            const auto uc = static_cast<unsigned char>(c);
+            if (uc == 0xC2u && pos_ + 1 < src_.size() &&
+                static_cast<unsigned char>(src_[pos_ + 1]) == 0xA0u) {
+                pos_ += 2; continue; // U+00A0 NBSP
+            }
+            if (uc == 0xE2u && pos_ + 2 < src_.size() &&
+                static_cast<unsigned char>(src_[pos_ + 1]) == 0x80u) {
+                const auto b2 = static_cast<unsigned char>(src_[pos_ + 2]);
+                if (b2 == 0x8Bu || b2 == 0x8Cu || b2 == 0x8Du) {
+                    pos_ += 3; continue; // U+200B/C/D ZWSP/ZWNJ/ZWJ
+                }
+            }
+            if (uc == 0xEFu && pos_ + 2 < src_.size() &&
+                static_cast<unsigned char>(src_[pos_ + 1]) == 0xBBu &&
+                static_cast<unsigned char>(src_[pos_ + 2]) == 0xBFu) {
+                pos_ += 3; continue; // stray UTF-8 BOM mid-stream
+            }
             if (c == '#') {
                 while (pos_ < src_.size() && src_[pos_] != '\n') ++pos_;
                 continue;

@@ -17,6 +17,36 @@ namespace gw::editor {
 
 namespace {
 
+// Canonical demo graph used to seed a fresh panel and to power the
+// "Reset demo" recovery button. Kept in a single place so the seed text
+// and the reset text can never drift out of sync.
+constexpr const char* kDemoSeedText =
+    "graph demo {\n"
+    "  input a : int = 3\n"
+    "  input b : int = 4\n"
+    "  output sum : int\n"
+    "  node 1 : get_input {\n"
+    "    in name : string = \"a\"\n"
+    "    out value : int\n"
+    "  }\n"
+    "  node 2 : get_input {\n"
+    "    in name : string = \"b\"\n"
+    "    out value : int\n"
+    "  }\n"
+    "  node 3 : add {\n"
+    "    in lhs : int\n"
+    "    in rhs : int\n"
+    "    out value : int\n"
+    "  }\n"
+    "  node 4 : set_output {\n"
+    "    in name : string = \"sum\"\n"
+    "    in value : int\n"
+    "  }\n"
+    "  edge 1.value -> 3.lhs\n"
+    "  edge 2.value -> 3.rhs\n"
+    "  edge 3.value -> 4.value\n"
+    "}\n";
+
 // Pin id packing: ImNodes uses a flat int space. We pack
 // (node_id << 16) | (pin_index << 1) | (is_output) so every pin is
 // uniquely addressable as an int.
@@ -83,33 +113,11 @@ VScriptPanel::VScriptPanel() {
     // Seed the editor with a tiny non-trivial demo script so the panel
     // shows something meaningful on first open. The user can paste over
     // this buffer at any time.
-    text_buf_ =
-        "graph demo {\n"
-        "  input a : int = 3\n"
-        "  input b : int = 4\n"
-        "  output sum : int\n"
-        "  node 1 : get_input {\n"
-        "    in name : string = \"a\"\n"
-        "    out value : int\n"
-        "  }\n"
-        "  node 2 : get_input {\n"
-        "    in name : string = \"b\"\n"
-        "    out value : int\n"
-        "  }\n"
-        "  node 3 : add {\n"
-        "    in lhs : int\n"
-        "    in rhs : int\n"
-        "    out value : int\n"
-        "  }\n"
-        "  node 4 : set_output {\n"
-        "    in name : string = \"sum\"\n"
-        "    in value : int\n"
-        "  }\n"
-        "  edge 1.value -> 3.lhs\n"
-        "  edge 2.value -> 3.rhs\n"
-        "  edge 3.value -> 4.value\n"
-        "}\n";
-    (void)load_text(text_buf_);
+    (void)load_text(kDemoSeedText);
+    // Reserve slack up-front so the very first keystroke in InputTextMultiline
+    // does not have to trigger a CallbackResize round-trip — removes an entire
+    // class of "buffer pointer churn" bugs during live editing.
+    text_buf_.reserve(text_buf_.size() + 1024);
 }
 
 VScriptPanel::~VScriptPanel() {
@@ -273,12 +281,20 @@ void VScriptPanel::on_imgui_render(EditorContext& /*ctx*/) {
     ImGui::BeginChild("vscript_text", {text_w, 0.f}, true);
     {
         ImGui::TextUnformatted("IR (ground-truth)");
-        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 70.f);
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 140.f);
+        if (ImGui::SmallButton("Reset demo")) {
+            (void)load_text(kDemoSeedText);
+            text_buf_.reserve(text_buf_.size() + 1024);
+        }
+        ImGui::SameLine();
         if (ImGui::SmallButton("Parse")) {
             (void)load_text(text_buf_);
         }
         // Multi-line editable buffer — grows dynamically via the resize
-        // callback below.
+        // callback below. We pass `capacity()+1` as the buffer size
+        // (`data()` is guaranteed null-terminated), and the
+        // CallbackResize handler re-reserves whenever ImGui needs more
+        // space than we currently have.
         ImGui::InputTextMultiline(
             "##vscript_text",
             text_buf_.data(),
@@ -289,6 +305,11 @@ void VScriptPanel::on_imgui_render(EditorContext& /*ctx*/) {
             [](ImGuiInputTextCallbackData* data) -> int {
                 if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
                     auto* s = static_cast<std::string*>(data->UserData);
+                    // Reserve headroom so subsequent keystrokes don't
+                    // thrash the allocator frame-by-frame.
+                    if (static_cast<std::size_t>(data->BufSize) > s->capacity() + 1) {
+                        s->reserve(static_cast<std::size_t>(data->BufSize));
+                    }
                     s->resize(static_cast<std::size_t>(data->BufTextLen));
                     data->Buf = s->data();
                 }
@@ -321,8 +342,11 @@ void VScriptPanel::draw_toolbar() {
     ImGui::TextUnformatted(current_path_.empty() ? "<unsaved>" : current_path_.c_str());
 
     if (!parse_error_.empty()) {
-        ImGui::SameLine();
-        ImGui::TextColored({1.0f, 0.4f, 0.4f, 1.f}, " [parse: %s]", parse_error_.c_str());
+        // Use a dedicated wrapped line so long diagnostics (with byte
+        // values from the lexer) are never clipped by the toolbar width.
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{1.0f, 0.45f, 0.45f, 1.f});
+        ImGui::TextWrapped("%s", parse_error_.c_str());
+        ImGui::PopStyleColor();
     }
 }
 
