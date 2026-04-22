@@ -1,5 +1,5 @@
 # gameplay/ — the hot-reloadable C++ dynamic library.
-# docs/00 §2.5: only the gameplay module hot-reloads; engine core and BLD do not.
+# docs/01_CONSTITUTION_AND_PROGRAM.md §2.5: only the gameplay module hot-reloads; engine core and BLD do not.
 # Phase 1 provides a loadable skeleton; Phase 2 wires the platform-layer loader
 # and file-watcher (engine/scripting/).
 

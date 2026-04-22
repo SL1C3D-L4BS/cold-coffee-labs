@@ -1,7 +1,7 @@
 /* bld/include/bld_register.h
  * Surface H  BLD plugin entry points + host-callback table (Surface P v1-v3).
  * Frozen at BLD_ABI_VERSION = 1 for Surface H; tracks Surface P versions
- * v1/v2/v3 for host-side additions. See docs/adr/0007-bld-c-abi-freeze.md
+ * v1/v2/v3 for host-side additions. See docs/10_APPENDIX_ADRS_AND_REFERENCES.md
  * (amended 2026-04-21) and the Phase-9 ADRs 0010-0016.
  *
  * Rules:

@@ -1,5 +1,5 @@
 // engine/ecs/component_registry.cpp
-// See docs/adr/0004-ecs-world.md §2.4.
+// See docs/10_APPENDIX_ADRS_AND_REFERENCES.md §2.4.
 
 #include "component_registry.hpp"
 

@@ -1,6 +1,6 @@
 // editor/bld_api/editor_bld_api.cpp
 // Thread-safe C-ABI surface for BLD (Phase 9) — Surface P, v1.
-// See docs/adr/0007-bld-c-abi-freeze.md.
+// See docs/10_APPENDIX_ADRS_AND_REFERENCES.md.
 #include "editor_bld_api.hpp"
 
 // Full type definitions required — the header only forward-declares these.

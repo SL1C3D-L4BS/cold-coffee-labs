@@ -1,5 +1,5 @@
 # engine/greywater_core — the static library every Greywater binary links.
-# docs/00 §2.2, §7; docs/architecture/grey-water-engine-blueprint.md §3.2.
+# docs/01_CONSTITUTION_AND_PROGRAM.md §2.2, §7; docs/06_ARCHITECTURE.md (blueprint §3.2).
 #
 # Phase 1 deliverable set: version surface + public include root.
 # Phase 2+ fills out platform/, memory/, core/, math/, jobs/, ecs/.

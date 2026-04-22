@@ -1,5 +1,5 @@
 # Greywater toolchain — Linux, Clang/LLVM.
-# docs/00 §2.2: Clang-only. GCC and MSVC are not supported.
+# docs/01_CONSTITUTION_AND_PROGRAM.md §2.2: Clang-only. GCC and MSVC are not supported.
 
 set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_C_COMPILER   clang)

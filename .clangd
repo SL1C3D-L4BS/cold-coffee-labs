@@ -1,0 +1,23 @@
+# Greywater — clangd / IDE IntelliSense
+#
+# CMake exports compile_commands.json (ignored in git) under build/<preset>/.
+# When that file exists, clangd merges these flags with the compile command.
+# When it does not, these fallbacks still resolve `#include "engine/..."` from
+# the repo root and enable C++20/23 library features (e.g. std::span).
+#
+# After `cmake --preset dev-win` (or dev-linux), symlink or copy
+# `build/<preset>/compile_commands.json` to the repo root so clangd picks up
+# full per-target flags (defines, third-party includes, etc.).
+#
+# Re-run the preset after adding a new executable or TU; otherwise the new
+# `tests/**` entry may be missing from compile_commands.json and clangd will
+# fall back to these flags only (breaking `#include "engine/..."` resolution).
+
+If:
+  PathMatch: .*
+CompileFlags:
+  Add:
+    - -std=c++23
+    - -I.
+    - -Ibuild/dev-win/_deps/glm-src
+    - -Ibuild/dev-linux/_deps/glm-src

@@ -1,7 +1,7 @@
 // tests/perf/phase17_budgets_perf_test.cpp — Phase 17 perf gate (ADR-0081 §budgets).
 //
 // Exercises the CPU-reference paths of the Studio-Renderer subsystems against
-// the time ceilings listed in docs/perf/phase17_budgets.md (§Per-pass budgets).
+// the time ceilings listed in docs/09_NETCODE_DETERMINISM_PERF.md (merged **Phase 17 performance budgets — Studio Renderer**, §Per-pass budgets).
 // GPU paths are out-of-scope for CI; the CPU references stand in as proxies
 // because the actual rendering is done through the same algorithmic shapes.
 //
@@ -24,7 +24,10 @@
 
 #include <array>
 #include <chrono>
+#include <cstdint>
 #include <cstdio>
+#include <span>
+#include <string>
 #include <vector>
 
 namespace {
@@ -40,9 +43,11 @@ struct Budget {
     double      ms_ceiling_release;
 };
 
-double elapsed_ms(std::chrono::steady_clock::time_point t0) noexcept {
-    const auto t1 = std::chrono::steady_clock::now();
-    return std::chrono::duration<double, std::milli>(t1 - t0).count();
+double elapsed_ms(decltype(std::chrono::steady_clock::now()) start) noexcept {
+    const auto stop = std::chrono::steady_clock::now();
+    const auto micros =
+        std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
+    return static_cast<double>(micros) / 1000.0;
 }
 
 bool run_budget(const Budget& b, double measured_ms) {
@@ -81,10 +86,10 @@ int main() {
         }
         auto t0 = std::chrono::steady_clock::now();
         for (const auto id : ids) {
-            (void)world.set_param_vec4(id, "base_color", 0.5f, 0.5f, 0.5f, 1.0f);
+            (void)world.set_param_vec4(id, "base_color", 0.5F, 0.5F, 0.5F, 1.0F);
         }
         const double per_iter = elapsed_ms(t0);
-        ok &= run_budget({"material upload 1024 inst", 0.3}, per_iter);
+        ok &= run_budget(Budget{.name = "material upload 1024 inst", .ms_ceiling_release = 0.3}, per_iter);
         world.shutdown();
     }
 
@@ -105,7 +110,7 @@ int main() {
             (void)decode_gwmat(std::span<const std::byte>{blob.bytes}, out, name);
         }
         const double per_iter = elapsed_ms(t0) / 32.0;
-        ok &= run_budget({"gwmat encode+decode roundtrip", 0.5}, per_iter);
+        ok &= run_budget(Budget{.name = "gwmat encode+decode roundtrip", .ms_ceiling_release = 0.5}, per_iter);
     }
 
     // 3. Particle emission + simulate CPU reference — 64k particles.
@@ -115,51 +120,52 @@ int main() {
         EmitterDesc d;
         d.name             = "perf";
         d.shape            = EmitterShape::Point;
-        d.spawn_rate_per_s = 0.0f;
-        d.min_lifetime     = 1.0f;
-        d.max_lifetime     = 2.0f;
-        d.min_speed        = 0.0f;
-        d.max_speed        = 1.0f;
+        d.spawn_rate_per_s = 0.0F;
+        d.min_lifetime     = 1.0F;
+        d.max_lifetime     = 2.0F;
+        d.min_speed        = 0.0F;
+        d.max_speed        = 1.0F;
         ParticleEmitter em{d};
         std::vector<GpuParticle> buf;
         buf.reserve(65536);
-        em.emit_cpu(65536, 0xC0FFEEu, buf);
+        em.emit_cpu(65536, 0xC0FFEEU, buf);
 
         SimulationParams sp;
-        sp.dt_seconds = 1.0f / 60.0f;
-        sp.gravity    = {0.0f, -9.81f, 0.0f};
-        sp.drag       = 0.1f;
+        sp.dt_seconds = 1.0F / 60.0F;
+        sp.gravity    = {0.0F, -9.81F, 0.0F};
+        sp.drag       = 0.1F;
 
         auto t0 = std::chrono::steady_clock::now();
         simulate_cpu(buf, sp);
         const double sim_ms = elapsed_ms(t0);
-        ok &= run_budget({"particles simulate 64k (CPU ref)", 2.5}, sim_ms);
+        ok &= run_budget(Budget{.name = "particles simulate 64k (CPU ref)", .ms_ceiling_release = 2.5}, sim_ms);
 
         auto t1 = std::chrono::steady_clock::now();
         (void)compact_cpu(buf);
         const double compact_ms = elapsed_ms(t1);
-        ok &= run_budget({"particles compact 64k (CPU ref)", 1.0}, compact_ms);
+        ok &= run_budget(Budget{.name = "particles compact 64k (CPU ref)", .ms_ceiling_release = 1.0}, compact_ms);
     }
 
     // 4. Dual-Kawase bloom reference — 1080p HDR buffer, 5 iterations.
     //    Budget: ≤ 0.6 ms GPU; CPU reference gets a generous 12 ms ceiling
     //    because it's ~20× slower than the compute pass it mirrors.
     {
-        constexpr std::uint32_t w = 256, h = 144;   // 1/60 scaled reference.
-        std::vector<float> in(static_cast<std::size_t>(w) * h * 4, 1.2f);
-        for (std::size_t i = 3; i < in.size(); i += 4) in[i] = 1.0f;
+        constexpr std::uint32_t w = 256;
+        constexpr std::uint32_t h = 144; // 1/60 scaled reference.
+        std::vector<float> in(static_cast<std::size_t>(w) * h * 4, 1.2F);
+        for (std::size_t i = 3; i < in.size(); i += 4) in[i] = 1.0F;
         Bloom b;
         BloomConfig cfg;
         cfg.enabled = true;
         cfg.iterations = 5;
-        cfg.threshold  = 0.8f;
-        cfg.intensity  = 1.0f;
+        cfg.threshold  = 0.8F;
+        cfg.intensity  = 1.0F;
         b.configure(cfg);
         std::vector<float> out;
         auto t0 = std::chrono::steady_clock::now();
         b.run(in, w, h, out);
         const double ms = elapsed_ms(t0);
-        ok &= run_budget({"bloom dual-kawase 256x144 CPU", 12.0}, ms);
+        ok &= run_budget(Budget{.name = "bloom dual-kawase 256x144 CPU", .ms_ceiling_release = 12.0}, ms);
     }
 
     // 5. TAA reference resolve — 10 k samples.
@@ -169,46 +175,49 @@ int main() {
         TaaConfig cfg;
         cfg.enabled      = true;
         cfg.clip_mode    = TaaClipMode::KDop;
-        cfg.blend_factor = 0.9f;
+        cfg.blend_factor = 0.9F;
         t.configure(cfg);
         std::array<std::array<float, 3>, 9> nb{};
-        for (auto& s : nb) s = {0.4f, 0.4f, 0.4f};
+        for (auto& s : nb) s = {0.4F, 0.4F, 0.4F};
         auto t0 = std::chrono::steady_clock::now();
         for (int i = 0; i < 10000; ++i) {
-            (void)t.resolve({0.5f, 0.5f, 0.5f}, {0.4f, 0.4f, 0.4f}, nb);
+            (void)t.resolve({0.5F, 0.5F, 0.5F}, {0.4F, 0.4F, 0.4F}, nb);
         }
         const double ms = elapsed_ms(t0);
-        ok &= run_budget({"taa resolve 10k (CPU ref)", 3.0}, ms);
+        ok &= run_budget(Budget{.name = "taa resolve 10k (CPU ref)", .ms_ceiling_release = 3.0}, ms);
     }
 
     // 6. Motion blur tilemax/neighbormax — 1920×1080 velocity field.
     //    Budget: ≤ 0.7 ms GPU; CPU reference ceiling 20 ms.
     {
-        constexpr std::uint32_t w = 384, h = 216, tile = 16;
-        std::vector<float> vel(static_cast<std::size_t>(w) * h * 2, 0.3f);
-        std::vector<float> tm, nm;
+        constexpr std::uint32_t w    = 384;
+        constexpr std::uint32_t h    = 216;
+        constexpr std::uint32_t tile = 16;
+        std::vector<float> vel(static_cast<std::size_t>(w) * h * 2, 0.3F);
+        std::vector<float> tm;
+        std::vector<float> nm;
         auto t0 = std::chrono::steady_clock::now();
         motion_blur_tilemax(vel, w, h, tile, tm);
         motion_blur_neighbormax(tm, w / tile, h / tile, nm);
         const double ms = elapsed_ms(t0);
-        ok &= run_budget({"motion blur tilemax+nmax 384x216", 20.0}, ms);
+        ok &= run_budget(Budget{.name = "motion blur tilemax+nmax 384x216", .ms_ceiling_release = 20.0}, ms);
     }
 
     // 7. DoF CoC closed-form — 100k sample evaluations.
     //    Budget: ≤ 0.8 ms GPU; CPU reference ceiling 4 ms.
     {
         DofConfig cfg;
-        cfg.focal_mm = 50.0f;
-        cfg.aperture = 2.0f;
-        cfg.focus_distance_m = 5.0f;
+        cfg.focal_mm         = 50.0F;
+        cfg.aperture         = 2.0F;
+        cfg.focus_distance_m = 5.0F;
         double acc = 0.0;
         auto t0 = std::chrono::steady_clock::now();
         for (int i = 0; i < 100000; ++i) {
-            acc += coc_radius_px(cfg, 1.0f + static_cast<float>(i & 31) * 0.25f, 1080);
+            acc += coc_radius_px(cfg, 1.0F + (static_cast<float>(i & 31) * 0.25F), 1080);
         }
         const double ms = elapsed_ms(t0);
         (void)acc;
-        ok &= run_budget({"dof CoC 100k samples", 4.0}, ms);
+        ok &= run_budget(Budget{.name = "dof CoC 100k samples", .ms_ceiling_release = 4.0}, ms);
     }
 
     // 8. Tonemap CPU reference — 500k RGB evaluations across all three curves.
@@ -217,15 +226,16 @@ int main() {
         double acc = 0.0;
         auto t0 = std::chrono::steady_clock::now();
         for (int i = 0; i < 500000; ++i) {
-            const float v = static_cast<float>(i & 1023) * (1.0f / 256.0f);
-            const std::array<float, 3> rgb{v, v * 0.9f, v * 1.1f};
-            const auto pbr  = apply_tonemap({TonemapCurve::PbrNeutral, 1.0f}, rgb);
-            const auto aces = apply_tonemap({TonemapCurve::ACES,       1.0f}, rgb);
+            const float v = static_cast<float>(i & 1023) * (1.0F / 256.0F);
+            const std::array<float, 3> rgb{v, v * 0.9F, v * 1.1F};
+            const auto pbr =
+                apply_tonemap(TonemapConfig{.curve = TonemapCurve::PbrNeutral, .exposure = 1.0F}, rgb);
+            const auto aces = apply_tonemap(TonemapConfig{.curve = TonemapCurve::ACES, .exposure = 1.0F}, rgb);
             acc += pbr[0] + aces[0];
         }
         const double ms = elapsed_ms(t0);
         (void)acc;
-        ok &= run_budget({"tonemap pbr+aces 500k samples", 8.0}, ms);
+        ok &= run_budget(Budget{.name = "tonemap pbr+aces 500k samples", .ms_ceiling_release = 8.0}, ms);
     }
 
     std::printf("phase17.perf RESULT %s\n", ok ? "PASS" : "FAIL");

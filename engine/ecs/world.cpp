@@ -1,5 +1,5 @@
 // engine/ecs/world.cpp
-// See docs/adr/0004-ecs-world.md.
+// See docs/10_APPENDIX_ADRS_AND_REFERENCES.md.
 
 #include "world.hpp"
 

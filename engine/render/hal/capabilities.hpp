@@ -2,7 +2,7 @@
 // engine/render/hal/capabilities.hpp
 // RHICapabilities — feature-flag snapshot populated once per physical device.
 // CLAUDE.md non-negotiable #2: Vulkan 1.2 baseline, 1.3 opportunistic.
-// See docs/adr/0003-rhi-capabilities.md for the full rationale.
+// See docs/10_APPENDIX_ADRS_AND_REFERENCES.md for the full rationale.
 
 #include <cstdint>
 #include <volk.h>
@@ -28,7 +28,7 @@ struct RHICapabilities {
     // Vulkan 1.3 opportunistic extensions (RX 580 reports true).
     // When false, the frame graph must take the legacy sync1 /
     // render-pass path — which is a Tier-G follow-up, see
-    // docs/adr/0003-rhi-capabilities.md §3 "Short term".
+    // docs/10_APPENDIX_ADRS_AND_REFERENCES.md §3 "Short term".
     bool dynamic_rendering     = false;
     bool synchronization_2     = false;
 

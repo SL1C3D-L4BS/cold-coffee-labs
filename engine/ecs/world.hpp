@@ -1,6 +1,6 @@
 #pragma once
 // engine/ecs/world.hpp
-// Top-level ECS container. See docs/adr/0004-ecs-world.md §2.1.
+// Top-level ECS container. See docs/10_APPENDIX_ADRS_AND_REFERENCES.md §2.1.
 
 #include "archetype.hpp"
 #include "component_registry.hpp"

@@ -1,6 +1,6 @@
 #pragma once
 // engine/ecs/archetype.hpp
-// Archetype-of-chunks storage. See docs/adr/0004-ecs-world.md §2.3.
+// Archetype-of-chunks storage. See docs/10_APPENDIX_ADRS_AND_REFERENCES.md §2.3.
 //
 // An Archetype owns N fixed-size byte chunks (default 16 KiB). Each chunk
 // holds a dense SOA: per component type, a contiguous array of

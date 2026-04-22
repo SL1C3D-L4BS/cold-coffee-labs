@@ -1,4 +1,4 @@
-# ECS library — see docs/adr/0004-ecs-world.md
+# ECS library — see docs/10_APPENDIX_ADRS_AND_REFERENCES.md (ADR `0004-ecs-world.md`).
 
 target_sources(greywater_core
     PRIVATE

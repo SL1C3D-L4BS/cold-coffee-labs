@@ -10,18 +10,18 @@ add_executable(gw_tests
     containers_test.cpp
     string_test.cpp
     unit/render/frame_graph_test.cpp
-    # Phase 7 fullstack Path-A — Editor CommandStack (docs/adr/0005-editor-command-stack.md)
+    # Phase 7 fullstack Path-A — Editor CommandStack (ADR 0005 in docs/10_APPENDIX_ADRS_AND_REFERENCES.md)
     unit/editor_undo/command_stack_test.cpp
     "${CMAKE_SOURCE_DIR}/editor/undo/command_stack.cpp"
-    # Phase 7 fullstack Path-A — PIE snapshot/restore (docs/adr/0006 + §12)
+    # Phase 7 fullstack Path-A — PIE snapshot/restore (ADR 0006 in docs/10_APPENDIX_ADRS_AND_REFERENCES.md + §12)
     unit/editor_pie/gameplay_host_test.cpp
     "${CMAKE_SOURCE_DIR}/editor/pie/gameplay_host.cpp"
-    # Phase 7 week 042 — BLD C-ABI v1 freeze smoke (docs/adr/0007)
+    # Phase 7 week 042 — BLD C-ABI v1 freeze smoke (ADR 0007 in docs/10_APPENDIX_ADRS_AND_REFERENCES.md)
     smoke/bld_abi_v1/bld_abi_smoke_test.cpp
     "${CMAKE_SOURCE_DIR}/editor/bld_api/editor_bld_api.cpp"
-    # Phase 7 gap-fill — ECS World (docs/adr/0004-ecs-world.md)
+    # Phase 7 gap-fill — ECS World (ADR 0004 in docs/10_APPENDIX_ADRS_AND_REFERENCES.md)
     unit/ecs/world_test.cpp
-    # Phase 7 — ECS serialization (docs/adr/0006-ecs-world-serialization.md)
+    # Phase 7 — ECS serialization (ADR 0006 in docs/10_APPENDIX_ADRS_AND_REFERENCES.md)
     unit/ecs/serialize_test.cpp
     # Phase 8 week 043 — `.gwscene` file format + migration (ADR-0006 + ADR-0008)
     unit/scene/scene_file_test.cpp

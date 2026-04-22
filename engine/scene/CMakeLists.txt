@@ -1,5 +1,5 @@
 # Scene module — .gwscene file I/O + component schema migration registry.
-# Phase 8 week 043 (docs/adr/0006 + docs/adr/0008).
+# Phase 8 week 043 (ADRs 0006 + 0008 in docs/10_APPENDIX_ADRS_AND_REFERENCES.md).
 
 target_sources(greywater_core
     PRIVATE

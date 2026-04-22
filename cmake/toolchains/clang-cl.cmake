@@ -1,5 +1,5 @@
 # Greywater toolchain — Windows, clang-cl against the MSVC ABI.
-# docs/00 §2.2: clang-cl is the required Windows compiler.
+# docs/01_CONSTITUTION_AND_PROGRAM.md §2.2: clang-cl is the required Windows compiler.
 #
 # Keep the toolchain declarative: specify the compiler frontends and let CMake
 # probe compiler id/version/features. Forcing *_COMPILER_ID short-circuits that

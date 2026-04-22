@@ -1,5 +1,5 @@
 // tests/unit/ecs/world_test.cpp
-// Phase 7 gap-fill (ECS fullstack) — see docs/adr/0004-ecs-world.md.
+// Phase 7 gap-fill (ECS fullstack) — see docs/10_APPENDIX_ADRS_AND_REFERENCES.md.
 //
 // Covers:
 //   - entity lifecycle (create / destroy / is_alive / generation reuse)

@@ -1,0 +1,4 @@
+-std=c++23
+-I../..
+-I../../build/dev-win/_deps/glm-src
+-I../../build/dev-linux/_deps/glm-src

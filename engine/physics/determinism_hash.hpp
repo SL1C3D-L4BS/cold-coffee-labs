@@ -2,7 +2,7 @@
 // engine/physics/determinism_hash.hpp — Phase 12 Wave 12E (ADR-0037).
 //
 // Canonical FNV-1a-64 hash of a physics world's dynamic state. See
-// `docs/adr/0037-determinism-contract.md` for the exact canonicalization
+// `docs/10_APPENDIX_ADRS_AND_REFERENCES.md` for the exact canonicalization
 // rules this file implements.
 
 #include "engine/physics/rigid_body.hpp"

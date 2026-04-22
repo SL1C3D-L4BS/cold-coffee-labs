@@ -1,7 +1,7 @@
 #pragma once
 // engine/ecs/component_registry.hpp
 // ComponentRegistry — runtime per-type-info table for ECS components.
-// See docs/adr/0004-ecs-world.md §2.4.
+// See docs/10_APPENDIX_ADRS_AND_REFERENCES.md §2.4.
 //
 // Each component type registered with the registry gets:
 //   - A ComponentTypeId (small integer, stable within a process).

@@ -1,5 +1,5 @@
-# runtime/ — the shipping runtime executable (docs/05 Phase 11,
-# docs/architecture §3.2 runtime target).
+# runtime/ — the shipping runtime executable (docs/02_ROADMAP_AND_OPERATIONS.md Phase 11,
+# docs/06_ARCHITECTURE.md §3.2 runtime target).
 #
 # Phase 11 wires audio + input + UI + console via runtime::Engine
 # (ADR-0029). Window + render pump land in Phase 12.

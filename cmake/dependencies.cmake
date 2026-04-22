@@ -6,7 +6,7 @@
 include("${CMAKE_SOURCE_DIR}/cmake/CPM.cmake")
 
 # --- Corrosion (Rust <-> CMake bridge for BLD) --------------------------------
-# docs/00 §2.4, non-negotiable #15: BLD lives behind Corrosion.
+# docs/01_CONSTITUTION_AND_PROGRAM.md §2.4, non-negotiable #15: BLD lives behind Corrosion.
 CPMAddPackage(
     NAME             Corrosion
     GITHUB_REPOSITORY corrosion-rs/corrosion
@@ -56,7 +56,7 @@ CPMAddPackage(
 )
 
 # --- Vulkan headers / loader (system-provided via VULKAN_SDK) -----------------
-# docs/00 §2.2: Vulkan 1.2 baseline; 1.3 features opportunistic.
+# docs/01_CONSTITUTION_AND_PROGRAM.md §2.2: Vulkan 1.2 baseline; 1.3 features opportunistic.
 find_package(Vulkan 1.2 REQUIRED)
 
 # --- Phase 6 — Asset Pipeline & Content Cook ---------------------------------
@@ -443,7 +443,7 @@ endif()
 
 if(GW_ENABLE_RECAST)
     # Recast/Detour 1.6.0 baseline plus the `main` DT_POLYREF64 patch window.
-    # docs/adr/0044 §6 documents the rationale for the pin + main-commit pick.
+    # ADR 0044 §6 in docs/10_APPENDIX_ADRS_AND_REFERENCES.md documents the pin + main-commit pick.
     CPMAddPackage(
         NAME             recastnavigation
         GITHUB_REPOSITORY recastnavigation/recastnavigation

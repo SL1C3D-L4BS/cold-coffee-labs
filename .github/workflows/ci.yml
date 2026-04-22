@@ -2,7 +2,7 @@ name: ci
 
 # Greywater CI matrix — the required-check set on main.
 # {windows-latest, ubuntu-latest} × {Debug, Release}.
-# docs/05 week 003; docs/10 §3 Week 01 Thursday; docs/00 §2.2.
+# docs/02_ROADMAP_AND_OPERATIONS.md week 003; docs/01_CONSTITUTION_AND_PROGRAM.md §2.2.
 
 on:
   push:

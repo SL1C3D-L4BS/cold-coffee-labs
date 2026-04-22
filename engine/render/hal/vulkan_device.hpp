@@ -46,7 +46,7 @@ public:
 
     // RHI capability snapshot — the canonical "what does this GPU support"
     // feature-flag struct. Populated once at construction; read-only.
-    // See docs/adr/0003-rhi-capabilities.md.
+    // See docs/10_APPENDIX_ADRS_AND_REFERENCES.md.
     [[nodiscard]] const RHICapabilities& capabilities() const noexcept { return caps_; }
 
     // Graphics command pool (one-per-frame-in-flight callers own the buffer lifetime)

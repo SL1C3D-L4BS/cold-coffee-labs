@@ -1,0 +1,11 @@
+---
+# Perf harnesses: inherit repo `.clang-tidy`, but relax rules that fight benchmark style.
+InheritParentConfig: true
+Checks: >
+  -readability-identifier-length,
+  -modernize-use-std-print,
+  -cppcoreguidelines-pro-type-vararg,
+  -cppcoreguidelines-init-variables,
+  -modernize-min-max-use-std-min-max,
+  -readability-braces-around-statements,
+  -readability-else-after-return

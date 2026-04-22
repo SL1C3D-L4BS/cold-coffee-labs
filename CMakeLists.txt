@@ -1,6 +1,6 @@
 # Greywater_Engine root build — C++23, Clang-only, Ninja-only.
-# Authoritative template: docs/10_PRE_DEVELOPMENT_MASTER_PLAN.md §6.1.
-# Clang minimum per docs/00 §2.2; CMake minimum 3.28.
+# Authoritative template: docs/01_CONSTITUTION_AND_PROGRAM.md (merged pre-dev plan) §6.1.
+# Clang minimum per docs/01_CONSTITUTION_AND_PROGRAM.md §2.2; CMake minimum 3.28.
 
 cmake_minimum_required(VERSION 3.28)
 
@@ -21,7 +21,7 @@ project(greywater
 
 # --- Compiler gate ------------------------------------------------------------
 # We only support Clang (clang / clang++ on Linux, clang-cl on Windows).
-# docs/00 §2.2 — violations are a review-blocking smell.
+# docs/01_CONSTITUTION_AND_PROGRAM.md §2.2 — violations are a review-blocking smell.
 if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     message(FATAL_ERROR
         "Greywater supports Clang only. Detected: ${CMAKE_CXX_COMPILER_ID}. "
@@ -46,7 +46,7 @@ endif()
 # Honor compile-command export for every target so clang-tidy / sourcegraph tools work.
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
-# --- Optional sccache wrapper (docs/10 Phase 1 exit criteria) -----------------
+# --- Optional sccache wrapper (docs/02_ROADMAP_AND_OPERATIONS.md Phase 1 exit criteria) -----------------
 option(GW_USE_SCCACHE "Use sccache as the compiler launcher if available" OFF)
 if(GW_USE_SCCACHE)
     find_program(SCCACHE_EXECUTABLE sccache)
@@ -67,7 +67,7 @@ include(cmake/dependencies.cmake)
 add_subdirectory(engine)
 add_subdirectory(shaders)
 
-# BLD — Rust workspace compiled via Corrosion (docs/00 §2.4, non-negotiable #15).
+# BLD — Rust workspace compiled via Corrosion (docs/01_CONSTITUTION_AND_PROGRAM.md §2.4, non-negotiable #15).
 corrosion_import_crate(
     MANIFEST_PATH "${CMAKE_SOURCE_DIR}/bld/Cargo.toml"
     PROFILE release
@@ -81,7 +81,7 @@ enable_testing()
 include(CTest)
 
 # --- Executables and libraries -----------------------------------------------
-add_subdirectory(gameplay)   # hot-reloadable C++ dylib (docs/00 §2.5)
+add_subdirectory(gameplay)   # hot-reloadable C++ dylib (docs/01_CONSTITUTION_AND_PROGRAM.md §2.5)
 add_subdirectory(sandbox)    # First Light: hello-triangle
 add_subdirectory(editor)     # Editor — hello-BLD C-ABI smoke for week 004
 add_subdirectory(runtime)    # Shipping runtime executable (Phase 11 boot wiring)

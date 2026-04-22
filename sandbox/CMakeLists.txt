@@ -1,6 +1,6 @@
 # sandbox/ — engine feature test bed.
 # Phase 1 week 004 deliverable: hello-triangle (First Light Milestone 1A).
-# docs/10 §3 Week 02 / §6 First-week code generation.
+# docs/01_CONSTITUTION_AND_PROGRAM.md (merged pre-dev plan) §3 Week 02 / §6.
 
 add_executable(gw_sandbox)
 target_sources(gw_sandbox PRIVATE main.cpp)
@@ -24,14 +24,14 @@ target_compile_definitions(gw_sandbox PRIVATE
 )
 
 # --- Shader compilation -------------------------------------------------------
-# docs/10 §6.6 + docs/00 §3 (Shaders): HLSL primary via DXC, GLSL supported.
+# docs/10_APPENDIX_ADRS_AND_REFERENCES.md §6.6 + docs/01_CONSTITUTION_AND_PROGRAM.md §3 (Shaders): HLSL primary via DXC, GLSL supported.
 # Phase 1 uses the Vulkan SDK's glslangValidator for bootstrapping — DXC
 # integration lands in Phase 5 (Shader toolchain week 028).
 find_program(GW_GLSLANG glslangValidator HINTS ENV VULKAN_SDK PATH_SUFFIXES Bin bin)
 if(NOT GW_GLSLANG)
     message(FATAL_ERROR
         "glslangValidator not found. Set VULKAN_SDK or install the Vulkan SDK "
-        "(docs/11 §Hot commands, docs/00 §2.2).")
+        "(docs/01_CONSTITUTION_AND_PROGRAM.md § handoff / §2.2).")
 endif()
 
 set(GW_SHADER_OUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/shaders")

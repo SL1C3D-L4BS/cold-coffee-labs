@@ -1,12 +1,12 @@
-# Cold Coffee Labs — Greywater
+# Cold Coffee Labs — Greywater Engine
 
-**Greywater** — a persistent procedural universe simulation, shipping on its own proprietary engine.
+**Cold Coffee Labs** builds **Greywater Engine** (C++23 / Vulkan). Greywater Engine presents ***Sacrilege*** as the debut title and forcing function.
 
 This repository is the monorepo for:
 
-- **Greywater_Engine** — a C++23 engine built from first principles on 2026 engineering standards.
-- **Greywater** (the game) — a persistent procedural universe simulation with seamless ground-to-orbit traversal, PvP survival, base building, and a living AI ecosystem. The first title shipping on Greywater_Engine.
-- **BLD** (Brewed Logic Directive) — a native AI copilot subsystem written in Rust, linked into the editor via a narrow C-ABI.
+- **Greywater_Engine** — proprietary engine: ECS, jobs, Vulkan renderer, editor, `engine/world/`, tools.  
+- ***Sacrilege*** — flagship game; program spec and vision in `docs/07_SACRILEGE.md`.  
+- **BLD** (Brewed Logic Directive) — Rust copilot subsystem linked through a narrow C-ABI.
 
 **Hardware baseline:** AMD Radeon RX 580 8GB @ 1080p / 60 FPS. Every Tier A feature runs there.
 **Languages:** C++23 (engine) · Rust stable, 2024 edition (BLD only).
@@ -25,15 +25,15 @@ This repository is the monorepo for:
 - *Editor v0.1* (Phase 7) — engineering **complete** across five commit gates (A–E). Gate E wired a cockpit-polish UI inspired by the Cold Coffee Labs reference mock-up: Scene stats, Render Settings (tone-map + SSAO + exposure + histogram), Lighting, and Render Targets, all bound to a shared `editor::render::RenderSettings`. Recording gate open.
 - *Brewed Logic* (Phase 9 / BLD + `.gwscene`) — engineering **complete**; ADR-0010–0016 + amended ADR-0007; six waves 9A–9F. Recording gate open.
 - *Playable Runtime* (Phase 11) — **complete**; `playable_sandbox` exit gate. *Living Scene* (Phase 13) — **complete**; `living_sandbox`. *Two Client Night* (Phase 14) — **complete**; `netplay_sandbox`. *Ship Ready* (Phase 16) — **complete**; `sandbox_platform_services`.
-- *Studio Renderer* (Phase 17) — engineering **complete**; ADR-0074–0082; `MaterialWorld` + `ParticleWorld` + `PostWorld`; `gw_perf_gate_phase17`; `apps/sandbox_studio_renderer` prints the `STUDIO RENDERER` exit marker; `dev-win` CTest **711/711** (see `docs/05_ROADMAP_AND_MILESTONES.md` §Phase 17, `docs/perf/phase17_budgets.md`).
+- *Studio Renderer* (Phase 17) — engineering **complete**; ADR-0074–0082; `MaterialWorld` + `ParticleWorld` + `PostWorld`; `gw_perf_gate_phase17`; `apps/sandbox_studio_renderer` prints the `STUDIO RENDERER` exit marker; `dev-win` CTest **711/711** (see `docs/02_ROADMAP_AND_OPERATIONS.md` §Phase 17 and `docs/09_NETCODE_DETERMINISM_PERF.md` — merged **Phase 17 performance budgets — Studio Renderer**).
 
 ---
 
 ## Getting started
 
 1. **Read** [`CLAUDE.md`](CLAUDE.md) — the cold-start primer for every session.
-2. **Build** per [`docs/BUILDING.md`](docs/BUILDING.md).
-3. **Read** [`docs/README.md`](docs/README.md) for the full document hierarchy.
+2. **Build** per [`docs/05_RESEARCH_BUILD_AND_STANDARDS.md`](docs/05_RESEARCH_BUILD_AND_STANDARDS.md) *(merged `BUILDING.md`)*.
+3. **Read** [`docs/README.md`](docs/README.md) — map of the **eleven** Markdown files under `docs/`.
 
 ```bash
 # Linux
@@ -69,21 +69,27 @@ docs/         Canonical + operational documentation (read docs/README.md)
 .github/      CI workflows (matrix + sanitizer nightly + Miri)
 ```
 
-Engine code never `#include`s from `gameplay/`. The engine/game boundary is enforced in the review rubric (`docs/12_ENGINEERING_PRINCIPLES.md §K7`).
+Engine code never `#include`s from `gameplay/`. The engine/game boundary is enforced in the review rubric (`docs/03_PHILOSOPHY_AND_ENGINEERING.md` §K).
 
 ---
 
 ## The canonical set (binding)
 
+The `docs/` folder is intentionally **eleven Markdown files** (see [`docs/README.md`](docs/README.md)).
+
 | | |
 | --- | --- |
 | [`CLAUDE.md`](CLAUDE.md) | Cold-start primer + non-negotiables |
-| [`docs/00_SPECIFICATION_Claude_Opus_4.7.md`](docs/00_SPECIFICATION_Claude_Opus_4.7.md) | Constitution — constraints, authorization, execution cadence |
-| [`docs/01_ENGINE_PHILOSOPHY.md`](docs/01_ENGINE_PHILOSOPHY.md) | The Brew Doctrine + realistic low-poly art direction |
-| [`docs/10_PRE_DEVELOPMENT_MASTER_PLAN.md`](docs/10_PRE_DEVELOPMENT_MASTER_PLAN.md) | 90-day sprint plan, first-week scaffolding |
-| [`docs/12_ENGINEERING_PRINCIPLES.md`](docs/12_ENGINEERING_PRINCIPLES.md) | Code-review playbook |
-| [`docs/architecture/grey-water-engine-blueprint.md`](docs/architecture/grey-water-engine-blueprint.md) | Formal architectural blueprint |
-| [`docs/architecture/greywater-engine-core-architecture.md`](docs/architecture/greywater-engine-core-architecture.md) | Narrative core architecture |
+| [`docs/01_CONSTITUTION_AND_PROGRAM.md`](docs/01_CONSTITUTION_AND_PROGRAM.md) | Constitution, executive brief, handoff |
+| [`docs/02_ROADMAP_AND_OPERATIONS.md`](docs/02_ROADMAP_AND_OPERATIONS.md) | Roadmap, milestones, Kanban |
+| [`docs/03_PHILOSOPHY_AND_ENGINEERING.md`](docs/03_PHILOSOPHY_AND_ENGINEERING.md) | Brew doctrine + engineering principles |
+| [`docs/04_SYSTEMS_INVENTORY.md`](docs/04_SYSTEMS_INVENTORY.md) | Subsystem inventory |
+| [`docs/05_RESEARCH_BUILD_AND_STANDARDS.md`](docs/05_RESEARCH_BUILD_AND_STANDARDS.md) | Vulkan/C++/Rust guides, build, coding standards |
+| [`docs/06_ARCHITECTURE.md`](docs/06_ARCHITECTURE.md) | Blueprint + core architecture (merged) |
+| [`docs/07_SACRILEGE.md`](docs/07_SACRILEGE.md) | Flagship program spec |
+| [`docs/08_BLACKLAKE_AND_RIPPLE_STUDIO_SPECS.md`](docs/08_BLACKLAKE_AND_RIPPLE_STUDIO_SPECS.md) | Blacklake + GWE × Ripple studio specs |
+| [`docs/09_NETCODE_DETERMINISM_PERF.md`](docs/09_NETCODE_DETERMINISM_PERF.md) | Netcode, determinism, perf annexes |
+| [`docs/10_APPENDIX_ADRS_AND_REFERENCES.md`](docs/10_APPENDIX_ADRS_AND_REFERENCES.md) | Glossary, appendix, **all ADRs** |
 
 ---
 

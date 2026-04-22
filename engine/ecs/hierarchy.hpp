@@ -1,7 +1,7 @@
 #pragma once
 // engine/ecs/hierarchy.hpp
 // HierarchyComponent — scene-graph parent/sibling/child linkage.
-// See docs/adr/0004-ecs-world.md §2.7.
+// See docs/10_APPENDIX_ADRS_AND_REFERENCES.md §2.7.
 
 #include "entity.hpp"
 

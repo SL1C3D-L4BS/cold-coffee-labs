@@ -1,7 +1,7 @@
 #pragma once
 // editor/bld_api/editor_bld_api.hpp
 // Surface P — Stable C-ABI exported by gw_editor for BLD (Phase 9) to drive.
-// Frozen at BLD_ABI_VERSION = 1. See docs/adr/0007-bld-c-abi-freeze.md.
+// Frozen at BLD_ABI_VERSION = 1. See docs/10_APPENDIX_ADRS_AND_REFERENCES.md.
 //
 // RULES (lifted to ADR-0007 status; the comment here is a quick-ref):
 //   - Never remove or reorder existing entries — only add at the tail.

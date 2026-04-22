@@ -1,7 +1,7 @@
 // tests/perf/phase15_budgets_perf_test.cpp — Phase 15 perf gate (ADR-0064 §2).
 //
 // Runs a set of persistence / telemetry micro-benchmarks against the budgets in
-// `docs/perf/phase15_budgets.md`. Under Debug builds we intentionally multiply
+// `docs/09_NETCODE_DETERMINISM_PERF.md` (merged **Phase 15 performance budgets**). Under Debug builds we intentionally multiply
 // the budget ceilings by `kDebugSlack` so CI on Debug configs stays green —
 // Release-mode runs (persist-* presets) tighten the envelope.
 //
@@ -14,9 +14,11 @@
 #include "engine/persist/gwsave_io.hpp"
 #include "engine/persist/integrity.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <cstring>
+#include <span>
 #include <vector>
 
 namespace {
@@ -32,27 +34,31 @@ constexpr double kDebugSlack = 1.0;
 #endif
 
 struct Budget {
-    const char* name;
-    double      ms_ceiling_release;
+    const char* name                = nullptr;
+    double      ms_ceiling_release = 0.0;
     // Optional extra Debug-only multiplier for pathologically slow-in-Debug
     // operations (e.g. BLAKE3 without SIMD optimizations). Applied on top of
     // kDebugSlack in Debug builds only; Release ceilings are untouched.
-    double      extra_debug_slack = 1.0;
+    double extra_debug_slack = 1.0;
 };
 
-double elapsed_ms(std::chrono::steady_clock::time_point t0) {
-    const auto t1 = std::chrono::steady_clock::now();
-    return std::chrono::duration<double, std::milli>(t1 - t0).count();
+double elapsed_ms(decltype(std::chrono::steady_clock::now()) start) {
+    const auto stop = std::chrono::steady_clock::now();
+    const auto micros =
+        std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
+    return static_cast<double>(micros) / 1000.0;
 }
 
-bool run_budget(const Budget& b, double measured_ms) {
+bool run_budget(const Budget& budget, double measured_ms) {
 #ifndef NDEBUG
-    const double ceiling = b.ms_ceiling_release * kDebugSlack * b.extra_debug_slack;
+    const double ceiling =
+        budget.ms_ceiling_release * kDebugSlack * budget.extra_debug_slack;
 #else
-    const double ceiling = b.ms_ceiling_release * kDebugSlack;
+    const double ceiling = budget.ms_ceiling_release * kDebugSlack;
 #endif
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
     std::printf("phase15.perf %-32s measured=%.3f ms ceiling=%.3f ms %s\n",
-                b.name, measured_ms, ceiling,
+                budget.name, measured_ms, ceiling,
                 measured_ms <= ceiling ? "OK" : "FAIL");
     return measured_ms <= ceiling;
 }
@@ -60,61 +66,68 @@ bool run_budget(const Budget& b, double measured_ms) {
 } // namespace
 
 int main() {
-    gw::ecs::World w;
-    (void)w.component_registry().id_of<Pos>();
-    for (int i = 0; i < 2048; ++i) {
-        const auto e = w.create_entity();
-        w.add_component(e, Pos{static_cast<float>(i), 0.0f, 0.0f});
+    gw::ecs::World world;
+    (void)world.component_registry().id_of<Pos>();
+    for (int idx = 0; idx < 2048; ++idx) {
+        const auto ent = world.create_entity();
+        world.add_component(ent, Pos{.x = static_cast<float>(idx), .y = 0.0F, .z = 0.0F});
     }
 
-    auto chunks = gw::persist::build_chunk_grid_demo(w);
+    auto chunks = gw::persist::build_chunk_grid_demo(world);
     gw::persist::gwsave::HeaderPrefix hdr{};
     hdr.schema_version = 1;
     hdr.engine_version = 1;
     hdr.chunk_count    = static_cast<std::uint32_t>(chunks.size());
-    const auto c       = gw::persist::centre_chunk_payload(chunks);
-    hdr.determinism_hash = gw::persist::ecs_blob_determinism_hash(
-        std::span<const std::byte>(reinterpret_cast<const std::byte*>(c.data()), c.size()));
+    const auto centre_bytes = gw::persist::centre_chunk_payload(chunks);
+    hdr.determinism_hash =
+        gw::persist::ecs_blob_determinism_hash(std::span<const std::byte>(centre_bytes));
 
-    bool ok = true;
+    bool all_ok = true;
 
     // 1. gwsave write (2048 entities) — budget 18 ms release.
     {
-        auto t0 = std::chrono::steady_clock::now();
-        for (int i = 0; i < 4; ++i) {
+        const auto bench_start = std::chrono::steady_clock::now();
+        for (int idx = 0; idx < 4; ++idx) {
             auto bytes = gw::persist::write_gwsave_container(0, hdr, chunks);
             (void)bytes;
         }
-        const double per_iter = elapsed_ms(t0) / 4.0;
-        ok &= run_budget({"gwsave write 2048 ent", 18.0}, per_iter);
+        double per_iter{0.0};
+        per_iter = elapsed_ms(bench_start) / 4.0;
+        all_ok &= run_budget(Budget{.name                = "gwsave write 2048 ent",
+                                    .ms_ceiling_release = 18.0},
+                              per_iter);
     }
 
     auto file = gw::persist::write_gwsave_container(0, hdr, chunks);
 
     // 2. gwsave header peek — budget 0.6 ms.
     {
-        auto t0 = std::chrono::steady_clock::now();
-        for (int i = 0; i < 32; ++i) {
+        const auto bench_start = std::chrono::steady_clock::now();
+        for (int idx = 0; idx < 32; ++idx) {
             auto peek = gw::persist::peek_gwsave(
                 std::span<const std::byte>(file.data(), file.size()), true);
             (void)peek;
         }
-        const double per_iter = elapsed_ms(t0) / 32.0;
-        ok &= run_budget({"gwsave header peek", 0.6}, per_iter);
+        double per_iter{0.0};
+        per_iter = elapsed_ms(bench_start) / 32.0;
+        all_ok &= run_budget(Budget{.name = "gwsave header peek", .ms_ceiling_release = 0.6}, per_iter);
     }
 
     // 3. gwsave full load (2048 entities) — budget 14 ms.
     {
-        auto t0 = std::chrono::steady_clock::now();
-        for (int i = 0; i < 4; ++i) {
+        const auto bench_start = std::chrono::steady_clock::now();
+        for (int idx = 0; idx < 4; ++idx) {
             auto peek = gw::persist::peek_gwsave(
                 std::span<const std::byte>(file.data(), file.size()), true);
             std::vector<gw::persist::gwsave::ChunkPayload> loaded;
             (void)gw::persist::load_gwsave_all_chunks(
                 std::span<const std::byte>(file.data(), file.size()), peek, loaded);
         }
-        const double per_iter = elapsed_ms(t0) / 4.0;
-        ok &= run_budget({"gwsave full load 2048 ent", 14.0}, per_iter);
+        double per_iter{0.0};
+        per_iter = elapsed_ms(bench_start) / 4.0;
+        all_ok &= run_budget(Budget{.name                = "gwsave full load 2048 ent",
+                                    .ms_ceiling_release = 14.0},
+                              per_iter);
     }
 
     // 4. BLAKE3-256 over a 2 MiB buffer — budget 2.5 ms Release.
@@ -124,27 +137,31 @@ int main() {
     //    slack on top of kDebugSlack so the Debug ceiling becomes 200 ms
     //    (≥ 10 MiB/s sustained; Release ceiling stays at 2.5 ms → 800 MiB/s).
     {
-        std::vector<std::byte> big(2ull * 1024 * 1024);
+        std::vector<std::byte> big(2ULL * 1024 * 1024);
         std::memset(big.data(), 0xAB, big.size());
         // Warm-up.
         {
-            auto d = gw::persist::blake3_digest_256(
+            auto digest = gw::persist::blake3_digest_256(
                 std::span<const std::byte>(big.data(), big.size()));
-            (void)d;
+            (void)digest;
         }
         constexpr int kIters = 8;
         double best_ms = 1e9;
-        for (int i = 0; i < kIters; ++i) {
-            auto t0 = std::chrono::steady_clock::now();
-            auto d  = gw::persist::blake3_digest_256(
+        for (int idx = 0; idx < kIters; ++idx) {
+            const auto bench_start = std::chrono::steady_clock::now();
+            auto       digest      = gw::persist::blake3_digest_256(
                 std::span<const std::byte>(big.data(), big.size()));
-            (void)d;
-            const double iter_ms = elapsed_ms(t0);
-            if (iter_ms < best_ms) best_ms = iter_ms;
+            (void)digest;
+            const double iter_ms = elapsed_ms(bench_start);
+            best_ms              = std::min(best_ms, iter_ms);
         }
-        ok &= run_budget({"BLAKE3-256 2 MiB", 2.5, 4.0}, best_ms);
+        all_ok &= run_budget(Budget{.name                 = "BLAKE3-256 2 MiB",
+                                    .ms_ceiling_release  = 2.5,
+                                    .extra_debug_slack   = 4.0},
+                              best_ms);
     }
 
-    std::printf("phase15.perf RESULT %s\n", ok ? "PASS" : "FAIL");
-    return ok ? 0 : 1;
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+    std::printf("phase15.perf RESULT %s\n", all_ok ? "PASS" : "FAIL");
+    return all_ok ? 0 : 1;
 }

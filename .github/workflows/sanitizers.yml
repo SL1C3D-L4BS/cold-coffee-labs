@@ -1,7 +1,7 @@
 name: sanitizers-nightly
 
 # Nightly ASan / UBSan / TSan / Miri runs.
-# docs/05 Escalation triggers; docs/10 §3 W03 P1.04; docs/02 §19.
+# docs/02_ROADMAP_AND_OPERATIONS.md escalation triggers; docs/01_CONSTITUTION_AND_PROGRAM.md; docs/04_SYSTEMS_INVENTORY.md.
 
 on:
   schedule:

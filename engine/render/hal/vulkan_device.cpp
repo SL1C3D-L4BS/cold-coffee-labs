@@ -20,7 +20,7 @@ VulkanDevice::VulkanDevice(VkPhysicalDevice physical_device)
 
     // Probe RHI capabilities BEFORE building the device-create lists. The
     // capability snapshot is the canonical gate for every optional extension
-    // and feature struct below. See docs/adr/0003-rhi-capabilities.md.
+    // and feature struct below. See docs/10_APPENDIX_ADRS_AND_REFERENCES.md.
     caps_ = probe_capabilities(physical_device);
 
     // Baseline (Tier-A) features — absent, the renderer cannot function.
@@ -49,14 +49,14 @@ VulkanDevice::VulkanDevice(VkPhysicalDevice physical_device)
         throw std::runtime_error(
             "VulkanDevice: VK_KHR_synchronization2 missing; Greywater's Tier-A "
             "baseline requires sync2 because the frame graph unconditionally "
-            "records vkCmdPipelineBarrier2. See docs/adr/0003-rhi-capabilities.md.");
+            "records vkCmdPipelineBarrier2. See docs/10_APPENDIX_ADRS_AND_REFERENCES.md.");
     }
     if (!caps_.has_dynamic_rendering()) {
         throw std::runtime_error(
             "VulkanDevice: VK_KHR_dynamic_rendering missing; Greywater's Tier-A "
             "baseline requires it because the command-buffer wrapper "
             "unconditionally records vkCmdBeginRendering. See "
-            "docs/adr/0003-rhi-capabilities.md.");
+            "docs/10_APPENDIX_ADRS_AND_REFERENCES.md.");
     }
 
     // Find queue families

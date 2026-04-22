@@ -1,126 +1,58 @@
-# Greywater — Documentation
+# Greywater Engine — documentation
 
-This directory is the documentation suite for **Greywater** — the proprietary game engine (`Greywater_Engine`) **and** the flagship game it powers (`Greywater`), both built by **Cold Coffee Labs**.
+**Studio → engine → title:** **Cold Coffee Labs** builds **Greywater Engine** (C++23 / Vulkan proprietary stack). Greywater Engine presents ***Sacrilege*** as the debut title and forcing function for priorities.
 
-- **Engine-side docs:** numbered `00`–`12`, plus `architecture/`, plus operational files.
-- **Game-side docs:** under `games/greywater/`, numbered `12`–`20` (extending the root-level `00`–`12` canonical sequence).
-- **Hardware baseline:** AMD Radeon RX 580 8GB @ 1080p / 60 FPS. Every Tier A decision is filtered through what this card can do.
-- **Art direction:** realistic low-poly (see `games/greywater/20_ART_DIRECTION.md`).
-
-The documents below form a single coherent system. Read them in the order given. Do not skim the canonical set — those are binding.
+**Production bar:** **Supra-AAA** — defined in `01_CONSTITUTION_AND_PROGRAM.md` §0.1 (constitution + executive brief merged there).
 
 ---
 
-## Reading order
+## Eleven-file suite
 
-### First time (~55 minutes)
+This directory contains **exactly eleven Markdown files** — no subfolders. Everything that previously lived in `architecture/`, `games/`, `adr/`, `daily/`, `perf/`, and scattered numbered roots is **merged** here; use **git history** if you need the old paths.
 
-| Order | Document                                            | Read time | Role          |
-| ----- | --------------------------------------------------- | --------- | ------------- |
-| 1     | `README.md` *(this file)*                           | 2 min     | Map           |
-| 2     | `MASTER_PLAN_BRIEF.md`                              | 5 min     | Mandate       |
-| 3     | `00_SPECIFICATION_Claude_Opus_4.7.md`               | 15 min    | Constitution  |
-| 4     | `01_ENGINE_PHILOSOPHY.md`                           | 10 min    | Values        |
-| 5     | `12_ENGINEERING_PRINCIPLES.md`                      | 15 min    | Review rubric |
-| 6     | `architecture/grey-water-engine-blueprint.md`       | 20 min    | Formal spec   |
-| 7     | `architecture/greywater-engine-core-architecture.md`| 15 min    | Narrative     |
-
-### Before any coding session (~10 minutes)
-
-1. `daily/YYYY-MM-DD.md` — today's log
-2. `git log --oneline -10`
-3. `CLAUDE.md` (project root)
-4. `11_HANDOFF_TO_CLAUDE_CODE.md` — session protocol
-5. `06_KANBAN_BOARD.md` — what's In Progress
-6. Relevant numbered doc for current phase
+| # | File | What it is |
+|---|------|----------------|
+| — | `README.md` | **You are here** — IA, reading order, precedence |
+| 01 | `01_CONSTITUTION_AND_PROGRAM.md` | Constitution (`00_`), doc-system map, executive brief, 90-day pre-dev, session handoff |
+| 02 | `02_ROADMAP_AND_OPERATIONS.md` | Roadmap (`05_`) + Kanban (`06_`) — schedule and rituals |
+| 03 | `03_PHILOSOPHY_AND_ENGINEERING.md` | Brew doctrine (`01_`) + engineering principles (`12_`) |
+| 04 | `04_SYSTEMS_INVENTORY.md` | Subsystem inventory (`02_`) |
+| 05 | `05_RESEARCH_BUILD_AND_STANDARDS.md` | Vulkan / C++ / Rust guides, build, coding standards, bootstrap + snippets |
+| 06 | `06_ARCHITECTURE.md` | Blueprint + core architecture (merged `architecture/`) |
+| 07 | `07_SACRILEGE.md` | Flagship program spec GW-SAC + `games/` README |
+| 08 | `08_BLACKLAKE_AND_RIPPLE_STUDIO_SPECS.md` | Blacklake (BLF) + GWE × Ripple studio specifications |
+| 09 | `09_NETCODE_DETERMINISM_PERF.md` | Netcode contract + perf budgets + determinism replay annexes |
+| 10 | `10_APPENDIX_ADRS_AND_REFERENCES.md` | Glossary, research appendix, **full ADR archive** |
 
 ---
 
-## Document hierarchy
+## Layers of truth
 
-### Canonical (binding — do not modify in flight)
-| File | Purpose |
-| --- | --- |
-| `00_SPECIFICATION_Claude_Opus_4.7.md` | Constraints, directives, authorization boundaries for AI agents |
-| `01_ENGINE_PHILOSOPHY.md` | Values, aesthetic, commitments — *The Brew Doctrine* |
-| `10_PRE_DEVELOPMENT_MASTER_PLAN.md` | 90-day sprint plan, code generation, first-week scaffolding |
-| `12_ENGINEERING_PRINCIPLES.md` | Code-review playbook — binding at every Review |
-| `architecture/grey-water-engine-blueprint.md` | Formal architectural blueprint (board-ready) |
-| `architecture/greywater-engine-core-architecture.md` | Narrative core-architecture walkthrough |
+| Layer | Source |
+| ----- | ------ |
+| L0 | `README.md` |
+| L1 | `01_CONSTITUTION_AND_PROGRAM.md` |
+| L2 | `03_PHILOSOPHY_AND_ENGINEERING.md` |
+| L3 | `06_ARCHITECTURE.md` |
+| L3b | `08_BLACKLAKE_AND_RIPPLE_STUDIO_SPECS.md` |
+| L4 | `07_SACRILEGE.md` |
+| L5 | `04_SYSTEMS_INVENTORY.md`, `09_NETCODE_DETERMINISM_PERF.md` |
+| L6 | `02_ROADMAP_AND_OPERATIONS.md`, `05_RESEARCH_BUILD_AND_STANDARDS.md` |
+| L7 | ADRs (search `## ADR file:` inside `10_APPENDIX_ADRS_AND_REFERENCES.md`) |
 
-### Operational (updated frequently)
-| File | Purpose |
-| --- | --- |
-| `05_ROADMAP_AND_MILESTONES.md` | 24 build phases + LTS Sustenance (Phase 25), 162-week schedule, named milestones |
-| `06_KANBAN_BOARD.md` | Workflow, WIP limits, rituals, milestone tracker |
-| `perf/phase15_budgets.md`, `perf/phase16_budgets.md`, `perf/phase17_budgets.md` | ADR-linked performance budgets (`gw_perf_gate_phase15` / `gw_perf_gate_phase17`) |
-| `07_DAILY_TODO_GENERATOR.py` | Generates pre-dated daily logs (Python, run once at project start) |
-| `11_HANDOFF_TO_CLAUDE_CODE.md` | Per-session cold-start protocol and CMake presets |
-| `daily/YYYY-MM-DD.md` | Daily log; one per working day across the ~37-month (162-week) build |
-
-### Reference (stable, updated for clarification only)
-| File | Purpose |
-| --- | --- |
-| `02_SYSTEMS_AND_SIMULATIONS.md` | Complete system inventory, Tier A/B/C classification |
-| `03_VULKAN_RESEARCH_GUIDE.md` | Rendering deep-dive, staged Vulkan learning path |
-| `04_LANGUAGE_RESEARCH_GUIDE.md` | C++23 discipline + Rust-for-BLD patterns |
-| `08_GLOSSARY.md` | Alphabetical technical terms with citations |
-| `09_APPENDIX_RESEARCH_AND_REFERENCES.md` | Research summaries, external references |
-
-### Archival (preserved with notice)
-| File | Purpose |
-| --- | --- |
-| `90_GREYWATER_VISION_SUBMITTED_2026-04-19.md` | Original board-submission vision, preserved as-is |
-
-### Game-side (Greywater the game)
-| File | Purpose |
-| --- | --- |
-| `games/greywater/README.md` | Greywater game overview — pillars, pitch, reading order |
-| `games/greywater/12_GAME_ARCHITECTURE.md` | Universe hierarchy, coordinates, deterministic rule systems |
-| `games/greywater/13_PROCEDURAL_UNIVERSE.md` | Seed-to-world generation, noise, biomes, resources, WFC |
-| `games/greywater/14_PLANETARY_SYSTEMS.md` | Spherical planets, quad-tree LOD, terrain, oceans, vegetation |
-| `games/greywater/15_ATMOSPHERE_AND_SPACE.md` | Atmospheric scattering, volumetric clouds, orbital mechanics, re-entry |
-| `games/greywater/16_SURVIVAL_AND_BUILDING.md` | Resources, crafting, base building, structural integrity, raiding |
-| `games/greywater/17_MULTIPLAYER.md` | Rollback + deterministic-lockstep hybrid, ECS replication, anti-cheat |
-| `games/greywater/18_ECOSYSTEM_AI.md` | Wildlife, factions, navigation, LLM dialogue, RL inference |
-| `games/greywater/19_AUDIO_DESIGN.md` | Spatial audio, atmospheric filtering, re-entry audio |
-| `games/greywater/20_ART_DIRECTION.md` | **Realistic low-poly style guide (binding for all art)** |
-
-### Bootstrap
-| File | Purpose |
-| --- | --- |
-| `bootstrap_command.txt` | One-line directory creation for first checkout |
-| `snippets/` | Pattern-demonstrating code examples |
+**Precedence when docs appear to conflict:** `01` → `07` → `08` → `06` → `04` → `09`. Use `02` (schedule, Kanban) and `05` (build/research detail) for operational execution.
 
 ---
 
-## Naming conventions
+## Suggested reading order
 
-- Numbered prefixes (`00`–`11`) indicate canonical reading order.
-- `90`–`99` indicate archival / historical.
-- `architecture/` holds the formal architecture specs (separate because they are referenced by external stakeholders).
-- `daily/` holds one file per working day across the full ~37-month (162-week) build.
-- All documents are Markdown (`.md`) except `07_DAILY_TODO_GENERATOR.py` (script) and `snippets/*.cpp|*.rs` (example code).
-
----
-
-## Non-negotiables
-
-The canonical set enforces a small number of commitments that **cannot** be modified without executive sign-off. The most important ones:
-
-- **Clang/LLVM only** for C++. No MSVC. No GCC.
-- **Rust only for BLD.** Nowhere else.
-- **ImGui is editor-only;** in-game UI is **RmlUi**.
-- **Text IR is the ground-truth** for visual scripting; the node graph is a projection.
-- **No custom UI framework.** Do not propose one.
-
-Full non-negotiables list in `00_SPECIFICATION_Claude_Opus_4.7.md` §2.
+1. `01_CONSTITUTION_AND_PROGRAM.md` — what is allowed and what is not  
+2. `02_ROADMAP_AND_OPERATIONS.md` — where we are in the phase plan  
+3. `03_PHILOSOPHY_AND_ENGINEERING.md` — values + review checklist  
+4. `06_ARCHITECTURE.md` — how the platform is shaped  
+5. `07_SACRILEGE.md` — what we are shipping first  
+6. `08_…` / `04_` / `09_` / `10_` — depth as needed for your subsystem  
 
 ---
 
-## Studio
-
-**Cold Coffee Labs** — slicedlabs.founder@proton.me
-Repo: `git@github.com:SL1C3D-L4BS/cold-coffee-labs.git`
-
-*Brewed with BLD.*
+*Cold Coffee Labs — Greywater Engine — Sacrilege.*

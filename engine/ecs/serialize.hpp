@@ -1,6 +1,6 @@
 #pragma once
 // engine/ecs/serialize.hpp
-// ECS World <-> binary blob. See docs/adr/0006-ecs-world-serialization.md §2.9.
+// ECS World <-> binary blob. See docs/10_APPENDIX_ADRS_AND_REFERENCES.md §2.9.
 //
 // Phase-7 scope (this file):
 //   * Trivially-copyable fast path (ADR §2.4) is implemented end-to-end.

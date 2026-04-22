@@ -1,7 +1,7 @@
 #pragma once
 // engine/ecs/entity.hpp
 // ECS entity handle: 64-bit generational index.
-// See docs/adr/0004-ecs-world.md §2.2.
+// See docs/10_APPENDIX_ADRS_AND_REFERENCES.md §2.2.
 //
 // Layout: bits[0..31] = index, bits[32..63] = generation.
 // Generation 0 is reserved to mean "never used / destroyed", so a freshly

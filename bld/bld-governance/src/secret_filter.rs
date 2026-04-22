@@ -216,7 +216,7 @@ mod tests {
         let f = SecretFilter::new();
         assert!(f.check(Path::new("src/main.rs")).is_ok());
         assert!(f.check(Path::new("README.md")).is_ok());
-        assert!(f.check(Path::new("docs/adr/0015.md")).is_ok());
+        assert!(f.check(Path::new("docs/10_APPENDIX_ADRS_AND_REFERENCES.md")).is_ok());
         assert!(f.check(Path::new("Cargo.toml")).is_ok());
     }
 
