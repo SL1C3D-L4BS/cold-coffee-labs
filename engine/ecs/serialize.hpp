@@ -51,7 +51,7 @@ enum class SerializationError : std::uint8_t {
     PayloadCorrupt,
 };
 
-[[nodiscard]] std::string_view to_string(SerializationError e) noexcept;
+[[nodiscard]] std::string_view to_string(SerializationError error) noexcept;
 
 // Migration callback — invoked when a component's on-disk size does not
 // match the live type's size (ADR-0006 §2.8). The callback returns the
@@ -78,23 +78,25 @@ struct LoadOptions {
 // ADR-specified error surface (e.g. a component registered but with no copy
 // semantics); callers treat empty as an internal bug.
 [[nodiscard]] std::vector<std::uint8_t>
-save_world(const World& w, SnapshotMode mode);
+save_world(const World& world, SnapshotMode mode);
 
 [[nodiscard]] std::expected<void, SerializationError>
-load_world(World& out, std::span<const std::uint8_t> blob, LoadOptions opts = {});
+load_world(World&                target_world,
+             std::span<const std::uint8_t> blob,
+             const LoadOptions&    opts = {});
 
 // ---------------------------------------------------------------------------
 // Single-entity paths (used by DestroyEntityCommand — ADR-0005 §2.7 / §2.6).
 // EntitySnapshot mode; no header. The save path refuses dead entities.
 // ---------------------------------------------------------------------------
 [[nodiscard]] std::vector<std::uint8_t>
-save_entity(const World& w, Entity e);
+save_entity(const World& world, Entity entity);
 
 // Returns a fresh entity handle (generation advanced) populated with the
 // components encoded in `blob`. The old entity_bits recorded in the blob are
 // ignored for the live handle; callers wanting old→new remapping keep the
 // previous handle externally (DestroyEntityCommand does this).
 [[nodiscard]] std::expected<Entity, SerializationError>
-load_entity(World& w, std::span<const std::uint8_t> blob);
+load_entity(World& world, std::span<const std::uint8_t> blob);
 
 } // namespace gw::ecs
