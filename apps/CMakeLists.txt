@@ -10,3 +10,6 @@ add_subdirectory(sandbox_living_scene)
 
 # Phase 14 Wave 14L — Networking exit-demo (ADR-0055).
 add_subdirectory(sandbox_netplay)
+
+# Phase 15 — Persistence & telemetry exit-demo (ADR-0064).
+add_subdirectory(sandbox_persistence)

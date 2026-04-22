@@ -89,6 +89,7 @@ add_subdirectory(apps)       # Phase 11 Wave 11F: sandbox_playable exit-demo
 
 # --- Tools --------------------------------------------------------------------
 add_subdirectory(tools/cook)
+add_subdirectory(tools/gw_save_tool)
 
 # --- Unit + integration test suite -------------------------------------------
 add_subdirectory(tests)

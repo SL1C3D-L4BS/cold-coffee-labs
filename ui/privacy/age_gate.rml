@@ -1,0 +1,11 @@
+<rml>
+<head>
+    <link type="text/rcss" href="consent.rcss"/>
+</head>
+<body template="privacy-age-gate">
+    <h1>Age</h1>
+    <p>We use your age only to apply child-privacy rules. You may skip if your product policy allows.</p>
+    <input type="text" id="birthyear" placeholder="Birth year (optional)"/>
+    <button id="ok">OK</button>
+</body>
+</rml>

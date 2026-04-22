@@ -125,6 +125,35 @@ jobs:
         shell: bash
         run: ctest --preset ${{ matrix.preset_debug }} --output-on-failure
 
+      - name: CTest phase15 label (sandbox + parity + perf)
+        if: matrix.config == 'Debug'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ctest --preset ${{ matrix.preset_debug }} -L "phase15" --output-on-failure
+
+      - name: Phase 15 — persistence sandbox `PERSIST OK` marker
+        if: matrix.config == 'Debug'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ctest --preset ${{ matrix.preset_debug }} -R "^persistence_sandbox$" --output-on-failure -V | tee /tmp/sandbox.log
+          grep -q "PERSIST OK" /tmp/sandbox.log
+
+      - name: Phase 15 — save-compat regression (gw_save_tool)
+        if: matrix.config == 'Debug'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          shopt -s nullglob
+          FIXTURES=(tests/fixtures/saves/v1/*.gwsave)
+          if [ ${#FIXTURES[@]} -gt 0 ]; then
+            ./build/${{ matrix.preset_debug }}/bin/gw_save_tool validate "${FIXTURES[@]}"
+            ./build/${{ matrix.preset_debug }}/bin/gw_save_tool migrate --dry-run "${FIXTURES[@]}"
+          else
+            echo "no fixtures yet — skipping (to be generated in Wave 15F follow-up)"
+          fi
+
       - name: Cargo test (BLD workspace)
         shell: bash
         run: |

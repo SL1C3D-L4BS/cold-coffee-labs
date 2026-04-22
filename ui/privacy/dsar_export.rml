@@ -1,0 +1,10 @@
+<rml>
+<head>
+    <link type="text/rcss" href="consent.rcss"/>
+</head>
+<body template="privacy-dsar">
+    <h1>Export my data</h1>
+    <p>Downloads a JSON summary of saved settings and slots to a folder you choose.</p>
+    <button id="export">Export now</button>
+</body>
+</rml>

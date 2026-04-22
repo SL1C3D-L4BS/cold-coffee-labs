@@ -224,16 +224,20 @@ Revised 2026-04-21 to reflect the six-wave plan (13A–13F) executed phase-compl
 | 094  | Steam / EOS session-backend stubs                                          | B    |
 | 095  | *Two Client Night*: 2c+server replicated sandbox, 60 Hz, 120 ms RTT        | B    |
 
-### Phase 15 — Persistence & Telemetry (weeks 096–101)
+### Phase 15 — Persistence & Telemetry (six-wave cadence, weeks 096–101)
 
-| Week | Deliverable                                                                | Tier |
-| ---- | -------------------------------------------------------------------------- | ---- |
-| 096  | Persistence: versioned binary save format + ECS snapshot                   | A    |
-| 097  | Persistence: SQLite local DB; migration hooks + save-compat regression     | A    |
-| 098  | Persistence: `ICloudSave` + Steam Cloud + EOS + S3 backends                | B    |
-| 099  | Telemetry: Sentry Native SDK crash reporting integrated                    | B    |
-| 100  | Telemetry: custom event pipeline + SQLite queue + opt-in flow              | B    |
-| 101  | Compliance pass: GDPR + CCPA + COPPA; data-collection UI                   | B    |
+| Wave | Week | Deliverable                                                                 | Tier |
+| ---- | ---- | --------------------------------------------------------------------------- | ---- |
+| 15A  | 096  | `PersistWorld` facade + `.gwsave` v1 + null FS backend + chunk TOC          | A    |
+| 15B  | 097  | `ILocalStore` + SQLite STRICT schema + migration harness + console commands | A    |
+| 15C  | 098  | `ICloudSave` + conflict policy + Steam/EOS/S3 factory stubs                 | B    |
+| 15D  | 099  | `TelemetryWorld` + Sentry (gated) + null crash backend                     | B    |
+| 15E  | 100  | Event pipeline + SQLite queue + PII scrub + consent tiers                  | B    |
+| 15F  | 101  | Privacy UI (RmlUi) + DSAR + `sandbox_persistence` exit gate                 | B    |
+
+Doctrine: ADRs **0056–0064**; perf: `docs/perf/phase15_budgets.md`; a11y: `docs/a11y_phase15_selfcheck.md`.
+
+**Status (2026-04-21): completed.** Phase 15 exit gate ticked: ADRs 0056–0064 Accepted; `PersistWorld` + `TelemetryWorld` PIMPL facades ship with header-quarantined Sentry/zstd/SQLite/cpr backends; `.gwsave` v1 bit-deterministic across Windows + Linux (cross-platform parity test in `phase15_extras_test.cpp`); 25 `persist.*`/`tele.*` CVars TOML-round-trip; 12 Phase-15 console commands registered + discoverable; named job lanes `persist_io`/`telemetry_io`/`background` live via `engine/jobs/lanes.hpp`; RmlUi consent FSM (`ConsentFsm*`) plus `ui/privacy/*` templates drive the disaggregated COPPA-compliant flow; `gw_save_tool` validates + dry-runs migrations; `gw_perf_gate_phase15` enforces §12 budgets; `sandbox_persistence` prints `PERSIST OK — saves≥3 migrations≥1 cloud_rt≥2 consent=CrashOnly events=500 …`; `dev-win` CTest count ≥ 445 with ≥ 45 new Phase-15 cases. Hand-off to Phase 16 in ADR-0064 §11: Steam/EOS production backends plug into the frozen `ICloudSave`, the `persist-*` preset becomes the base for `ship-*`, and the RmlUi consent/DSAR screens enter the WCAG 2.2 AA audit.
 
 ### Phase 16 — Platform Services, Localization & Accessibility (weeks 102–107)
 
@@ -244,7 +248,7 @@ Revised 2026-04-21 to reflect the six-wave plan (13A–13F) executed phase-compl
 | 104  | Localization: ICU runtime + binary string tables + XLIFF workflow          | B    |
 | 105  | Localization: HarfBuzz shaping + font-stack fallback                       | B    |
 | 106  | Accessibility: color-blind modes, text scaling, screen-reader hooks        | B    |
-| 107  | *Ship Ready*: WCAG 2.2 AA audit; subtitle system                           | B    |
+| 107  | *Ship Ready* (**depends Phase 15 exit**): WCAG 2.2 AA audit; subtitle system | B    |
 
 ### Phase 17 — Shader Pipeline Maturity, Materials & VFX (weeks 108–113)
 

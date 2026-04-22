@@ -107,6 +107,14 @@ add_executable(gw_tests
     unit/net/session_test.cpp
     unit/net/cvars_console_test.cpp
     integration/net/two_client_night_test.cpp
+    # Phase 15 — Persistence (ADR-0056..0064)
+    unit/persist/persist_gwsave_test.cpp
+    unit/persist/phase15_sqlite_test.cpp
+    unit/persist/phase15_cloud_test.cpp
+    unit/persist/phase15_persist_world_test.cpp
+    unit/persist/phase15_extras_test.cpp
+    unit/telemetry/phase15_telemetry_test.cpp
+    unit/telemetry/phase15_privacy_ui_test.cpp
     test_main.cpp
 )
 
@@ -123,6 +131,8 @@ target_link_libraries(gw_tests
         greywater::gameai
         greywater::net
         greywater::runtime
+        greywater::persist
+        greywater::telemetry
         doctest::doctest
         volk
         xxhash
@@ -133,6 +143,11 @@ target_include_directories(gw_tests PRIVATE
     "${CMAKE_BINARY_DIR}/_deps/VulkanMemoryAllocator-src/include"
     "${CMAKE_BINARY_DIR}/_deps/volk-src"
     "${CMAKE_SOURCE_DIR}"
+)
+
+# Phase 15 — privacy-UI test resolves `ui/privacy/en.locale.txt` at runtime.
+target_compile_definitions(gw_tests PRIVATE
+    CCL_REPO_ROOT="${CMAKE_SOURCE_DIR}"
 )
 
 # Phase 7: GLM is needed for reflect macro tests (widget_drawer.hpp pulls glm).

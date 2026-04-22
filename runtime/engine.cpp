@@ -11,7 +11,10 @@
 
 #include "runtime/engine.hpp"
 
+#include "engine/persist/console_commands.hpp"
 #include "engine/physics/console_commands.hpp"
+#include "engine/telemetry/console_commands.hpp"
+#include "engine/telemetry/telemetry_config.hpp"
 
 #include <string>
 #include <string_view>
@@ -76,8 +79,9 @@ void seed_english_strings(ui::LocaleBridge& lb) {
 
 Engine::Engine(const EngineConfig& cfg) : cfg_(cfg) {
     // --- Tier-0: standard CVars + bus wiring ---
-    std_cvars_ = config::register_standard_cvars(cvars_);
+    std_cvars_     = config::register_standard_cvars(cvars_);
     physics_cvars_ = physics::register_physics_cvars(cvars_);
+    persist_cvars_ = persist::register_persist_and_telemetry_cvars(cvars_);
     cvars_.set_bus(&bus_cvars_);
 
     // --- Tier-1: UI substrate ---
@@ -123,6 +127,22 @@ Engine::Engine(const EngineConfig& cfg) : cfg_(cfg) {
     physics::apply_cvars_to_config(cvars_, pcfg);
     (void)physics_->initialize(pcfg);
     physics::register_physics_console_commands(*console_, *physics_);
+
+    // --- Phase 15: persistence + telemetry ---
+    persist_ = std::make_unique<persist::PersistWorld>();
+    persist::PersistConfig persist_cfg{};
+    persist_cfg.save_dir            = cvars_.get_string_or("persist.save.dir", "$user/saves");
+    persist_cfg.cloud_backend       = cvars_.get_string_or("persist.cloud.backend", "local");
+    persist_cfg.cloud_sim_latency_ms = cvars_.get_f32_or("persist.cloud.sim_latency_ms", 0.0f);
+    (void)persist_->initialize(persist_cfg, &cvars_, nullptr, nullptr);
+
+    telemetry_ = std::make_unique<telemetry::TelemetryWorld>();
+    telemetry::TelemetryConfig tcfg{};
+    tcfg.ingest_url = cvars_.get_string_or("tele.endpoint", "");
+    (void)telemetry_->initialize(tcfg, persist_->local_store(), &cvars_);
+
+    persist::register_persist_console_commands(*console_, *persist_);
+    telemetry::register_telemetry_console_commands(*console_, *telemetry_, persist_->local_store());
 }
 
 Engine::~Engine() = default;
@@ -163,6 +183,14 @@ void Engine::tick(double dt_seconds) {
 
     // 5) UI render pass — publishes UILayoutComplete.
     ui_->render();
+
+    // 6) persistence + telemetry (ADR-0064 tick order).
+    if (persist_) {
+        persist_->step(dt_seconds);
+    }
+    if (telemetry_) {
+        telemetry_->step(dt_seconds);
+    }
 
     ++frame_index_;
 }

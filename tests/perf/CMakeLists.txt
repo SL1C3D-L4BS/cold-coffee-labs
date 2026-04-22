@@ -34,3 +34,25 @@ set_tests_properties(foundation_renderer_perf PROPERTIES
     LABELS   "perf"
     TIMEOUT  120
 )
+
+# Phase 15 — persistence/telemetry micro-benchmarks (ADR-0064 §2).
+add_executable(gw_perf_gate_phase15
+    phase15_budgets_perf_test.cpp
+)
+target_link_libraries(gw_perf_gate_phase15
+    PRIVATE
+        greywater::core
+        greywater::persist
+)
+set_target_properties(gw_perf_gate_phase15 PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
+add_test(NAME phase15_budgets_perf
+    COMMAND gw_perf_gate_phase15
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+)
+set_tests_properties(phase15_budgets_perf PROPERTIES
+    LABELS     "phase15;perf"
+    TIMEOUT    60
+    RUN_SERIAL TRUE
+)

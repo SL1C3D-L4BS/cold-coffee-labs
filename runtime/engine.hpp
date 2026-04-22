@@ -17,8 +17,11 @@
 #include "engine/core/events/events_core.hpp"
 #include "engine/input/input_service.hpp"
 #include "engine/input/input_types.hpp"
+#include "engine/persist/persist_cvars.hpp"
+#include "engine/persist/persist_world.hpp"
 #include "engine/physics/physics_cvars.hpp"
 #include "engine/physics/physics_world.hpp"
+#include "engine/telemetry/telemetry_world.hpp"
 #include "engine/ui/font_library.hpp"
 #include "engine/ui/glyph_atlas.hpp"
 #include "engine/ui/locale_bridge.hpp"
@@ -90,6 +93,8 @@ public:
     [[nodiscard]] ui::SettingsBinder&    settings_binder() noexcept { return *binder_; }
     [[nodiscard]] physics::PhysicsWorld& physics() noexcept { return *physics_; }
     [[nodiscard]] const physics::PhysicsWorld& physics() const noexcept { return *physics_; }
+    [[nodiscard]] persist::PersistWorld&       persist() noexcept { return *persist_; }
+    [[nodiscard]] telemetry::TelemetryWorld&   telemetry() noexcept { return *telemetry_; }
 
     // Event buses (one per subscribable event type).
     [[nodiscard]] events::EventBus<events::ConfigCVarChanged>&      bus_cvars()   noexcept { return bus_cvars_; }
@@ -115,6 +120,7 @@ private:
     config::CVarRegistry                                   cvars_{};
     config::StandardCVars                                  std_cvars_{};
     physics::PhysicsCVars                                  physics_cvars_{};
+    persist::PersistCVars                                  persist_cvars_{};
     events::EventBus<events::ConfigCVarChanged>            bus_cvars_{};
     events::EventBus<events::ConsoleCommandExecuted>       bus_console_{};
     events::EventBus<events::WindowResized>                bus_resize_{};
@@ -134,6 +140,8 @@ private:
     std::unique_ptr<ui::SettingsBinder>        binder_;
     std::unique_ptr<console::ConsoleService>   console_;
     std::unique_ptr<physics::PhysicsWorld>     physics_;
+    std::unique_ptr<persist::PersistWorld>     persist_;
+    std::unique_ptr<telemetry::TelemetryWorld> telemetry_;
 };
 
 } // namespace gw::runtime

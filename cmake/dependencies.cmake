@@ -156,6 +156,38 @@ CPMAddPackage(
         "SQLITECPP_BUILD_EXAMPLES OFF"
 )
 
+# BLAKE3 C sources (Phase 15 — `.gwsave` footer). Built from `engine/persist/CMakeLists.txt`
+# with `BLAKE3_SIMD_TYPE=none` for portable clang-cl + Linux CI.
+CPMAddPackage(
+    NAME gw_blake3_fetch
+    GITHUB_REPOSITORY BLAKE3-team/blake3
+    GIT_TAG 1.5.4
+    DOWNLOAD_ONLY YES
+)
+
+# Phase 15 — optional production deps (ADR-0064). Defaults OFF on dev-* presets.
+option(GW_ENABLE_ZSTD "Enable zstd compression for .gwsave chunk payloads" OFF)
+option(GW_ENABLE_SENTRY "Enable Sentry Native crash reporting (telemetry)" OFF)
+option(GW_TELEMETRY_COMPILED "Compile telemetry subsystem (OFF = header-only stubs)" ON)
+option(GW_ENABLE_CPR "Enable libcpr HTTP client (telemetry ingest / S3 stub)" OFF)
+option(GW_ENABLE_STEAMWORKS "Enable Steamworks cloud-save implementation (Phase 16)" OFF)
+option(GW_ENABLE_EOS "Enable EOS Player Data cloud-save implementation (Phase 16)" OFF)
+
+# zstd 1.5.6 — optional save compression (Phase 15).
+if(GW_ENABLE_ZSTD)
+    CPMAddPackage(
+        NAME zstd
+        GITHUB_REPOSITORY facebook/zstd
+        GIT_TAG v1.5.6
+        SOURCE_SUBDIR build/cmake
+        OPTIONS
+            "ZSTD_BUILD_PROGRAMS OFF"
+            "ZSTD_BUILD_TESTS OFF"
+            "ZSTD_BUILD_SHARED OFF"
+            "ZSTD_BUILD_STATIC ON"
+    )
+endif()
+
 # --- GLM (Phase 7+ — math library for editor camera, gizmos, debug draw) ----
 # Header-only; no tests/extras.
 CPMAddPackage(

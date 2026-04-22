@@ -75,6 +75,10 @@ add_subdirectory(gameai)
 # Phase 14 — Networking & Multiplayer (ADR-0047..0055).
 add_subdirectory(net)
 
+# Phase 15 — Persistence & Telemetry (ADR-0056..0064).
+add_subdirectory(persist)
+add_subdirectory(telemetry)
+
 # Project version plumbed through a generated header so release binaries
 # and diagnostics report the exact build (git SHA landed in Phase 1 CI).
 configure_file(

@@ -1,0 +1,16 @@
+<rml>
+<head>
+    <link type="text/rcss" href="consent.rcss"/>
+</head>
+<body template="privacy-consent">
+    <h1 id="title">Privacy &amp; data choices</h1>
+    <p id="legal">Plain-English summary: you choose what we collect. You can change this later in settings.</p>
+    <div id="tiers">
+        <label><input type="checkbox" id="crash"/> Crash reports only</label>
+        <label><input type="checkbox" id="core"/> Anonymous session metrics</label>
+        <label><input type="checkbox" id="analytics"/> Feature usage analytics</label>
+        <label><input type="checkbox" id="marketing"/> Marketing / aggregate sharing</label>
+    </div>
+    <button id="continue">Continue</button>
+</body>
+</rml>

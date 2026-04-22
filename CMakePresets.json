@@ -152,6 +152,28 @@
                 "GW_ENABLE_GNS":  "ON",
                 "GW_ENABLE_OPUS": "ON"
             }
+        },
+        {
+            "name": "persist-linux",
+            "inherits": "netplay-linux",
+            "displayName": "Persist Linux (Phase 15 Sentry + zstd + BLAKE3 + cpr)",
+            "description": "ADR-0064 §1: production persistence/telemetry deps for CI smoke.",
+            "cacheVariables": {
+                "GW_ENABLE_SENTRY": "ON",
+                "GW_ENABLE_ZSTD": "ON",
+                "GW_ENABLE_CPR": "ON"
+            }
+        },
+        {
+            "name": "persist-win",
+            "inherits": "netplay-win",
+            "displayName": "Persist Windows (Phase 15 Sentry + zstd + BLAKE3 + cpr)",
+            "description": "ADR-0064 §1: production persistence/telemetry deps for CI smoke.",
+            "cacheVariables": {
+                "GW_ENABLE_SENTRY": "ON",
+                "GW_ENABLE_ZSTD": "ON",
+                "GW_ENABLE_CPR": "ON"
+            }
         }
     ],
     "buildPresets": [
@@ -169,7 +191,9 @@
         { "name": "living-linux",  "configurePreset": "living-linux" },
         { "name": "living-win",    "configurePreset": "living-win" },
         { "name": "netplay-linux", "configurePreset": "netplay-linux" },
-        { "name": "netplay-win",   "configurePreset": "netplay-win" }
+        { "name": "netplay-win",   "configurePreset": "netplay-win" },
+        { "name": "persist-linux", "configurePreset": "persist-linux" },
+        { "name": "persist-win",   "configurePreset": "persist-win" }
     ],
     "testPresets": [
         {

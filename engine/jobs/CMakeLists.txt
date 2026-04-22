@@ -19,4 +19,5 @@ target_sources(greywater_core
             wait_group.hpp
             parallel_for.hpp
             reserved_worker.hpp
+            lanes.hpp
 )

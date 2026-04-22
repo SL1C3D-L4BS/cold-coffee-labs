@@ -1,0 +1,10 @@
+privacy.title=Privacy and data choices
+privacy.crash=Crash reports help us fix bugs. No gameplay content.
+privacy.core=Session metrics stay anonymous.
+privacy.analytics=We learn which features are used.
+privacy.marketing=Optional sharing with partners in aggregate form.
+privacy.continue=Continue
+privacy.age.title=Age check
+privacy.age.body=We use age only for privacy rules.
+privacy.dsar.title=Export my data
+privacy.dsar.body=Save a copy of your settings and slot list.

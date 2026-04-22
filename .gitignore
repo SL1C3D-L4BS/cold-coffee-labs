@@ -48,3 +48,11 @@ compile_commands.json
 *.p12
 .DS_Store
 Thumbs.db
+
+# Phase 15 — local saves / telemetry / cloud (never commit).
+*.gwsave
+**/sentry-db/
+**/cloud_saves/
+telemetry_queue.sqlite
+tele.dsn.key
+dsar_out/
