@@ -220,5 +220,25 @@ doctest_discover_tests(seq_tests
     PROPERTIES LABELS seq
 )
 
+# Phase 19-A — Blacklake HEC + SDR universe tests.
+add_executable(universe_tests
+    test_main.cpp
+    world/hec_test.cpp
+    world/sdr_noise_test.cpp
+    world/chunk_streamer_test.cpp
+    world/biome_test.cpp
+    world/determinism_test.cpp
+    world/resource_distributor_test.cpp
+)
+target_link_libraries(universe_tests PRIVATE greywater::world doctest::doctest)
+target_include_directories(universe_tests PRIVATE "${CMAKE_SOURCE_DIR}")
+set_target_properties(universe_tests PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
+doctest_discover_tests(universe_tests
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+    PROPERTIES LABELS universe
+)
+
 # Week 032 — Foundation Renderer milestone perf gate.
 add_subdirectory(perf)

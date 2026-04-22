@@ -22,3 +22,6 @@ add_subdirectory(sandbox_studio_renderer)
 
 # Phase 18 — Studio Ready (cinematics + mod + BLD seq surface).
 add_subdirectory(sandbox_studio)
+
+# Phase 19-C — Infinite Seed (Hell Seed Murmur3 / resource gate).
+add_subdirectory(sandbox_infinite_seed)

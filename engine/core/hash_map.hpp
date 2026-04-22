@@ -24,5 +24,12 @@ struct StringHash {
 template <typename Value>
 using StringHashMap = std::unordered_map<std::string, Value, StringHash, std::equal_to<>>;
 
+/// Engine-wide alias for `std::unordered_map` with explicit hash/equality (used by streaming, ECS, etc.).
+template <typename Key,
+          typename Value,
+          typename Hash    = std::hash<Key>,
+          typename KeyEqual = std::equal_to<Key>>
+using HashMap = std::unordered_map<Key, Value, Hash, KeyEqual>;
+
 }  // namespace core
 }  // namespace gw

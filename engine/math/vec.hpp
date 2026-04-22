@@ -1,8 +1,6 @@
 #pragma once
 
 #include <cstddef>
-#include <cstdint>
-#include <type_traits>
 #include <cmath>
 
 namespace gw {
@@ -170,6 +168,9 @@ using Vec2f = Vec2<float>;
 using Vec2d = Vec2<double>;
 using Vec3f = Vec3<float>;
 using Vec3d = Vec3<double>;
+/// World / simulation positions in metres (f64). Same type as `Vec3d`; use at subsystem boundaries
+/// (events, streaming) so core headers do not depend on `engine/world/`.
+using WorldVec3d = Vec3d;
 using Vec4f = Vec4<float>;
 using Vec4d = Vec4<double>;
 

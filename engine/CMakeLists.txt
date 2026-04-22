@@ -90,6 +90,9 @@ add_subdirectory(vfx)
 # Phase 18 — Mod surface + gameplay_module host (engine/scripting/).
 add_subdirectory(scripting)
 
+# Phase 19-A — Blacklake universe / HEC + SDR (engine/world/).
+add_subdirectory(world)
+
 # Project version plumbed through a generated header so release binaries
 # and diagnostics report the exact build (git SHA landed in Phase 1 CI).
 configure_file(

@@ -32,7 +32,7 @@ This document governs the schedule and day-to-day workflow for Greywater Engine 
 | 16 | Platform Services, i18n & a11y | 102–107 | 6w | *Ship Ready* | ✅ Complete (586/586 tests) |
 | 17 | Shader Pipeline, Materials & VFX | 108–113 | 6w | *Studio Renderer* | ✅ Complete (711/711 tests) |
 | 18 | Cinematics & Mods | 114–118 | 5w | *Studio Ready* | ✅ Complete (18-C: `mod_api` / `ModRegistry`, `example_mod`, `sandbox_studio`, BLD seq gate) |
-| 19 | **Blacklake Core & Deterministic Genesis** | 119–126 | 8w | *Infinite Seed* | 🔜 Planned |
+| 19 | **Blacklake Core & Deterministic Genesis** | 119–126 | 8w | *Infinite Seed* | ✅ Complete (19-C: `sandbox_infinite_seed` exit gate, Murmur3 *Hell Seed* `GoldenHashes`, `resource_distributor`, `determinism_validator`; **26** `universe_tests` — resource + proof-vector suite) |
 | 20 | **Arena Topology, GPTM & Sacrilege LOD** | 127–134 | 8w | *Nine Circles Ground* | 🔜 Planned |
 | 21 | **Sacrilege Frame — Rendering, Atmosphere, Audio** | 135–142 | 8w | *Hell Frame* | 🔜 Planned |
 | 22 | **Martyrdom Combat & Player Stack** | 143–148 | 6w | *Martyrdom Online* | 🔜 Planned |

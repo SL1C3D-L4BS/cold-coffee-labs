@@ -2,6 +2,9 @@
 
 target_sources(greywater_core
     PRIVATE
+        crypto/sha256.cpp
+        crypto/sha3.cpp
+        crypto/tiny_sha3.c
         type_registry.cpp
         field_reflection.cpp
         serialization.cpp
@@ -15,6 +18,9 @@ target_sources(greywater_core
         FILE_SET HEADERS
         BASE_DIRS ${CMAKE_SOURCE_DIR}
         FILES
+            crypto/sha256.hpp
+            crypto/sha3.hpp
+            crypto/tiny_sha3.h
             type_registry.hpp
             field_reflection.hpp
             serialization.hpp
@@ -22,6 +28,7 @@ target_sources(greywater_core
             # Phase 11 Wave 11A.
             events/event_bus.hpp
             events/events_core.hpp
+            events/events_world.hpp
             events/event_trace.hpp
             # Phase 11 Wave 11B.
             config/cvar.hpp
