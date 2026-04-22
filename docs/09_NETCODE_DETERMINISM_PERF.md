@@ -1,10 +1,16 @@
-# 09 — Netcode, determinism & performance annexes
+# 09 — Netcode, Determinism & Performance Budgets
 
+**Status:** Reference — binding rules for simulation code in rollback or lockstep paths  
+**Precedence:** L5 — subsystem contracts; narrowed by ADRs 0047–0055 (networking) and 0031–0038 (physics)
 
+> Pure in the rewind window. Deterministic in the lockstep path.
 
 ---
 
-## Merged from `09_NETCODE_DETERMINISM_PERF.md`
+---
+
+
+---
 
 # Netcode & determinism contract
 
@@ -41,8 +47,6 @@ ECS replication, interest management, and snapshot encoding are specified in **`
 
 
 ---
-
-## Merged from `perf/phase12_budgets.md`
 
 # Phase 12 — Performance budgets
 
@@ -109,8 +113,6 @@ Any row may be raised by up to 10% in a single ADR note; larger raises require a
 
 ---
 
-## Merged from `perf/phase13_budgets.md`
-
 # Phase 13 — Performance gates
 
 **Status:** Operational (CI-enforced)
@@ -156,8 +158,6 @@ Any pin bump (Ozz / ACL / Recast) reruns **all 16 gates** as part of the PR. Tab
 
 
 ---
-
-## Merged from `perf/phase14_budgets.md`
 
 # Phase 14 — Performance gates
 
@@ -216,8 +216,6 @@ Any pin bump (GNS / Opus / Steam Audio) reruns **all 19 gates** as part of the P
 
 ---
 
-## Merged from `perf/phase15_budgets.md`
-
 # Phase 15 performance budgets
 
 CI enforcement target: label `phase15` (see ADR-0064). Measurements use `gw_perf_gate` / wall-clock micro-benchmarks on RX-580-class dev PCs.
@@ -247,8 +245,6 @@ CI enforcement target: label `phase15` (see ADR-0064). Measurements use `gw_perf
 
 ---
 
-## Merged from `perf/phase16_budgets.md`
-
 # Phase 16 — perf budgets
 
 Enforced by `tests/perf/phase16_perf_gate.cpp` (CTest label `phase16;perf`).
@@ -272,8 +268,6 @@ apply a 4× slack to stay green on sanitizer presets.
 
 
 ---
-
-## Merged from `perf/phase17_budgets.md`
 
 # Phase 17 performance budgets — Studio Renderer
 
@@ -325,8 +319,6 @@ True GPU timings come from the nightly `studio-*` matrix.
 
 
 ---
-
-## Merged from `determinism/phase12_replay_protocol.md`
 
 # Phase 12 — Replay protocol
 
@@ -452,8 +444,6 @@ build/dev-win/bin/sandbox_physics.exe --replay=out.gwreplay --enforce-hash
 
 ---
 
-## Merged from `determinism/phase13_replay_protocol.md`
-
 # Phase 13 — `.gwreplay` extension for animation + BT + navmesh
 
 **Status:** Operational
@@ -564,8 +554,6 @@ Both commands ship in Phase-13 Wave 13F.
 
 ---
 
-## Merged from `a11y_phase10_selfcheck.md`
-
 # Accessibility Self-Check — Phase 10
 
 **Status:** open — signed off at Phase-10 exit gate
@@ -625,8 +613,6 @@ Signed — _(founder signature at Phase-10 close)_
 
 
 ---
-
-## Merged from `a11y_phase11_selfcheck.md`
 
 # Accessibility Self-Check — Phase 11
 
@@ -701,8 +687,6 @@ Signed — _(founder signature at Phase-11 close)_
 
 ---
 
-## Merged from `a11y_phase12_selfcheck.md`
-
 # Accessibility Self-Check — Phase 12
 
 **Status:** open — signed off at Phase-12 exit gate
@@ -764,8 +748,6 @@ Signed — _(founder signature at Phase-12 close)_
 
 ---
 
-## Merged from `a11y_phase13_selfcheck.md`
-
 # docs/a11y_phase13_selfcheck.md — Phase 13 accessibility self-check
 
 **Status:** Operational
@@ -810,8 +792,6 @@ Checklist reviewed at start of each Phase-13 wave (13A..13F) and at the end of P
 
 
 ---
-
-## Merged from `a11y_phase14_selfcheck.md`
 
 # docs/a11y_phase14_selfcheck.md — Phase 14 accessibility self-check
 
@@ -872,8 +852,6 @@ Checklist reviewed at start of each Phase-14 wave (14A..14L) and at the end of P
 
 ---
 
-## Merged from `a11y_phase15_selfcheck.md`
-
 # Phase 15 accessibility self-check — privacy & persistence UI
 
 Use before merging RmlUi changes under `ui/privacy/`.
@@ -889,8 +867,6 @@ Use before merging RmlUi changes under `ui/privacy/`.
 
 
 ---
-
-## Merged from `a11y_phase16_selfcheck.md`
 
 # Phase 16 — WCAG 2.2 AA self-check
 

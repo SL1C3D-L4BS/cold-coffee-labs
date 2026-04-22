@@ -1,10 +1,14 @@
-# 06 — Architecture (blueprint + core)
+# 06 — Architecture
 
+**Status:** Draft — pending stakeholder sign-off  
+**Version:** 0.3 · 2026-04-21  
+**Precedence:** L3 — platform shape and module topology; narrowed by ADRs in `10_APPENDIX_ADRS_AND_REFERENCES.md`
 
+> ADRs record decisions that narrow or supersede narrative architecture where they conflict. Trust the ADR over older prose.
 
 ---
 
-## Merged from `architecture/README.md`
+---
 
 # `docs/06_ARCHITECTURE.md` — Greywater Engine architecture
 
@@ -29,10 +33,6 @@ Implementation progress and phase gates are **operational truth** in `docs/02_RO
 
 *Architecture explains the machine. The map of all docs is `docs/README.md`.*
 
-
----
-
-## Merged from `docs/06_ARCHITECTURE.md`
 
 # Greywater — Architectural Blueprint & Phased Execution Plan
 
@@ -1045,10 +1045,6 @@ This blueprint is submitted for stakeholder sign-off. Approval authorizes the En
 
 *End of document.*
 
-
----
-
-## Merged from `docs/06_ARCHITECTURE.md`
 
 # Greywater_Engine × Cold Coffee Labs — Core Architecture
 

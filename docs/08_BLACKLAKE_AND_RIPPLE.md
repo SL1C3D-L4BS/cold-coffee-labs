@@ -1,42 +1,18 @@
-# 08 — Studio specifications (Blacklake + GWE × Ripple)
-
-
-
----
-
-## Merged from `08_BLACKLAKE_AND_RIPPLE_STUDIO_SPECS.md`
-
-
-*On-disk canonical path:* `docs/08_BLACKLAKE_AND_RIPPLE_STUDIO_SPECS.md` *(studio spec; consolidated from `docs/ref/` — ADR-0085).*
+# 08 — Blacklake Framework & Ripple Studio Specifications
 
 **⬛ TOP SECRET // COLD COFFEE LABS // BLACKLAKE-1 ⬛**
 
-**BLACKLAKE FRAMEWORK**  
-×  
-**COLD COFFEE LABS**
+**Classification:** Proprietary Confidential · Patent Pending · Authorized Personnel Only  
+**Precedence:** L3b — mathematical and procedural depth for Blacklake; narrowed by ADRs  
+**Document Designation:** BLF-CCL-001-REV-A · Date of Issue: 2026-04-21
 
-*A Unified Mathematical & Computational Framework for*  
-**Infinite Procedural Universe Generation**  
-*Implemented in C++23 & Vulkan 1.3 on the Greywater Engine*
-
-**CLASSIFICATION LEVEL: PROPRIETARY CONFIDENTIAL**  
-**PATENT PENDING — PROVISIONAL APPLICATION IN PROCESS**  
-**DISTRIBUTION: AUTHORIZED PERSONNEL ONLY**
-
-| FIELD | DATA |
-| ----- | ----- |
-| Document Designation | BLF-CCL-001-REV-A |
-| Classification Authority | Cold Coffee Labs — Internal Counsel |
-| Primary Author(s) | Cold Coffee Labs R\&D Division |
-| Engine Target | Greywater\_Engine (CCL Custom) |
-| Language & API | C++23 ISO / Vulkan 1.3 / GLSL 4.60 |
-| Date of Issue | April 21, 2026 |
-| Supersedes | Cosmogenesis Framework v0.1 (Internal Draft) |
-| Document Status | LIVING DOCUMENT — ACTIVE DEVELOPMENT |
-
-*WARNING: This document contains trade secrets, novel mathematical frameworks, and proprietary algorithms constituting patentable intellectual property of Cold Coffee Labs. Unauthorized disclosure, reproduction, or reverse engineering of any system described herein is strictly prohibited under applicable intellectual property, trade secret, and computer fraud statutes. All mathematical derivations, architectural designs, and algorithmic constructs described in this document are the exclusive property of Cold Coffee Labs.*
+*This document contains trade secrets, novel mathematical frameworks, and proprietary algorithms constituting patentable intellectual property of Cold Coffee Labs.*
 
 **⬛ BLACKLAKE FRAMEWORK // COLD COFFEE LABS // CCL-001 ⬛**
+
+---
+
+---
 
 # **ABSTRACT**
 
@@ -1482,11 +1458,6 @@ BLACKLAKE FRAMEWORK v1.0 — BLF-CCL-001-REV-A
 
 ---
 
-## Merged from `08_BLACKLAKE_AND_RIPPLE_STUDIO_SPECS.md`
-
-
-*On-disk canonical path:* `docs/08_BLACKLAKE_AND_RIPPLE_STUDIO_SPECS.md` *(studio spec; consolidated from `docs/ref/` — ADR-0085).*
-
 **⬛ TOP SECRET // COLD COFFEE LABS // GWE-ARCH-001-REV-A ⬛**
 
 **GREYWATER ENGINE**  
@@ -1514,8 +1485,6 @@ BLACKLAKE FRAMEWORK v1.0 — BLF-CCL-001-REV-A
 | Target Platforms | Windows 11, Linux, Steam Deck |
 | Companion Document | Blacklake Framework BLF-CCL-001-REV-A |
 | Date of Issue | April 21, 2026 |
-
-*WARNING: This document contains proprietary architectural designs, novel system specifications, and patentable intellectual property of Cold Coffee Labs. All engine subsystem designs, scripting language specifications, AI integration architectures, and IDE systems described herein are the exclusive property of Cold Coffee Labs. Unauthorized disclosure or reproduction is strictly prohibited.*
 
 **⬛ GREYWATER ENGINE // COLD COFFEE LABS // GWE-ARCH-001-REV-A ⬛**
 

@@ -1,15 +1,16 @@
-# 05 — Research, build & coding standards
+# 05 — Research, Build & Coding Standards
 
+**Status:** Reference · Operational  
+**Precedence:** L6 — build detail and language discipline; specific decisions superseded by ADRs
+
+---
+
+---
 
 
 ---
 
-## Merged from `03_VULKAN_RESEARCH_GUIDE.md`
-
-# 03_VULKAN_RESEARCH_GUIDE — Greywater_Engine Rendering Stack
-
-**Status:** Reference
-**Scope:** Vulkan 1.2-baseline with opportunistic 1.3 features as Greywater's graphics API. Staged learning path, feature commitments, capability gates, and the shader toolchain. **Hardware baseline: AMD Radeon RX 580 8 GB** (Polaris, GCN 4.0, 2016).
+## Vulkan 1.2-Baseline Research Guide
 
 ---
 
@@ -287,12 +288,10 @@ Beyond the general renderer patterns, Greywater uses Vulkan for game-specific wo
 
 ---
 
-## Merged from `docs/05_RESEARCH_BUILD_AND_STANDARDS.md`
 
-# 04_LANGUAGE_RESEARCH_GUIDE — Greywater_Engine
+---
 
-**Status:** Reference
-**Scope:** The C++23 discipline used across the engine **and** the Rust patterns used inside BLD. Greywater is a dual-language codebase with a narrow FFI seam — the disciplines differ and both must be understood.
+## Language Research Guide (C++23 + Rust)
 
 ---
 
@@ -621,9 +620,10 @@ Greywater does not maintain an external curriculum of C++ or Rust books here. En
 
 ---
 
-## Merged from `BUILDING.md`
 
-# BUILDING — Greywater_Engine
+---
+
+## Build Instructions
 
 **Audience:** anyone who has just cloned the repo and wants a working build.
 **Status:** Operational · Phase 1 minimum. Phase 2+ adds per-subsystem detail.
@@ -737,9 +737,10 @@ Everything beyond the Phase 1 smoke. Run `git log` for landed work. The phase-ga
 
 ---
 
-## Merged from `CODING_STANDARDS.md`
 
-# CODING_STANDARDS — Greywater
+---
+
+## Coding Standards (Quick Reference)
 
 **Status:** Operational
 **Derived from:** `docs/01_CONSTITUTION_AND_PROGRAM.md` §3 + `docs/05_RESEARCH_BUILD_AND_STANDARDS.md` + `docs/03_PHILOSOPHY_AND_ENGINEERING.md`
@@ -884,7 +885,8 @@ Non-conforming PRs are blocked on CI. See `12` §J for the exhaustive review rub
 
 ---
 
-## Merged from `bootstrap_command.txt`
+
+---
 
 ```text
 mkdir -p engine/{platform,memory,core/{command,events,config},math,jobs,ecs,render/{hal,shader,material},assets,scene,scripting,vscript,audio,net,physics,anim,input,ui,i18n,a11y,persist,telemetry,console,gameai,vfx,sequencer,mod,platform_services} bld/{bld-mcp,bld-tools,bld-provider,bld-rag,bld-agent,bld-governance,bld-bridge,bld-ffi} editor/{agent_panel,bld_bridge,vscript_panel} sandbox runtime gameplay tools/cook tests content assets third_party cmake/packaging docs/{daily,snippets,architecture,adr}
@@ -893,7 +895,8 @@ mkdir -p engine/{platform,memory,core/{command,events,config},math,jobs,ecs,rend
 
 ---
 
-## Merged from `snippets/ecs_system_example.cpp`
+
+---
 
 ```cpp
 // snippets/ecs_system_example.cpp — Greywater_Engine
@@ -954,7 +957,8 @@ inline void register_gameplay_systems(ecs::World& world)
 
 ---
 
-## Merged from `snippets/bld_tool_example.rs`
+
+---
 
 ```rust
 // snippets/bld_tool_example.rs — Greywater_Engine · BLD crate

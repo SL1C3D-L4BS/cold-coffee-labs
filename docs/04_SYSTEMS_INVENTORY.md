@@ -1,10 +1,22 @@
-# 04 — Systems inventory
+# 04 — Systems Inventory
 
+**Status:** Reference · Last revised 2026-04-21  
+**Precedence:** L5 — authoritative subsystem list; narrowed by ADRs in `10_APPENDIX_ADRS_AND_REFERENCES.md`
 
+> Tiering is the core defense against scope creep. Every architectural conversation ends with the question: *"Is this Tier A?"*
+
+## Tier Legend
+
+| Tier | Commitment |
+|------|------------|
+| **A** | **Ships in v1.0.** Cannot be cut without stakeholder-level scope decision. |
+| **B** | Ships if schedule holds. Can slip to Post-v1 without board escalation. |
+| **C** | Stretch / Post-v1. Referenced so we know we chose not to build it yet. |
+| **G** | Hardware-gated. Ships only where `RHICapabilities` reports support. |
 
 ---
 
-## Merged from `02_SYSTEMS_AND_SIMULATIONS.md`
+---
 
 ## Former title: 02_SYSTEMS_AND_SIMULATIONS — Greywater_Engine System Inventory
 

@@ -1,10 +1,13 @@
-# 10 — Appendix, glossary & architecture decision records
+# 10 — Appendix: Glossary, Research References & Architecture Decision Records
 
+**Status:** Reference — living document updated as decisions land  
+**Precedence:** L7 — ADRs narrow or supersede narrative architecture where they conflict; always trust the ADR over prose
 
+> Every ADR is a decision made once, documented so it is never re-litigated without cause.
 
 ---
 
-## Merged from `08_GLOSSARY.md`
+---
 
 # 08_GLOSSARY — Greywater_Engine
 
@@ -301,10 +304,7 @@
 
 *Terminology deliberately. If a term is used in the codebase or docs and is not here, add it.*
 
-
 ---
-
-## Merged from `09_APPENDIX_RESEARCH_AND_REFERENCES.md`
 
 # 09_APPENDIX — Research & Internal References
 
@@ -445,14 +445,11 @@ New entries in this appendix follow three rules:
 
 *Everything we depend on is listed. Everything we don't depend on is irrelevant to Greywater.*
 
-
 ---
 
 # Architecture Decision Records (full text)
 
 Individual `docs/10_APPENDIX_ADRS_AND_REFERENCES.md.md` files were merged here for the 11-file layout. Original filenames are repeated in each subsection header.
-
-
 
 ---
 
@@ -597,7 +594,6 @@ struct RHICapabilities {
 
 *Drafted by Claude Opus 4.7 on 2026-04-20 as part of the audit Round-1 tail.
 Doctrine lands before code per `CLAUDE.md` non-negotiable #20.*
-
 
 ---
 
@@ -911,7 +907,6 @@ If we ever need parallel queries, they get a dedicated ADR.
 
 *Drafted by Claude Opus 4.7 on 2026-04-20 late-night as part of the Phase-7 fullstack Path-A push. Doctrine lands before code per `CLAUDE.md` non-negotiable #20. Implementation tracked via the todo list on the same session.*
 
-
 ---
 
 ## ADR file: `adr/0005-editor-command-stack.md`
@@ -1148,7 +1143,6 @@ Handled in the editor's global shortcut layer (`editor/app/editor_app.cpp` or a 
 ---
 
 *Drafted by Claude Opus 4.7 on 2026-04-20 late-night as part of the Phase-7 fullstack Path-A push. Doctrine lands before code per `CLAUDE.md` non-negotiable #20.*
-
 
 ---
 
@@ -1413,7 +1407,6 @@ The `std::expected<void, SerializationError>` return is consistent with the rest
 ---
 
 *Drafted by Claude Opus 4.7 on 2026-04-20 late-night as part of the Phase-7 fullstack Path-A push. Doctrine lands before code per `CLAUDE.md` non-negotiable #20.*
-
 
 ---
 
@@ -1714,7 +1707,6 @@ This amendment is the versioning trail recorded per CLAUDE.md #20 so the phase's
 
 *Drafted by Claude Opus 4.7 on 2026-04-20 late-night as part of the Phase-7 fullstack Path-A push. Doctrine lands before code per `CLAUDE.md` non-negotiable #20. Amended 2026-04-21 for Phase 9.*
 
-
 ---
 
 ## ADR file: `adr/0008-scene-file-codec-and-migration.md`
@@ -1913,7 +1905,6 @@ The callback-in-LoadOptions version keeps migration logic *inside* the ECS loade
 
 *Drafted by Claude Opus 4.7 on 2026-04-21 as part of the Phase 8 fullstack push. Doctrine lands before code per `CLAUDE.md` non-negotiable #20.*
 
-
 ---
 
 ## ADR file: `adr/0009-visual-scripting-ir.md`
@@ -2093,7 +2084,6 @@ Phase 8 week 046 ships the `compile` function from `Graph → Program`. The cook
 
 *Drafted by Claude Opus 4.7 on 2026-04-21 as part of the Phase 8 fullstack push. Doctrine lands before code per `CLAUDE.md` non-negotiable #20.*
 
-
 ---
 
 ## ADR file: `adr/0010-bld-provider-abstraction.md`
@@ -2228,7 +2218,6 @@ Pass rate < 95 % on any provider fails CI. Since this runs against real APIs, th
   deterministic providers on every push; the `BLD_CONTRACT_TESTS_CLOUD=1`
   gate for the Claude leg is unchanged.
 
-
 ---
 
 ## ADR file: `adr/0011-bld-mcp-transport-and-elicitation.md`
@@ -2343,7 +2332,6 @@ Cancellation is a `tokio_util::sync::CancellationToken` passed into every long-r
 - MCP spec: <https://modelcontextprotocol.io/specification/2025-11-25>
 - `rmcp`: <https://docs.rs/rmcp>
 - Anthropic elicitation guidance: MCP draft-to-final notes, 2025-11.
-
 
 ---
 
@@ -2491,7 +2479,6 @@ Every `#[bld_tool]` compile emits a `#[test] fn schema_of_<fn>_is_valid()`. Thes
   for tools whose input type is `serde_json::Value` and defers
   fine-grained schema emission to a future wave. Every other plank of
   the ADR is implemented.
-
 
 ---
 
@@ -2666,7 +2653,6 @@ Model names and revisions are written into the `meta` table. On open, BLD compar
 - `petgraph::algo::page_rank`: <https://docs.rs/petgraph>
 - `tree-sitter-graph`: <https://docs.rs/tree-sitter-graph>
 
-
 ---
 
 ## ADR file: `adr/0014-bld-plan-act-verify-loop.md`
@@ -2833,7 +2819,6 @@ The LLM is non-deterministic (temperature > 0 on the brainstorm slash-commands; 
   `Agent::run_turn`; exceeding any budget returns
   `AgentError::BudgetExhausted` and the CommandStack rollback fires
   on the next user `undo`.
-
 
 ---
 
@@ -3030,7 +3015,6 @@ Wired in 9E:
 - Secret filter, audit log, and pre-commit hook changes already
   landed in wave 9A — no revisions in 9E.
 
-
 ---
 
 ## ADR file: `adr/0016-bld-local-inference-and-offline-mode.md`
@@ -3183,7 +3167,6 @@ All `unsafe` in `bld-ffi` is grouped into small, heavily-documented blocks per n
   `-Zmiri-strict-provenance -Zmiri-retag-fields`; the nightly job
   consumes the same target set described in §2.6.
 
-
 ---
 
 ## ADR file: `adr/0017-engine-audio-service-and-mixer-graph.md`
@@ -3326,7 +3309,6 @@ Negative:
 
 The audio module is ring-fenced — deleting `engine/audio/` and `engine/platform/audio/` leaves the rest of the engine compiling (only the sandbox demo loses audio).
 
-
 ---
 
 ## ADR file: `adr/0018-engine-audio-steam-integration.md`
@@ -3439,7 +3421,6 @@ Negative:
 ## 6. Rollback
 
 Setting `AudioConfig::enable_hrtf = false` forces the stub backend. No schema / file changes involved.
-
 
 ---
 
@@ -3594,7 +3575,6 @@ Negative:
 ## 6. Rollback
 
 Streaming can be disabled by forcing `codec = raw_f32`. Files are naturally fast-path; larger disk but simpler.
-
 
 ---
 
@@ -3754,7 +3734,6 @@ Negative:
 ## 6. Rollback
 
 Forcing `InputConfig::backend = Null` disables all device input (keyboard/mouse still available through the Phase-2 platform stub). No file changes required.
-
 
 ---
 
@@ -3937,7 +3916,6 @@ Negative:
 
 The whole action map can be bypassed by reading raw `RawSnapshot` from `InputService::snapshot()`. This is intentional — used by the editor's 3D camera which bypasses rebinding for debug navigation.
 
-
 ---
 
 ## ADR file: `adr/0022-phase10-cross-cutting.md`
@@ -4027,7 +4005,6 @@ No `std::thread` / `std::async` introduced. `engine/jobs/` is the only paralleli
 - [x] `docs/05` marks Phase 10 *shipped* with today's date
 - [x] Git tag `v0.10.0-runtime-1` pushed
 
-
 ---
 
 ## ADR file: `adr/0023-engine-core-events.md`
@@ -4109,7 +4086,6 @@ All three gates enforced by `gw_perf_gate`'s `events_*` tests.
 - **Broadcast every event over the cross-subsystem bus** — too slow; we measure 120 µs for 1 000 events, so every cheap synchronous edge would cost µs instead of ns.
 
 Rejected. `EventBus<T>` + `InFrameQueue<T>` + `CrossSubsystemBus` is the minimum surface that covers every known 11A–11F use-case and forces new use-cases to motivate themselves against one of the three.
-
 
 ---
 
@@ -4194,7 +4170,6 @@ Wave 11B takes ownership of Phase-10's TOML files:
 
 Rejected. TOML is the community default for game settings; toml++ is header-only, no-exceptions-mode capable, MIT-licensed, and gives us a clean C++23 API.
 
-
 ---
 
 ## ADR file: `adr/0025-engine-console-dev-overlay.md`
@@ -4263,7 +4238,6 @@ Ship `engine/console/` with:
 - `audio.*` and `input.*` domains gain one command each (`audio.stats`, `input.list_devices`) that dumps current state. These commands are the first BLD-readable console tap; Phase 18 wires them to the BLD Plan-Act-Verify loop as state-inspection hooks.
 - The Phase-10 ad-hoc `std::fprintf(stderr, …)` calls inside `audio_service.cpp` are forbidden going forward; the audio service emits to `engine/core/logger` which the console can mirror.
 
-
 ---
 
 ## ADR file: `adr/0026-engine-ui-rmlui-service.md`
@@ -4330,7 +4304,6 @@ Additional UI tests live in ADR-0027/0028/0029 territory.
 - `engine/platform/clipboard` is introduced in this wave as a thin OS-seam (Win32 `OpenClipboard`, Wayland `wl_data_device`, X11 `XClipboard`). Three-file module; 50 lines each.
 - `rml_debugger` lives in a debug-only `.cpp` compiled under `#ifdef GW_UI_RMLUI_DEBUGGER` (default ON in Debug, OFF in Release).
 - Phase 12's physics-anchored HUD (world-space → screen-space name tags) needs a `RmlUi::DataModel` feature that's already in 6.2; no retrofit needed.
-
 
 ---
 
@@ -4402,7 +4375,6 @@ Same as ADR-0026: `GW_UI_RMLUI=ON` pulls the backend; `GW_UI_RMLUI=OFF` substitu
 
 - A studio fork of RmlUi at `third_party/rmlui/` is introduced. Rebasing on each upstream tag is a Phase-18 maintenance task.
 - The `ui_pass` frame-graph node is the first post-resolve pass that does not run at the scene resolution; it always targets the swapchain (to avoid a second resolve). Phase 17's VFX work inherits this pattern.
-
 
 ---
 
@@ -4480,7 +4452,6 @@ When either gate is OFF, a placeholder shaper emits monospace-Latin-only runs an
 
 - `assets/ui/fonts/` ships three fonts by default: **Inter** (Latin UI), **Noto Sans CJK** (CJK fallback), **Noto Color Emoji** (COLRv1 emoji). Licences: Inter is OFL 1.1; Noto is OFL 1.1; Noto Color Emoji is OFL 1.1 (Google SIL OFL release). All three are redistributable under the repo's license manifest.
 - Phase 16's ICU drop replaces `LocaleBridge` internals, keeping the interface.
-
 
 ---
 
@@ -4579,7 +4550,6 @@ and asserts the `.event_trace` output byte-matches `tests/golden/playable_events
 - `docs/05_RESEARCH_BUILD_AND_STANDARDS.md` gains a `Playable Runtime` section documenting the new presets.
 - The asset pipeline gains the `assets/scenes/playable_boot.gwscene` fixture; its cook outputs pin the 120-frame golden.
 
-
 ---
 
 ## ADR file: `adr/0030-phase11-cross-cutting.md`
@@ -4677,7 +4647,6 @@ All four gates default **OFF** on the CI pipelines that do *not* target the Play
 - [x] `docs/a11y_phase11_selfcheck.md` signed off
 - [x] `docs/05` marks Phase 11 *shipped*
 - [x] Git tag `v0.11.0-runtime-2` pushed
-
 
 ---
 
@@ -4805,7 +4774,6 @@ Tick order (ADR-0029 revision §3):
 - **Variable-step simulation.** Rejected — breaks determinism (ADR-0037).
 - **Spawning Jolt threads.** Rejected — violates non-negotiable #10; `JoltJobBridge` adapts into `engine/jobs/` (ADR-0032).
 
-
 ---
 
 ## ADR file: `adr/0032-physics-ecs-bridge.md`
@@ -4930,7 +4898,6 @@ Only `physics_world.step(dt)` is permitted to fan out into the job system (via `
 - **Storing body handles in a side-table keyed by `EntityHandle`.** Rejected — a component is the ECS-native home and preserves archetype locality.
 - **Writing body poses directly into `TransformComponent` every substep.** Rejected — shreds render interpolation and makes partial substeps non-deterministic per-frame.
 - **Hard-realising bodies immediately on component add.** Rejected — makes scene-load a single-threaded blocker; lazy materialization batches.
-
 
 ---
 
@@ -5061,7 +5028,6 @@ Speed constants are CVars:
 - **Rigid-body character with constraints.** Rejected — unpredictable on stairs; requires per-scene tuning.
 - **Per-bone ragdoll as the primary locomotion model.** Rejected — ragdoll is a death + impact response; locomotion is analytical.
 - **Capsule + step-up via a second capsule sweep.** Considered; Jolt's `CharacterVirtual` already handles this internally — we rely on it.
-
 
 ---
 
@@ -5223,7 +5189,6 @@ Hinge + slider motors have `motor_target_velocity_*`. When the error exceeds `mo
 - **Vehicle via custom rigid-body suspension.** Rejected — Jolt's wheeled vehicle is the stable reference; DIY re-invents a wheel.
 - **Making vehicles always-on.** Rejected — Phase 13's *Living Scene* demo has no vehicles; the gate keeps that path cheap.
 
-
 ---
 
 ## ADR file: `adr/0035-physics-query-api.md`
@@ -5337,7 +5302,6 @@ The `QueryFilter::excluded` span is scanned linearly per candidate (typical size
 - **Exposing Jolt's `NarrowPhaseQuery` directly.** Rejected — would leak Jolt types into public headers (CLAUDE.md non-negotiable #3).
 - **Returning `std::vector<RaycastHit>` from `raycast_all`.** Rejected — forces an allocation per call; span-out keeps the hot path zero-alloc.
 
-
 ---
 
 ## ADR file: `adr/0036-physics-debug-pass.md`
@@ -5449,7 +5413,6 @@ physics.debug help
 - **ImGui draw lists.** Rejected — in-game surface; ImGui is editor-only (CLAUDE.md non-negotiable #12).
 - **Separate pipeline per flag.** Rejected — redundant; one pipeline handles all line + triangle draws.
 - **Draw commands recorded by physics on the job threads.** Rejected — the render thread owns Vulkan command recording; physics hands over geometry data, not draw calls.
-
 
 ---
 
@@ -5618,7 +5581,6 @@ Debug / deterministic headless mode → hash every frame. Release / retail → h
 - **CRC-32 instead of FNV-1a-64.** Rejected — 32 bits is too narrow for a 60-frame, 1 024-body game; collision probability is non-negligible.
 - **Hash in release only every 60 frames.** Considered; default 30 keeps the detection window tight enough to surface regressions within the Phase-13 `Living Scene` 60-second demo.
 
-
 ---
 
 ## ADR file: `adr/0038-phase12-cross-cutting.md`
@@ -5726,7 +5688,6 @@ Physics touches accessibility only through debug draw. `physics.debug.enabled = 
 - [x] `docs/09_NETCODE_DETERMINISM_PERF.md (merged section **Phase 12 — Replay protocol**)` accepted
 - [x] `docs/05` marks Phase 12 *shipped*
 - [x] Git tag `v0.12.0-physics` pushed
-
 
 ---
 
@@ -5838,7 +5799,6 @@ Quaternion canonicalization (`w >= 0`) applies to root-motion quats. Same trick 
 - **Ozz's own `std::async` sample path** — rejected by #10. We own the thread policy end-to-end.
 - **A second VM for blend graphs** — rejected; graph is evaluated by a small interpreter tied to vscript IR (ADR-0043).
 
-
 ---
 
 ## ADR file: `adr/0040-acl-integration-kanim.md`
@@ -5926,7 +5886,6 @@ CI job `kanim_cook_parity`:
 - **Ozz native compression only** — rejected: compiler-stability risk, Phase-12 cross-OS replay is already fragile under FMA reordering.
 - **GLTF runtime format** — rejected: unacceptable memory + load-time cost for 100-character scenes.
 - **Custom in-house codec** — rejected: out of scope; ACL is a known quantity.
-
 
 ---
 
@@ -6027,7 +5986,6 @@ An additive layer computes `pose_base + (pose_ref_to_pose_delta)` in SoaTransfor
 - **Hand-coded graph for each character** — rejected: not authorable by designers, not by BLD.
 - **Binary graph format v1** — deferred; scope bloat for Phase 13.
 - **State machine as a separate subsystem** — rejected: folds into the same graph; transitions are just timed blends.
-
 
 ---
 
@@ -6137,7 +6095,6 @@ Recovery reverses the process through a `RagdollRecovered` event. Both states ar
 - **Unreal-style Anim BP with IK nodes** — too much scope; our IK is 3 small solvers on top of Ozz.
 - **Physics-authored IK** — rejected: IK runs in anim step, not physics step, so one-frame feedback is acceptable.
 - **Morph in GPU compute** — deferred to Phase 17 VFX budget; Phase 13 keeps it CPU for determinism + memory clarity.
-
 
 ---
 
@@ -6250,7 +6207,6 @@ All four folded into FNV-1a-64, sorted by entity id. `behavior_tree::state_hash`
 - **Dedicated BT bytecode** — rejected (see §1).
 - **Utility AI instead of BT** — deferred to Phase 23 (faction AI); BT is the framework that ecosystem AI extends.
 - **GOAP** — out of scope; cost-benefit does not clear the engineering bar for Phase 13.
-
 
 ---
 
@@ -6370,7 +6326,6 @@ Phase 23 `per_chunk_navmesh_bake` builds on top of this surface unchanged — ch
 - **Per-entity steering without navmesh** — rejected for scope of ecosystems (Phase 23).
 - **Voxel-based nav (Overgrowth-style)** — memory cost is prohibitive at planet scale.
 
-
 ---
 
 ## ADR file: `adr/0045-living-scene-spec.md`
@@ -6458,7 +6413,6 @@ This gate is **not** gated on BLD being online — it uses a recorded tool-respo
 - **Smaller demo (1 character, 1 clip, no BT)** — rejected; does not exercise the *Living Scene* claim.
 - **Random-seed BT instead of canned patrol** — rejected; makes cross-OS replay non-trivial.
 - **Separate recording/replay binaries** — rejected; one binary + `--record` / `--replay` flags.
-
 
 ---
 
@@ -6595,7 +6549,6 @@ The `living-*` preset is the base for `netcode-*` in Phase 14.
 - [x] Roadmap Phase 13 → `completed` with closeout paragraph.
 - [x] Risk-table retrospective filled in above §7.
 
-
 ---
 
 ## ADR file: `adr/0047-engine-net-facade.md`
@@ -6709,7 +6662,6 @@ Zero `std::thread`, zero `std::async`. The net_io lane is a named lane inside `j
 - **A separate `engine/netcode/` split from `engine/net/`** — rejected; replication and transport are always used together, and the split doubles the header quarantine burden.
 - **One mega `net` header** — rejected; split by concern (see §2.3) so hot-path translation units include only what they use.
 
-
 ---
 
 ## ADR file: `adr/0048-ecs-replication.md`
@@ -6811,7 +6763,6 @@ Gates live in `docs/09_NETCODE_DETERMINISM_PERF.md (merged section **Phase 14 �
 - **Run replication off the main thread directly** — rejected; we take a snapshot copy so the main thread can publish state freely while replicate_job reads.
 - **Use flatbuffers / protobuf for the snapshot** — rejected; these are fine for session metadata but the per-tick hot path demands fixed-width bit-packing.
 
-
 ---
 
 ## ADR file: `adr/0049-reliability-and-priority.md`
@@ -6877,7 +6828,6 @@ The transport layer (ADR-0047) demuxes on channel id; the reliability layer is p
 - **FEC-only unreliability** — rejected for our reliable tier; FEC is voice-only (covers brief packet loss without a retransmit round trip).
 - **Static per-component bandwidth caps** — rejected; DRR adapts to traffic automatically and starvation guard provides the backstop.
 - **Leave priority to the gameplay layer** — rejected; networking owns latency ceilings so game code doesn't have to reimplement them per feature.
-
 
 ---
 
@@ -6946,7 +6896,6 @@ All rewinds run on the server main thread inside `NetworkWorld::step_fixed()`. A
 - **Client-authoritative hit tests** — rejected as a cheating vector.
 - **Replay physics from fixed-step seed** — rejected; too expensive (re-stepping is ~10× archive).
 - **Archive full physics state (contacts included)** — rejected for memory; velocities + transforms suffice because contact resolution is re-derived in the rewind.
-
 
 ---
 
@@ -7039,7 +6988,6 @@ The format matches ADR-0037's side channel so an engineer can replay the recorde
 - **Stochastic drops without seed** — rejected; irreproducibility kills the feedback loop.
 - **Write desync dumps only on divergence** — rejected; `net.desync.dump` is useful for manual inspection of "looks fine but I'm suspicious" states.
 
-
 ---
 
 ## ADR file: `adr/0052-voice-pipeline.md`
@@ -7129,7 +7077,6 @@ Without `GW_ENABLE_OPUS` the codec is a **null passthrough** that stores the raw
 - **libsamplerate in the path** — rejected; capture is already 48 kHz mono.
 - **Multi-channel voice (stereo)** — rejected; doubles bandwidth, HRTF spatialization is mono-source by contract.
 - **Speex** — rejected; Opus is the RFC-standard descendant and ships better quality per bit at speech band.
-
 
 ---
 
@@ -7239,7 +7186,6 @@ dev-local has **no authentication**. It is developer-mode only and the backend n
 - **Separate discovery and rendezvous services** — rejected; dev-local is a discovery + rendezvous singleton.
 - **Require Steam/EOS from day one** — rejected; we need CI green on clean-checkout without SDK mounts.
 
-
 ---
 
 ## ADR file: `adr/0054-lockstep.md`
@@ -7313,7 +7259,6 @@ This is the structural shield for K5 (determinism purity, `docs/03_PHILOSOPHY_AN
 - **Client-authoritative predict-and-reconcile only** — rejected; lockstep is the preferred path for small competitive matches because it never needs a snap-back.
 - **GGPO library** — rejected; the library's thread model uses `std::thread`, violating CLAUDE.md #10. We reimplement its shape around `jobs::Scheduler`.
 - **Longer rollback window (16 frames)** — rejected; 133 ms is enough for LAN + 100 ms WAN; doubling the window doubles worst-case CPU.
-
 
 ---
 
@@ -7494,7 +7439,6 @@ The `net-*` preset is the base for `persist-*` in Phase 15.
 - [x] Roadmap Phase 14 → `completed` with closeout paragraph.
 - [x] Risk-table retrospective filled in §10.
 
-
 ---
 
 ## ADR file: `adr/0056-engine-persist-facade.md`
@@ -7526,7 +7470,6 @@ Phase 15 introduces durable gameplay state with chunk-scoped streaming, integrit
 
 - ADR-0006 (ECS serialization), ADR-0037 (determinism), ADR-0053 (session seed), ADR-0055 §11 (hand-off).
 
-
 ---
 
 ## ADR file: `adr/0057-ecs-snapshot-and-migration.md`
@@ -7552,7 +7495,6 @@ ECS state must round-trip across OSes and engine versions with an append-only mi
 
 - Golden fixtures in `tests/fixtures/saves/v1/` are validated by `gw_tests` and future `gw_save_tool`.
 
-
 ---
 
 ## ADR file: `adr/0058-sqlite-local-store.md`
@@ -7574,7 +7516,6 @@ ECS state must round-trip across OSes and engine versions with an append-only mi
 
 - Cook cache and runtime persistence share the same SQLite linkage discipline.
 
-
 ---
 
 ## ADR file: `adr/0059-icloudsave-and-conflict-policy.md`
@@ -7595,7 +7536,6 @@ ECS state must round-trip across OSes and engine versions with an append-only mi
 ## Consequences
 
 - Phase 16 replaces stubs with production SDKs without interface churn.
-
 
 ---
 
@@ -7619,7 +7559,6 @@ ECS state must round-trip across OSes and engine versions with an append-only mi
 
 - Pin **Sentry Native 0.7.19**; bumps require ADR-0064 revision + full crash round-trip CI.
 
-
 ---
 
 ## ADR file: `adr/0061-telemetry-event-pipeline.md`
@@ -7640,7 +7579,6 @@ ECS state must round-trip across OSes and engine versions with an append-only mi
 ## Consequences
 
 - Offline queue survives restart; `tele.queue.max_age_days` enforces storage minimisation.
-
 
 ---
 
@@ -7678,7 +7616,6 @@ ECS state must round-trip across OSes and engine versions with an append-only mi
 
 - Legal review updates this ADR when statutes or platform rules change.
 
-
 ---
 
 ## ADR file: `adr/0063-secure-local-storage.md`
@@ -7697,7 +7634,6 @@ ECS state must round-trip across OSes and engine versions with an append-only mi
 ## Consequences
 
 - Phase 15 ships keyring integration points as stubs where OS helpers are not yet linked; production `persist-*` presets enable them.
-
 
 ---
 
@@ -7817,7 +7753,6 @@ The `persist-*` preset becomes the base for the `ship-*` preset.
 ## 12. Exit gate closeout
 
 Phase 15 exits Accepted on 2026-04-21. Hand-off block above is normative for Phase 16. For the roadmap status flip see `docs/02_ROADMAP_AND_OPERATIONS.md` §Phase-15 closeout.
-
 
 ---
 
@@ -7966,7 +7901,6 @@ Seven new `plat.*` CVars:
 - The `sandbox_platform_services` exit gate uses the dev-local backend —
   real SDK runs stay behind `ship-*` preset + signed CI job.
 
-
 ---
 
 ## ADR file: `adr/0066-steamworks-backend.md`
@@ -8046,7 +7980,6 @@ A CI grep for `#include <steam_api` outside `impl/` fails the build.
 | Workshop quota surprise | `UGCQueryHandle_t` is paged; default page 20 items |
 | Steam overlay pause during `step()` | Façade `step()` is idempotent + wall-clock budget 0.5 ms |
 
-
 ---
 
 ## ADR file: `adr/0067-eos-backend.md`
@@ -8097,7 +8030,6 @@ means by "Steam + EOS dual-unlock from a single gameplay event."
 | EOS Cloud conflict semantics differ from Steam | The ADR-0059 `CloudConflictPolicy` enum is append-only; EOS backend maps its ETag to `vector_clock` |
 | Anti-cheat surface (Easy Anti-Cheat) | Out of scope for Phase 16; Phase 24 reopens |
 | Epic Account login flow vs Steam offline | Façade `signed_in()` surfaces false when EOS auth has not completed; games degrade gracefully |
-
 
 ---
 
@@ -8178,7 +8110,6 @@ The cook stage hashes **after** NFC normalisation and **after** removing
 trailing whitespace per translator convention. `bidi_hint_present` flips
 when any string contains at least one RTL scalar (U+0590..U+06FF,
 U+0700..U+08FF) — precomputed so the runtime doesn't re-scan.
-
 
 ---
 
@@ -8277,7 +8208,6 @@ localised.
 `<unicode/*.h>` is included only in `impl/icu_backend.cpp`. Public
 headers use opaque forward declarations + `std::unique_ptr`.
 
-
 ---
 
 ## ADR file: `adr/0070-harfbuzz-bidi-messageformat.md`
@@ -8367,7 +8297,6 @@ Enforced by `gw_perf_gate_phase16` (ADR-0073 §6).
 
 `<hb.h>` only in `impl/hb_shaper.cpp`. `<unicode/ubidi.h>` only in
 `impl/icu_bidi.cpp`. Public headers stay SDK-free.
-
 
 ---
 
@@ -8461,7 +8390,6 @@ per WCAG 2.2 AA criterion that's statically checkable (contrast, text
 size, focus visibility, captions available). The *Ship Ready* demo
 consumes this and prints `a11y_selfcheck=green` on all-pass.
 
-
 ---
 
 ## ADR file: `adr/0072-screen-reader-bridge.md`
@@ -8550,7 +8478,6 @@ headers stay platform-neutral.
 - No `Role::Unknown` in a built scene.
 
 Passing all four → `a11y::SelfCheckReport::screen_reader = Pass`.
-
 
 ---
 
@@ -8679,7 +8606,6 @@ No subsystem may block main > 0.5 ms in `ship-*`.
 | `.gwstr` content-hash drift by OS line-endings | XLIFF cook normalises to LF + NFC before hashing | CI parity gate (Windows ↔ Linux) |
 | WCAG 2.2 §1.4.4 text scaling vs layout break | Settings binder clamps `ui.text.scale` ∈ [0.5, 2.5]; UI reflow tested | Phase 18 cinematics must retest |
 | BLD session drifting a11y CVars | `a11y.*` CVars registered as `Execute` tier (ADR-0015) — BLD cannot flip without form-mode elicitation | Periodic audit |
-
 
 ---
 
@@ -8812,7 +8738,6 @@ permutation count per template ≤ 64 (≤ 128 fail band). Enforced by
 - DXC v1.9.2602 (2026-02).
 - SPIRV-Reflect main@2026-02-25.
 - Vulkan 1.4.336 (2025-12-12).
-
 
 ---
 
@@ -8981,7 +8906,6 @@ per-frame CPU upload ≤ 0.3 ms.
 `MaterialTemplate` ABI is frozen at the end of Phase 17. Planetary
 rendering (Phase 20) inherits it as a first-class input.
 
-
 ---
 
 ## ADR file: `adr/0076-gwmat-v1-binary-format.md`
@@ -9088,7 +9012,6 @@ Errors: `GwMatError::MagicMismatch`, `VersionUnsupported`,
 - **Negative.** Version bumps require a minor bump + migration table —
   registered in `MaterialWorld::register_migration()`.
 
-
 ---
 
 ## ADR file: `adr/0077-gpu-particle-system.md`
@@ -9194,7 +9117,6 @@ seed.
 `IParticleSystem` contract is frozen; planetary rendering (Phase 20) and
 combat VFX (Phase 21) inherit it.
 
-
 ---
 
 ## ADR file: `adr/0078-ribbons-and-decals.md`
@@ -9269,7 +9191,6 @@ between particles (17D) and the post chain (17F).
 
 See `docs/09_NETCODE_DETERMINISM_PERF.md (merged section **Phase 17 performance budgets — Studio Renderer**)`; decals + ribbons share the particle
 simulate bucket (≤ 2.5 ms GPU on RX 580 baseline at 1080p).
-
 
 ---
 
@@ -9398,7 +9319,6 @@ See ADR-0081 + `docs/09_NETCODE_DETERMINISM_PERF.md (merged section **Phase 17 p
 - **Negative.** Debug overlays (`post.*_debug`) increase maintenance
   surface; mitigated by shared debug shader `post/debug_common.hlsl`.
 
-
 ---
 
 ## ADR file: `adr/0080-tone-mapping-doctrine.md`
@@ -9469,7 +9389,6 @@ See ADR-0079 §9 (`post.tonemap.curve`, `post.tonemap.exposure`).
 - **Negative.** None significant; art-direction tests must re-grade if
   they were authored against ACES. Mitigated by
   `post.tonemap.curve=aces` opt-in.
-
 
 ---
 
@@ -9550,7 +9469,6 @@ Gate emits a single JSON blob per run:
 - `phase17-budgets-dev-win` / `phase17-budgets-dev-linux` — run
   `gw_perf_gate_phase17`, fail on `pass=false`.
 - `phase17-budgets-studio` — weekly on `studio-*` presets.
-
 
 ---
 
@@ -9690,7 +9608,6 @@ Existing: `dev-win`, `dev-linux`, `playable-*`, `physics-*`,
 - C++ tests: ~4,500 LoC (13 test files, ≥ 94 cases).
 - Docs: 9 ADRs + perf spec + daily closeout.
 
-
 ---
 
 ## ADR file: `adr/0083-documentation-system-unified-program-reboot.md`
@@ -9738,7 +9655,6 @@ with **Blacklake** as the in-engine procedural framework and existing **Phases 1
 
 *The reboot organizes truth; it does not erase shipped engineering.*
 
-
 ---
 
 ## ADR file: `adr/0084-removal-of-legacy-game-documentation-tree.md`
@@ -9775,7 +9691,6 @@ Studio directive: **eliminate legacy alternate-game documentation** and run a **
 ---
 
 *One flagship doc tree. No parallel universe.*
-
 
 ---
 
