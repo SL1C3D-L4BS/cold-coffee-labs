@@ -16,8 +16,8 @@
 
 #include <algorithm>
 #include <chrono>
-#include <cstdio>
 #include <cstring>
+#include <print>
 #include <span>
 #include <vector>
 
@@ -56,10 +56,11 @@ bool run_budget(const Budget& budget, double measured_ms) {
 #else
     const double ceiling = budget.ms_ceiling_release * kDebugSlack;
 #endif
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
-    std::printf("phase15.perf %-32s measured=%.3f ms ceiling=%.3f ms %s\n",
-                budget.name, measured_ms, ceiling,
-                measured_ms <= ceiling ? "OK" : "FAIL");
+    std::println("phase15.perf {:<32} measured={:.3f} ms ceiling={:.3f} ms {}",
+                 budget.name,
+                 measured_ms,
+                 ceiling,
+                 measured_ms <= ceiling ? "OK" : "FAIL");
     return measured_ms <= ceiling;
 }
 
@@ -161,7 +162,6 @@ int main() {
                               best_ms);
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
-    std::printf("phase15.perf RESULT %s\n", all_ok ? "PASS" : "FAIL");
+    std::println("phase15.perf RESULT {}", all_ok ? "PASS" : "FAIL");
     return all_ok ? 0 : 1;
 }

@@ -99,12 +99,13 @@ int main() {
         MaterialTemplateDesc desc;
         desc.name = "pbr_opaque/metal_rough";
         desc.parameter_keys = {"base_color", "metallic_roughness", "emissive"};
-        MaterialTemplate tmpl{desc};
+        MaterialTemplate material_template{desc};
         MaterialInstanceState state{};
 
         auto t0 = std::chrono::steady_clock::now();
         for (int i = 0; i < 32; ++i) {
-            const auto blob = encode_gwmat(state, tmpl, tmpl.desc().name);
+            const auto blob =
+                encode_gwmat(state, material_template, material_template.desc().name);
             MaterialInstanceState out{};
             std::string name;
             (void)decode_gwmat(std::span<const std::byte>{blob.bytes}, out, name);
