@@ -10,7 +10,7 @@ Cold-start primer for **Claude Code** (and any AI assistant) on this repository.
 
 - **Cold Coffee Labs** — studio.  
 - **Greywater_Engine** — `greywater_core`, editor, jobs, ECS, Vulkan renderer, BLD, `engine/world/`, tools.  
-- ***Sacrilege*** — flagship game; vision in `docs/07_SACRILEGE.md`. Procedural stack: **Blacklake** (`docs/08_BLACKLAKE_AND_RIPPLE_STUDIO_SPECS.md`).  
+- ***Sacrilege*** — flagship game; vision in `docs/07_SACRILEGE.md`. Procedural stack: **Blacklake** (`docs/08_BLACKLAKE_AND_RIPPLE.md`).  
 
 **Engine/game separation is absolute:** the engine never imports from game code.
 
@@ -21,7 +21,7 @@ Cold-start primer for **Claude Code** (and any AI assistant) on this repository.
 - **CMake + Corrosion**; Windows + Linux.  
 - **Dear ImGui** (editor); **RmlUi** (in-game UI).  
 - **MCP** (`2025-11-25`) — BLD wire protocol.  
-- **Art & tone for shipping:** *Sacrilege* — `docs/07_SACRILEGE.md`; studio math + Ripple depth — `docs/08_BLACKLAKE_AND_RIPPLE_STUDIO_SPECS.md`.  
+- **Art & tone for shipping:** *Sacrilege* — `docs/07_SACRILEGE.md`; studio math + Ripple depth — `docs/08_BLACKLAKE_AND_RIPPLE.md`.  
 
 **Documentation (11 files under `docs/`):** `docs/README.md` · **Constitution & handoff:** `docs/01_CONSTITUTION_AND_PROGRAM.md` · **Architecture:** `docs/06_ARCHITECTURE.md` · **ADRs (merged):** `docs/10_APPENDIX_ADRS_AND_REFERENCES.md`
 
@@ -72,7 +72,7 @@ Full rationale: `docs/03_PHILOSOPHY_AND_ENGINEERING.md`, `docs/01_CONSTITUTION_A
 3. `docs/03_PHILOSOPHY_AND_ENGINEERING.md`  
 4. `docs/06_ARCHITECTURE.md`  
 5. `docs/07_SACRILEGE.md`  
-6. `docs/08_BLACKLAKE_AND_RIPPLE_STUDIO_SPECS.md` *(skim ToC + your subsystem)*  
+6. `docs/08_BLACKLAKE_AND_RIPPLE.md` *(skim ToC + your subsystem)*  
 
 ---
 

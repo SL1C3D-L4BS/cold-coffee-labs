@@ -262,7 +262,7 @@ Benchmarks run nightly in CI on an RX-580-class reference runner and compare to 
 
 Beyond the general renderer patterns, Greywater uses Vulkan for game-specific workloads:
 
-- **GPU terrain / mesh generation** — compute shaders generate meshes from deterministic fields (arenas, circles, Blacklake GPTM slices). See `docs/08_BLACKLAKE_AND_RIPPLE_STUDIO_SPECS.md` and `docs/04_SYSTEMS_INVENTORY.md`.
+- **GPU terrain / mesh generation** — compute shaders generate meshes from deterministic fields (arenas, circles, Blacklake GPTM slices). See `docs/08_BLACKLAKE_AND_RIPPLE.md` and `docs/04_SYSTEMS_INVENTORY.md`.
 - **Atmospheric and volumetric effects** — scattering and fog paths that fit RX 580; *Sacrilege* pushes local volumetrics and horror reads (GW-SAC-001). See `docs/06_ARCHITECTURE.md` rendering chapters.
 - **Raymarched volumetric clouds** — compute shader, 3D Perlin-Worley density texture.
 - **GPU procedural vegetation** — compute shader emits `VkDrawIndexedIndirectCommand` buffers; culling + LOD selection on GPU.

@@ -23,7 +23,7 @@
 
 ## Unified program context
 
-**Cold Coffee Labs → Greywater Engine → *Sacrilege*.** These architecture docs describe the **platform**. Product-facing mandates for the debut title live in `docs/07_SACRILEGE.md`. Mathematical / procedural depth for **Blacklake:** `docs/08_BLACKLAKE_AND_RIPPLE_STUDIO_SPECS.md`. GWE × Ripple / RSL: `docs/08_BLACKLAKE_AND_RIPPLE_STUDIO_SPECS.md` (reconcile with shipped editor + `vscript` via ADRs).
+**Cold Coffee Labs → Greywater Engine → *Sacrilege*.** These architecture docs describe the **platform**. Product-facing mandates for the debut title live in `docs/07_SACRILEGE.md`. Mathematical / procedural depth for **Blacklake:** `docs/08_BLACKLAKE_AND_RIPPLE.md`. GWE × Ripple / RSL: `docs/08_BLACKLAKE_AND_RIPPLE.md` (reconcile with shipped editor + `vscript` via ADRs).
 
 ## Engineering status
 
@@ -54,7 +54,7 @@ Implementation progress and phase gates are **operational truth** in `docs/02_RO
 
 ## 1. Executive Summary
 
-Cold Coffee Labs is chartering **Greywater Engine** — the proprietary C++23/Vulkan platform — and its debut flagship title, ***Sacrilege*** (**supra-AAA** bar: `docs/01_CONSTITUTION_AND_PROGRAM.md` §0.1). Procedural depth is delivered through the **Blacklake** framework (`docs/08_BLACKLAKE_AND_RIPPLE_STUDIO_SPECS.md`). The engine is **purpose-built** to ship *Sacrilege* first, targets the **AMD Radeon RX 580 8GB at 1080p / 60 FPS** as its baseline hardware, and maintains a clean engine/game code separation so future Cold Coffee Labs titles can ship on the same stack.
+Cold Coffee Labs is chartering **Greywater Engine** — the proprietary C++23/Vulkan platform — and its debut flagship title, ***Sacrilege*** (**supra-AAA** bar: `docs/01_CONSTITUTION_AND_PROGRAM.md` §0.1). Procedural depth is delivered through the **Blacklake** framework (`docs/08_BLACKLAKE_AND_RIPPLE.md`). The engine is **purpose-built** to ship *Sacrilege* first, targets the **AMD Radeon RX 580 8GB at 1080p / 60 FPS** as its baseline hardware, and maintains a clean engine/game code separation so future Cold Coffee Labs titles can ship on the same stack.
 
 Greywater is not an attempt to compete feature-for-feature with the large commercial engines. It is a focused, **data-oriented, tool-agnostic, hardware-accessible** technology stack designed to give Cold Coffee Labs the following durable advantages:
 
@@ -899,7 +899,7 @@ BLD is the engine's primary competitive differentiator. Implemented as a Rust cr
 
 ### *Sacrilege* / Blacklake phases (19–23)
 
-Phases 19–23 build engine-side capabilities for **Blacklake** procedural genesis and the ***Sacrilege*** debut title. They consume prior platform work (Phases 1–18) and extend `engine/world/`, gameplay facades, and content pipelines. **Authoritative week rows:** `docs/02_ROADMAP_AND_OPERATIONS.md`. **Flagship spec:** `docs/07_SACRILEGE.md`. **Procedural depth:** `docs/08_BLACKLAKE_AND_RIPPLE_STUDIO_SPECS.md`.
+Phases 19–23 build engine-side capabilities for **Blacklake** procedural genesis and the ***Sacrilege*** debut title. They consume prior platform work (Phases 1–18) and extend `engine/world/`, gameplay facades, and content pipelines. **Authoritative week rows:** `docs/02_ROADMAP_AND_OPERATIONS.md`. **Flagship spec:** `docs/07_SACRILEGE.md`. **Procedural depth:** `docs/08_BLACKLAKE_AND_RIPPLE.md`.
 
 ### Phase 19 — Blacklake Core & Deterministic Genesis · 8 weeks · World Systems Lead
 

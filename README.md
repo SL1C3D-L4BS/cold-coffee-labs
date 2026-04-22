@@ -87,7 +87,7 @@ The `docs/` folder is intentionally **eleven Markdown files** (see [`docs/README
 | [`docs/05_RESEARCH_BUILD_AND_STANDARDS.md`](docs/05_RESEARCH_BUILD_AND_STANDARDS.md) | Vulkan/C++/Rust guides, build, coding standards |
 | [`docs/06_ARCHITECTURE.md`](docs/06_ARCHITECTURE.md) | Blueprint + core architecture (merged) |
 | [`docs/07_SACRILEGE.md`](docs/07_SACRILEGE.md) | Flagship program spec |
-| [`docs/08_BLACKLAKE_AND_RIPPLE_STUDIO_SPECS.md`](docs/08_BLACKLAKE_AND_RIPPLE_STUDIO_SPECS.md) | Blacklake + GWE × Ripple studio specs |
+| [`docs/08_BLACKLAKE_AND_RIPPLE.md`](docs/08_BLACKLAKE_AND_RIPPLE.md) | Blacklake + GWE × Ripple studio specs |
 | [`docs/09_NETCODE_DETERMINISM_PERF.md`](docs/09_NETCODE_DETERMINISM_PERF.md) | Netcode, determinism, perf annexes |
 | [`docs/10_APPENDIX_ADRS_AND_REFERENCES.md`](docs/10_APPENDIX_ADRS_AND_REFERENCES.md) | Glossary, appendix, **all ADRs** |
 

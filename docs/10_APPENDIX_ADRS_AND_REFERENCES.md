@@ -46,7 +46,7 @@
 
 **Brew Doctrine.** Greywater Engine's philosophy statement. See `docs/03_PHILOSOPHY_AND_ENGINEERING.md`.
 
-**Blacklake Framework (BLF).** Cold Coffee Labs' deterministic procedural stack hosted in Greywater Engine — **HEC** (Hierarchical Entropy Cascade) seeding, **SDR** (Stratified Domain Resonance) noise, **GPTM** (Greywater Planetary Topology Model), **TEBS** (Tessellated Evolutionary Biology System). Authoritative math/spec: `docs/08_BLACKLAKE_AND_RIPPLE_STUDIO_SPECS.md`. Flagship use: *Sacrilege*'s Nine Inverted Circles and arena genesis.
+**Blacklake Framework (BLF).** Cold Coffee Labs' deterministic procedural stack hosted in Greywater Engine — **HEC** (Hierarchical Entropy Cascade) seeding, **SDR** (Stratified Domain Resonance) noise, **GPTM** (Greywater Planetary Topology Model), **TEBS** (Tessellated Evolutionary Biology System). Authoritative math/spec: `docs/08_BLACKLAKE_AND_RIPPLE.md`. Flagship use: *Sacrilege*'s Nine Inverted Circles and arena genesis.
 
 ## C
 
@@ -429,7 +429,7 @@ Greywater's own canonical documents — the ones to read rather than to summaris
 | `docs/05_RESEARCH_BUILD_AND_STANDARDS.md` | Vulkan capability table, C++23 / Rust idioms, build & coding standards |
 | `docs/06_ARCHITECTURE.md` | Stakeholder blueprint + narrative core architecture |
 | `docs/07_SACRILEGE.md` | *Sacrilege* program spec (GW-SAC-001) |
-| `docs/08_BLACKLAKE_AND_RIPPLE_STUDIO_SPECS.md` | Blacklake (BLF) + GWE × Ripple studio specifications |
+| `docs/08_BLACKLAKE_AND_RIPPLE.md` | Blacklake (BLF) + GWE × Ripple studio specifications |
 | `docs/09_NETCODE_DETERMINISM_PERF.md` | Netcode contract, perf budgets, determinism / replay annexes |
 | `docs/10_APPENDIX_ADRS_AND_REFERENCES.md` | Glossary, this appendix, **ADR archive** |
 
@@ -9710,8 +9710,8 @@ Studio directives: (1) **supra-AAA** production language in canonical docs; (2) 
 ## Decision
 
 1. **Rename and relocate** (from former `docs/ref/`):
-   - `Blacklake Framework x Cold Coffee Labs.md` → **`docs/08_BLACKLAKE_AND_RIPPLE_STUDIO_SPECS.md`**
-   - `Greywater Engine x Ripple IDE Architecture Spec.md` → **`docs/08_BLACKLAKE_AND_RIPPLE_STUDIO_SPECS.md`**
+   - `Blacklake Framework x Cold Coffee Labs.md` → **`docs/08_BLACKLAKE_AND_RIPPLE.md`**
+   - `Greywater Engine x Ripple IDE Architecture Spec.md` → **`docs/08_BLACKLAKE_AND_RIPPLE.md`**
 2. **Delete** the `docs/ref/` directory (including its README).
 3. **Update** `README.md`, `README.md`, `CLAUDE.md`, cross-links in architecture, roadmap, GW-SAC-001, ADRs, and guides to use the new paths.
 4. **Classify** both files as **canonical** studio specifications (L3b), same change discipline as `docs/06_ARCHITECTURE.md`.

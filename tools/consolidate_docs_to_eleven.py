@@ -57,7 +57,7 @@ This folder intentionally contains **exactly eleven Markdown files** (this `READ
 | 5 | `05_RESEARCH_BUILD_AND_STANDARDS.md` | Vulkan/C++/Rust guides, build, coding standards |
 | 6 | `06_ARCHITECTURE.md` | Blueprint + core architecture narrative |
 | 7 | `07_SACRILEGE.md` | Flagship program spec (GW-SAC) |
-| 8 | `08_BLACKLAKE_AND_RIPPLE_STUDIO_SPECS.md` | BLF + GWE×Ripple long-form studio specs |
+| 8 | `08_BLACKLAKE_AND_RIPPLE.md` | BLF + GWE×Ripple long-form studio specs |
 | 9 | `09_NETCODE_DETERMINISM_PERF.md` | Netcode contract + perf/determinism annexes |
 | 10 | `10_APPENDIX_ADRS_AND_REFERENCES.md` | Glossary, research appendix, **all ADRs** |
 
@@ -71,7 +71,7 @@ This folder intentionally contains **exactly eleven Markdown files** (this `READ
 | L1 | `01_CONSTITUTION_AND_PROGRAM.md` |
 | L2 | `03_PHILOSOPHY_AND_ENGINEERING.md` |
 | L3 | `06_ARCHITECTURE.md` |
-| L3b | `08_BLACKLAKE_AND_RIPPLE_STUDIO_SPECS.md` |
+| L3b | `08_BLACKLAKE_AND_RIPPLE.md` |
 | L4 | `07_SACRILEGE.md` |
 | L5 | `04_SYSTEMS_INVENTORY.md`, `09_NETCODE_DETERMINISM_PERF.md` |
 | L6 | `02_ROADMAP_AND_OPERATIONS.md`, `05_RESEARCH_BUILD_AND_STANDARDS.md` |
@@ -184,7 +184,7 @@ This folder intentionally contains **exactly eleven Markdown files** (this `READ
     )
 
     # --- 08 ---
-    (STAGE / "08_BLACKLAKE_AND_RIPPLE_STUDIO_SPECS.md").write_text(
+    (STAGE / "08_BLACKLAKE_AND_RIPPLE.md").write_text(
         "# 08 — Studio specifications (Blacklake + GWE × Ripple)\n\n"
         + banner("BLACKLAKE_FRAMEWORK_BLF-CCL-001-REV-A.md")
         + read_text("BLACKLAKE_FRAMEWORK_BLF-CCL-001-REV-A.md")
@@ -249,7 +249,7 @@ This folder intentionally contains **exactly eleven Markdown files** (this `READ
         "05_RESEARCH_BUILD_AND_STANDARDS.md",
         "06_ARCHITECTURE.md",
         "07_SACRILEGE.md",
-        "08_BLACKLAKE_AND_RIPPLE_STUDIO_SPECS.md",
+        "08_BLACKLAKE_AND_RIPPLE.md",
         "09_NETCODE_DETERMINISM_PERF.md",
         "10_APPENDIX_ADRS_AND_REFERENCES.md",
     }
