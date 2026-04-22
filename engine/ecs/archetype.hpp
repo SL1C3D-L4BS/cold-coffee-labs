@@ -11,29 +11,33 @@
 #include "component_registry.hpp"
 #include "entity.hpp"
 
-#include <array>
 #include <bitset>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <utility>
 #include <vector>
 
-namespace gw {
-namespace ecs {
+namespace gw::ecs {
 
 using ComponentMask = std::bitset<kMaxComponentTypes>;
 
-inline constexpr std::size_t kDefaultChunkBytes = 16u * 1024u;
+inline constexpr std::size_t kDefaultChunkBytes = std::size_t{16} * std::size_t{1024};
 
 // ---------------------------------------------------------------------------
 // Chunk — one fixed-size block of SOA component storage.
 // ---------------------------------------------------------------------------
 
+struct ChunkAllocation {
+    std::size_t   total_bytes{};
+    std::uint16_t slots_per_chunk{};
+};
+
 class Chunk {
 public:
     // Layout is set by the owning Archetype: `component_offsets_` [ids] gives
     // the byte offset of each component array inside the chunk.
-    Chunk(std::size_t chunk_bytes, std::uint16_t slots_per_chunk);
+    explicit Chunk(ChunkAllocation allocation);
     ~Chunk() = default;
 
     Chunk(const Chunk&)            = delete;
@@ -57,12 +61,14 @@ public:
     [[nodiscard]] std::byte* component_ptr(std::size_t type_offset_bytes,
                                             std::size_t component_size,
                                             std::uint16_t slot) noexcept {
-        return data_.get() + type_offset_bytes + component_size * slot;
+        const std::size_t byte_index = type_offset_bytes + (component_size * slot);
+        return std::addressof(data_[byte_index]);
     }
     [[nodiscard]] const std::byte* component_ptr(std::size_t type_offset_bytes,
                                                   std::size_t component_size,
                                                   std::uint16_t slot) const noexcept {
-        return data_.get() + type_offset_bytes + component_size * slot;
+        const std::size_t byte_index = type_offset_bytes + (component_size * slot);
+        return std::addressof(data_[byte_index]);
     }
 
     // Bumps the live counter; caller must have ensured capacity.
@@ -74,14 +80,16 @@ public:
 
     // Pops the last live slot (does NOT run destructors — caller's job).
     void pop_slot() noexcept {
-        if (live_count_ > 0) --live_count_;
+        if (live_count_ > 0) {
+            --live_count_;
+        }
     }
 
 private:
-    std::unique_ptr<std::byte[]>                data_;
-    std::unique_ptr<Entity[]>                   entities_;
-    std::uint16_t                               capacity_   = 0;
-    std::uint16_t                               live_count_ = 0;
+    std::vector<std::byte> data_;
+    std::vector<Entity>    entities_;
+    std::uint16_t          capacity_   = 0;
+    std::uint16_t          live_count_ = 0;
 };
 
 // ---------------------------------------------------------------------------
@@ -95,7 +103,7 @@ inline constexpr ArchetypeId kInvalidArchetypeId =
 class Archetype {
 public:
     // `types` must be sorted + unique.
-    Archetype(ArchetypeId                            id,
+    Archetype(ArchetypeId                            archetype_id,
               std::vector<ComponentTypeId>           types,
               ComponentMask                          mask,
               const ComponentRegistry&               registry,
@@ -105,14 +113,17 @@ public:
     Archetype& operator=(const Archetype&) = delete;
     Archetype(Archetype&&) noexcept        = default;
     Archetype& operator=(Archetype&&) noexcept = default;
+    ~Archetype()                           = default;
 
     [[nodiscard]] ArchetypeId                   id()        const noexcept { return id_; }
     [[nodiscard]] const ComponentMask&          mask()      const noexcept { return mask_; }
     [[nodiscard]] const std::vector<ComponentTypeId>& types() const noexcept { return types_; }
     [[nodiscard]] std::uint16_t                 slots_per_chunk() const noexcept { return slots_per_chunk_; }
     [[nodiscard]] std::size_t                   chunk_count()     const noexcept { return chunks_.size(); }
-    [[nodiscard]] Chunk&                        chunk(std::size_t i)       noexcept { return *chunks_[i]; }
-    [[nodiscard]] const Chunk&                  chunk(std::size_t i) const noexcept { return *chunks_[i]; }
+    [[nodiscard]] Chunk&       chunk(std::size_t chunk_index) noexcept { return *chunks_[chunk_index]; }
+    [[nodiscard]] const Chunk& chunk(std::size_t chunk_index) const noexcept {
+        return *chunks_[chunk_index];
+    }
 
     // Returns byte-offset inside a chunk for component type `tid`, or
     // std::numeric_limits<std::size_t>::max() if not present in this archetype.
@@ -197,20 +208,28 @@ public:
 
     [[nodiscard]] std::size_t archetype_count() const noexcept { return archetypes_.size(); }
 
-    [[nodiscard]] Archetype&       archetype(ArchetypeId id)       noexcept { return *archetypes_[id]; }
-    [[nodiscard]] const Archetype& archetype(ArchetypeId id) const noexcept { return *archetypes_[id]; }
+    [[nodiscard]] Archetype& archetype(ArchetypeId archetype_id) noexcept {
+        return *archetypes_[archetype_id];
+    }
+    [[nodiscard]] const Archetype& archetype(ArchetypeId archetype_id) const noexcept {
+        return *archetypes_[archetype_id];
+    }
 
     // Enumerate archetype ids whose mask is a superset of `required`.
     // Callback: bool(ArchetypeId) — return false to stop early.
-    template <typename Fn>
-    void for_each_matching(const ComponentMask& required, Fn&& fn) const {
-        for (ArchetypeId id = 0; id < archetypes_.size(); ++id) {
-            const auto& m = archetypes_[id]->mask();
-            if ((m & required) == required) {
-                if constexpr (std::is_same_v<decltype(fn(id)), bool>) {
-                    if (!fn(id)) return;
+    template <typename Callback>
+    void for_each_matching(const ComponentMask& required, Callback&& callback) const {
+        for (ArchetypeId archetype_index = 0; archetype_index < archetypes_.size(); ++archetype_index) {
+            const auto& archetype_mask = archetypes_[archetype_index]->mask();
+            if ((archetype_mask & required) == required) {
+                if constexpr (std::is_same_v<decltype(std::forward<Callback>(callback)(
+                                                   std::declval<ArchetypeId>())),
+                                               bool>) {
+                    if (!std::forward<Callback>(callback)(archetype_index)) {
+                        return;
+                    }
                 } else {
-                    fn(id);
+                    std::forward<Callback>(callback)(archetype_index);
                 }
             }
         }
@@ -218,7 +237,7 @@ public:
 
 private:
     struct MaskHash {
-        std::size_t operator()(const ComponentMask& m) const noexcept;
+        std::size_t operator()(const ComponentMask& mask) const noexcept;
     };
 
     std::vector<std::unique_ptr<Archetype>>                   archetypes_;
@@ -227,5 +246,4 @@ private:
     std::unordered_map<ComponentMask, ArchetypeId, MaskHash>  by_mask_;
 };
 
-} // namespace ecs
-} // namespace gw
+} // namespace gw::ecs
