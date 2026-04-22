@@ -65,6 +65,8 @@ Every Greywater build uses one of these presets. No ad-hoc `-D` flags in the IDE
 | `linux-asan`     | Debug  | Linux   | ASan       | AddressSanitizer run (nightly)             |
 | `linux-ubsan`    | Debug  | Linux   | UBSan      | UndefinedBehaviorSanitizer run (nightly)   |
 | `linux-tsan`     | Debug  | Linux   | TSan       | ThreadSanitizer run (nightly)              |
+| `studio-linux`   | see preset | Linux | varies  | Phase 17 full shader/post stack; `phase17_budgets_perf`, `phase17_studio_renderer` |
+| `studio-win`     | see preset | Windows | varies | Same on Windows |
 | `ci`             | varies | both    | varies     | GitHub Actions matrix-driven               |
 
 Usage:

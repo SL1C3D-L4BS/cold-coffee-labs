@@ -32,6 +32,8 @@ A **static-library C++23 engine core** plus a **Rust BLD crate** linked into the
 
 Subsystems with concrete library choices or custom implementations: audio (miniaudio + Steam Audio), physics (Jolt), animation (Ozz + ACL), networking (GameNetworkingSockets), localization (ICU + HarfBuzz), persistence (SQLite + custom save format), telemetry (Sentry), and more. Full inventory in `02_SYSTEMS_AND_SIMULATIONS.md`.
 
+**Snapshot (2026-04-21):** Phase 17 (*Studio Renderer*) is engineering-complete — shader permutation matrix + optional Slang path, `MaterialWorld` / `.gwmat` v1, GPU VFX (particles, ribbons, deferred decals), and the `engine/render/post/` chain (dual-Kawase bloom, k-DOP TAA, McGuire motion blur, CoC DoF, PBR Neutral + ACES). `dev-win` ships **711/711** CTests; exit marker: `sandbox_studio_renderer` → `STUDIO RENDERER`. Next phase gate: Phase 18 (*Studio Ready*). See `05_ROADMAP_AND_MILESTONES.md` §Phase 17.
+
 ### The game (Greywater)
 A persistent procedural universe: hierarchical seed-driven generation from galaxy cluster → system → planet → chunk; spherical planet rendering with quad-tree cube-sphere LOD; physically-based atmospheric scattering and volumetric clouds; orbital mechanics with `float64` precision; seamless ground-to-orbit transition through five atmospheric layers with re-entry plasma and structural stress; base building with graph-based structural-integrity collapse; PvP survival loop (Gather → Craft → Build → Raid → Dominate → Survive); hybrid rollback + deterministic-lockstep netcode; living ecosystem with predator/prey dynamics and utility-AI factions; optional async LLM dialogue post-MVP. Full game-vision specification in `docs/games/greywater/12_*` through `20_*`.
 

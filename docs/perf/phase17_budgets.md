@@ -6,7 +6,10 @@ Source of truth: **ADR-0081**.
 
 `gw_perf_gate_phase17` boots a headless `Engine` + synthetic Studio scene
 and emits a single JSON report (schema in ADR-0081 §4). The CTest entry
-`phase17_budgets_perf` fails on `pass: false`.
+`phase17_budgets_perf` fails on `pass: false`. The separate exit gate
+`phase17_studio_renderer` (`apps/sandbox_studio_renderer`) greps for the
+`STUDIO RENDERER` marker. As of 2026-04-21, full `dev-win` CTest is **711**
+tests (all green), including Phase-17 perf + ship-ready labels.
 
 ## Budget ceilings (enforced)
 

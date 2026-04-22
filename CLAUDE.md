@@ -96,7 +96,7 @@ Full rationale and the code-review rubric behind these: `docs/12_ENGINEERING_PRI
 ## Canonical vs. operational vs. archival
 
 - **Canonical** (binding, do not modify in flight): `00`, `01`, `10`, `12`, `CLAUDE.md`, `docs/architecture/*`, `docs/games/greywater/*`
-- **Operational** (updated frequently): `05`, `06`, `07`, `11`, `docs/daily/*`
+- **Operational** (updated frequently): `05`, `06`, `07`, `11`, `docs/daily/*`, `docs/perf/phase*_budgets.md`
 - **Reference** (stable): `02`, `03`, `04`, `08`, `09`
 - **Archival** (preserved with notice): `90_*`
 

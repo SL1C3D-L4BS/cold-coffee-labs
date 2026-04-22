@@ -53,6 +53,7 @@ The documents below form a single coherent system. Read them in the order given.
 | --- | --- |
 | `05_ROADMAP_AND_MILESTONES.md` | 24 build phases + LTS Sustenance (Phase 25), 162-week schedule, named milestones |
 | `06_KANBAN_BOARD.md` | Workflow, WIP limits, rituals, milestone tracker |
+| `perf/phase15_budgets.md`, `perf/phase16_budgets.md`, `perf/phase17_budgets.md` | ADR-linked performance budgets (`gw_perf_gate_phase15` / `gw_perf_gate_phase17`) |
 | `07_DAILY_TODO_GENERATOR.py` | Generates pre-dated daily logs (Python, run once at project start) |
 | `11_HANDOFF_TO_CLAUDE_CODE.md` | Per-session cold-start protocol and CMake presets |
 | `daily/YYYY-MM-DD.md` | Daily log; one per working day across the ~37-month (162-week) build |

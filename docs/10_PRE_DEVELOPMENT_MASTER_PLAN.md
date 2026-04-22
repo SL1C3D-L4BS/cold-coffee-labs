@@ -285,7 +285,10 @@ cold-coffee-labs/
 │   ├── ecs/             Archetype ECS
 │   ├── render/
 │   │   ├── hal/         Hardware Abstraction Layer
-│   │   └── vk/          Vulkan 1.3 backend
+│   │   ├── vk/          Vulkan 1.3 backend
+│   │   ├── shader/      Permutations, DXC/SPIR-V, optional Slang (Phase 17)
+│   │   ├── material/    MaterialWorld, .gwmat v1 (Phase 17)
+│   │   └── post/        Bloom, TAA, MB, DoF, tonemap (Phase 17)
 │   ├── assets/          Import/cook/load
 │   ├── scene/           Scene view + .gwscene serialization (Phase 8)
 │   ├── scripting/       Dynamic-lib loader (gameplay hot-reload)
@@ -302,9 +305,9 @@ cold-coffee-labs/
 │   ├── telemetry/       Sentry + custom (Phase 15)
 │   ├── console/         In-game dev console (Phase 11)
 │   ├── gameai/          BT + Recast/Detour (Phase 13)
-│   ├── vfx/             GPU particles + post (Phase 17)
-│   ├── sequencer/       Cinematics (Phase 17)
-│   ├── mod/             Mod sandbox (Phase 17)
+│   ├── vfx/             Particles, ribbons, decals (Phase 17)
+│   ├── sequencer/       Cinematics (Phase 18)
+│   ├── mod/             Mod sandbox (Phase 18)
 │   └── platform_services/   Steam/EOS/Galaxy (Phase 16)
 ├── bld/                 Rust crate — Cargo workspace (Phase 9)
 ├── editor/              C++ executable, statically links core + BLD (Phase 7)

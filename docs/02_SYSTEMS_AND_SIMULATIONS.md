@@ -1,7 +1,7 @@
 # 02_SYSTEMS_AND_SIMULATIONS — Greywater_Engine System Inventory
 
 **Status:** Reference
-**Last revised:** 2026-04-19
+**Last revised:** 2026-04-21
 
 This document is the complete enumeration of every subsystem in Greywater_Engine, classified by **Tier**. Tiering is the core defense against scope creep — every architectural conversation should end with the question *"is this Tier A?"*
 
@@ -51,20 +51,21 @@ Every subsystem below has a **tier**, an **owning phase** (see `05_ROADMAP_AND_M
 | Pipeline cache      | `engine/render/`                 | Vulkan pipeline cache + content hashes        | 4      | A    |
 | Frame graph         | `engine/render/`                 | Custom explicit-resource-lifetime + barriers  | 5      | A    |
 | Async compute path  | `engine/render/`                 | Timeline semaphores, multi-queue scheduling   | 5      | A    |
-| Shader pipeline     | `engine/render/shader/`          | HLSL + DXC → SPIR-V                           | 5, 17  | A    |
-| Material system     | `engine/render/material/`        | Data-driven instances; graph editor Tier C    | 5, 17  | A    |
+| Shader pipeline     | `engine/render/shader/`          | HLSL + DXC → SPIR-V; permutations, optional Slang, SPIRV-Reflect | 5, 17  | A    |
+| Material system     | `engine/render/material/`        | `MaterialTemplate` / `MaterialInstance`, `.gwmat` v1; graph editor Tier C | 5, 17  | A    |
 | Forward+ lighting   | `engine/render/`                 | Custom clustered                              | 5      | A    |
 | Cascaded shadows    | `engine/render/`                 | Custom                                        | 5      | A    |
 | IBL                 | `engine/render/`                 | Split-sum approximation                       | 5      | A    |
-| Tonemapping         | `engine/render/`                 | Custom filmic + exposure                      | 5      | A    |
+| Tonemapping         | `engine/render/post/` + `engine/render/` | IBL + filmic in reference path; **PBR Neutral** (default) + **ACES** opt-in in `post/` (Phase 17) | 5, 17  | A    |
 | Profiler integration | `engine/render/`                | Tracy GPU zones + CPU correlation             | 5      | A    |
 | WebGPU backend      | `engine/render/webgpu/`          | Dawn (eventual)                               | Post   | C    |
 | DX12 backend        | —                                | Not planned                                   | —      | C    |
 | Ray tracing         | `engine/render/rt/`              | `VK_KHR_ray_tracing_pipeline`                 | Post   | G    |
 | Mesh shaders        | `engine/render/`                 | `VK_EXT_mesh_shader`                          | Post   | G    |
 | GPU work graphs     | `engine/render/`                 | Vulkan 1.4 extension                          | Post   | G    |
-| GPU particles       | `engine/vfx/`                    | Custom compute-based                          | 17     | B    |
-| Screen-space post   | `engine/vfx/`                    | Bloom, DoF, motion blur, CA, grain             | 17     | B    |
+| GPU particles       | `engine/vfx/particles/`          | Compute emit/sim, curl noise, stream compaction, indirect draw | 17     | B    |
+| Ribbons + decals    | `engine/vfx/ribbons/`, `engine/vfx/decals/` | GPU-tessellated trails; deferred screen-space (Wronski 2015) | 17     | B    |
+| Post-processing     | `engine/render/post/`            | Dual-Kawase bloom, k-DOP TAA, McGuire MB, CoC DoF, CA, grain | 17     | B    |
 | Screen-space GI     | `engine/render/`                 | SSGI placeholder; ReSTIR or baked Post        | Post   | C    |
 | Virtual texturing   | `engine/render/`                 | Not planned v1                                | Post   | C    |
 

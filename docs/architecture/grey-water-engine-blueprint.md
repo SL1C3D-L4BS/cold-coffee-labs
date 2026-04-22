@@ -842,12 +842,14 @@ BLD is the engine's primary competitive differentiator. Implemented as a Rust cr
 
 ### Phase 17 — Shader Pipeline Maturity, Materials & VFX · 6 weeks · Tools & Content Lead
 
-**Deliverables**
-1. Shader-pipeline maturity — cooked permutation matrix; no runtime shader compilation in shipped builds.
-2. Material system — data-driven instances over shader templates; editor material browser with hot-reload.
-3. VFX — GPU compute particle system; ribbon trails; decals; screen-space post (bloom, DoF, motion blur, CA, grain).
+**Status (2026-04-21): completed** — See `docs/05_ROADMAP_AND_MILESTONES.md` §Phase 17 and ADRs 0074–0082. `dev-win` CTest 711/711; exit gate: `apps/sandbox_studio_renderer` + `STUDIO RENDERER` marker; `gw_perf_gate_phase17` + `docs/perf/phase17_budgets.md`.
 
-**Exit Criteria** — a technical artist ships a hero particle effect in under one day; shader permutations cook deterministically; editor material-browser hot-reload works end-to-end on both OSes.
+**Deliverables (landed)**
+1. Shader-pipeline maturity — orthogonal permutation matrix (≤ 64 / template), content-hash cache, Slang opt-in, SPIRV-Reflect layout inference; DXC default.
+2. Material system — `MaterialWorld` PIMPL, `MaterialTemplate` / `MaterialInstance`, `.gwmat` v1, glTF PBR + KHR clearcoat/specular/sheen/transmission; hot-reload on `material_reload` job lane; ImGui material-browser.
+3. VFX + post — GPU particle lifecycle, ribbons, deferred decals; `engine/render/post/` dual-Kawase bloom, k-DOP TAA, McGuire motion blur, CoC DoF, chromatic aberration, grain, Khronos PBR Neutral + ACES.
+
+**Exit Criteria** — *Studio Renderer* marker green: shader cache warm hit ≥ 95 %, `sandbox_studio_renderer` prints configured budgets, frozen render sub-phase order in `runtime/engine.cpp::tick` (see ADR-0082).
 
 ### Phase 18 — Cinematics & Mods · 5 weeks · Tools & Content Lead
 

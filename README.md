@@ -23,7 +23,9 @@ This repository is the monorepo for:
 - *Foundation Renderer* (Phase 5) — engineering **complete** (`b191ca4`); recording gate open.
 - *Foundations Set* (Phase 3) — engineering **complete** (pulled forward through Phase 7 per the 2026-04-20 audit; 101/101 doctest suite green, including the generational-handle ABA guard fixed today).
 - *Editor v0.1* (Phase 7) — engineering **complete** across five commit gates (A–E). Gate E wired a cockpit-polish UI inspired by the Cold Coffee Labs reference mock-up: Scene stats, Render Settings (tone-map + SSAO + exposure + histogram), Lighting, and Render Targets, all bound to a shared `editor::render::RenderSettings`. Recording gate open.
-- *Brewed Logic* (Phase 8 / `.gwscene` binary format) — **in progress**.
+- *Brewed Logic* (Phase 9 / BLD + `.gwscene`) — engineering **complete**; ADR-0010–0016 + amended ADR-0007; six waves 9A–9F. Recording gate open.
+- *Playable Runtime* (Phase 11) — **complete**; `playable_sandbox` exit gate. *Living Scene* (Phase 13) — **complete**; `living_sandbox`. *Two Client Night* (Phase 14) — **complete**; `netplay_sandbox`. *Ship Ready* (Phase 16) — **complete**; `sandbox_platform_services`.
+- *Studio Renderer* (Phase 17) — engineering **complete**; ADR-0074–0082; `MaterialWorld` + `ParticleWorld` + `PostWorld`; `gw_perf_gate_phase17`; `apps/sandbox_studio_renderer` prints the `STUDIO RENDERER` exit marker; `dev-win` CTest **711/711** (see `docs/05_ROADMAP_AND_MILESTONES.md` §Phase 17, `docs/perf/phase17_budgets.md`).
 
 ---
 

@@ -63,8 +63,10 @@ On Windows: `.\build\dev-win\bin\gw_sandbox.exe`, etc.
 | `linux-asan` | Debug + ASan | Linux | Nightly AddressSanitizer |
 | `linux-ubsan` | Debug + UBSan | Linux | Nightly UndefinedBehaviorSanitizer |
 | `linux-tsan` | Debug + TSan | Linux | Nightly ThreadSanitizer |
+| `studio-linux` | see `CMakePresets.json` | Linux | Phase 17 *Studio Renderer* matrix (Slang, SPIRV-Reflect, DXC, SM69); `phase17_*` perf + ship-ready CTests |
+| `studio-win` | see `CMakePresets.json` | Windows | Same on Windows |
 
-Workflow presets exist for `dev-linux` and `dev-win` — `cmake --workflow --preset dev-linux` does configure + build + test in one invocation.
+Workflow presets exist for `dev-linux` and `dev-win` — `cmake --workflow --preset dev-linux` does configure + build + test in one invocation. Weekly CI also runs `studio-{win,linux}` (ADR-0082).
 
 ---
 

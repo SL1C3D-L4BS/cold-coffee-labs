@@ -163,6 +163,7 @@ Current state notes
 - 2026-04-20: *Foundation Renderer* engineering deliverables complete (commit `b191ca4`); recording gate open.
 - 2026-04-21: *Foundations Set* (Phase 3) engineering complete via the Phase-7 pull-forward (ECS `World`, `ComponentRegistry`, queries, `CommandStack`, serialization). 101/101 doctest suite green. Recording rolled into the *Editor v0.1* demo since both milestones can be exercised in a single take.
 - 2026-04-21: *Editor v0.1* (Phase 7) engineering complete across five commit gates (A–E); includes the cockpit-polish pass inspired by the Cold Coffee Labs reference mock-up (Scene / Render Settings / Lighting / Render Targets panels). Recording gate remains open.
+- 2026-04-21: *Studio Renderer* (Phase 17) engineering complete — ADR-0074–0082, `STUDIO RENDERER` exit marker from `sandbox_studio_renderer`, `dev-win` CTest 711/711. Recording gate for the full post chain remains consistent with the project’s narrated milestone policy.
 
 - [ ] *First Light* (week 004 · Phase 1)
 - [ ] *Foundations Set* (week 016 · Phase 3)
@@ -173,6 +174,7 @@ Current state notes
 - [ ] *Living Scene* (week 083 · Phase 13)
 - [ ] *Two Client Night* (week 095 · Phase 14)
 - [ ] *Ship Ready* (week 107 · Phase 16)
+- [ ] *Studio Renderer* (week 113 · Phase 17)
 - [ ] *Studio Ready* (week 118 · Phase 18)
 - [ ] *Infinite Seed* (week 126 · Phase 19)
 - [ ] *First Planet* (week 134 · Phase 20)
