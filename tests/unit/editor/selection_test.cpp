@@ -11,7 +11,7 @@ using namespace gw::editor;
 using gw::ecs::Entity;
 
 namespace {
-constexpr EntityHandle E(std::uint64_t raw) noexcept { return Entity{raw}; }
+constexpr EntityHandle E(std::uint64_t raw) noexcept { return Entity::from_raw_bits(raw); }
 } // namespace
 
 TEST_CASE("SelectionContext — single select clears previous") {

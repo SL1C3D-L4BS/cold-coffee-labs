@@ -2,12 +2,13 @@
 
 #include <doctest/doctest.h>
 
+#include "engine/persist/detail/sqlite_connection_pragmas.hpp"
 #include "engine/persist/local_store.hpp"
 #include "engine/persist/persist_types.hpp"
 
 #include <SQLiteCpp/SQLiteCpp.h>
 
-#include <cstdint>
+#include <array>
 #include <filesystem>
 #include <vector>
 
@@ -33,24 +34,29 @@ TEST_CASE("phase15 — sqlite journal_mode is WAL") {
     CHECK(st.getColumn(0).getString() == "wal");
 }
 
-TEST_CASE("phase15 — sqlite synchronous is NORMAL") {
-    const auto path = unique_temp_db("sync").string();
-    auto                store = gw::persist::make_sqlite_local_store(path);
-    REQUIRE(store->open_or_create());
-    SQLite::Database db(path, SQLite::OPEN_READONLY);
-    SQLite::Statement st(db, "PRAGMA synchronous;");
-    REQUIRE(st.executeStep());
-    CHECK(st.getColumn(0).getInt() == 1); // NORMAL
-}
-
-TEST_CASE("phase15 — sqlite foreign_keys pragma is ON") {
-    const auto path = unique_temp_db("fk").string();
-    auto                store = gw::persist::make_sqlite_local_store(path);
-    REQUIRE(store->open_or_create());
-    SQLite::Database db(path, SQLite::OPEN_READONLY);
-    SQLite::Statement st(db, "PRAGMA foreign_keys;");
-    REQUIRE(st.executeStep());
-    CHECK(st.getColumn(0).getInt() == 1);
+TEST_CASE("phase15 — sqlite ADR-0058 connection pragmas (single handle)") {
+    // synchronous / foreign_keys are per-connection; a second handle does not
+    // inherit the store's settings. This matches the shared helper used by
+    // SqliteLocalStore::open_or_create. Use a temp file (not :memory:) so
+    // journal_mode can settle to wal instead of memory.
+    const auto path = unique_temp_db("adr58").string();
+    SQLite::Database db(path, SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
+    gw::persist::detail::apply_sqlite_connection_pragmas(db);
+    {
+        SQLite::Statement st(db, "PRAGMA journal_mode;");
+        REQUIRE(st.executeStep());
+        CHECK(st.getColumn(0).getString() == "wal");
+    }
+    {
+        SQLite::Statement st(db, "PRAGMA synchronous;");
+        REQUIRE(st.executeStep());
+        CHECK(st.getColumn(0).getInt() == 1); // NORMAL
+    }
+    {
+        SQLite::Statement st(db, "PRAGMA foreign_keys;");
+        REQUIRE(st.executeStep());
+        CHECK(st.getColumn(0).getInt() == 1);
+    }
 }
 
 TEST_CASE("phase15 — STRICT table rejects wrong column type") {
@@ -101,9 +107,9 @@ TEST_CASE("phase15 — telemetry queue insert and pending count") {
     const auto path = unique_temp_db("tele").string();
     auto                store = gw::persist::make_sqlite_local_store(path);
     REQUIRE(store->open_or_create());
-    const std::byte payload[4] = {std::byte{1}, std::byte{2}, std::byte{3}, std::byte{4}};
-    const std::byte bid[8]     = {};
-    const std::byte d128[16]   = {};
+    const std::array<std::byte, 4> payload{std::byte{1}, std::byte{2}, std::byte{3}, std::byte{4}};
+    const std::array<std::byte, 8>  bid{};
+    const std::array<std::byte, 16> d128{};
     REQUIRE(store->telemetry_enqueue(42, bid, payload, 0, 42, d128));
     CHECK(store->telemetry_pending_count() == 1);
     REQUIRE(store->telemetry_delete_all_rows());
@@ -114,9 +120,9 @@ TEST_CASE("phase15 — telemetry_delete_older_than drops aged rows (ADR-0061)") 
     const auto path = unique_temp_db("age").string();
     auto                store = gw::persist::make_sqlite_local_store(path);
     REQUIRE(store->open_or_create());
-    const std::byte payload[1] = {std::byte{0xAB}};
-    const std::byte bid[8]     = {};
-    const std::byte d128[16]   = {};
+    const std::array<std::byte, 1>  payload{std::byte{0xAB}};
+    const std::array<std::byte, 8>  bid{};
+    const std::array<std::byte, 16> d128{};
     REQUIRE(store->telemetry_enqueue(  100, bid, payload, 0,   100, d128));
     REQUIRE(store->telemetry_enqueue(  500, bid, payload, 0,   500, d128));
     REQUIRE(store->telemetry_enqueue(10000, bid, payload, 0, 10000, d128));
@@ -132,9 +138,9 @@ TEST_CASE("phase15 — telemetry_delete_all_rows drains queue") {
     const auto path = unique_temp_db("drain").string();
     auto                store = gw::persist::make_sqlite_local_store(path);
     REQUIRE(store->open_or_create());
-    const std::byte payload[2] = {std::byte{9}, std::byte{9}};
-    const std::byte bid[8]     = {};
-    const std::byte d128[16]  = {};
+    const std::array<std::byte, 2>  payload{std::byte{9}, std::byte{9}};
+    const std::array<std::byte, 8>  bid{};
+    const std::array<std::byte, 16> d128{};
     REQUIRE(store->telemetry_enqueue(1, bid, payload, 0, 1, d128));
     REQUIRE(store->telemetry_enqueue(2, bid, payload, 0, 2, d128));
     CHECK(store->telemetry_pending_count() == 2);

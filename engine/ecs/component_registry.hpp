@@ -28,8 +28,7 @@ namespace gw::core {
 struct TypeInfo;   // forward declare from engine/core/field_reflection.hpp
 } // namespace gw::core
 
-namespace gw {
-namespace ecs {
+namespace gw::ecs {
 
 struct ComponentTypeInfo {
     ComponentTypeId  id                 = kInvalidComponentTypeId;
@@ -45,7 +44,7 @@ struct ComponentTypeInfo {
     // Lifecycle hooks. Null when the type is trivially copyable / destructible.
     void (*copy_construct)(void* dst, const void* src) = nullptr;
     void (*move_construct)(void* dst, void* src) noexcept = nullptr;
-    void (*destruct)(void* p) noexcept = nullptr;
+    void (*destruct)(void* object) noexcept = nullptr;
 
     // Reflection pointer (populated via ADL on describe(T*); nullptr if the type
     // has no GW_REFLECT).
@@ -73,7 +72,7 @@ public:
     template <typename T>
     [[nodiscard]] ComponentTypeId id_of_or_invalid() const noexcept;
 
-    [[nodiscard]] const ComponentTypeInfo& info(ComponentTypeId id) const;
+    [[nodiscard]] const ComponentTypeInfo& info(ComponentTypeId component_type_id) const;
     [[nodiscard]] std::size_t component_count() const noexcept { return infos_.size(); }
 
     [[nodiscard]] std::optional<ComponentTypeId>
@@ -102,13 +101,13 @@ namespace detail {
 
 // FNV1a-64 of a null-terminated C string. constexpr-able; used at compile time
 // via a type-name helper.
-[[nodiscard]] constexpr std::uint64_t fnv1a_64(std::string_view s) noexcept {
-    std::uint64_t h = 0xcbf29ce484222325ULL;
-    for (char c : s) {
-        h ^= static_cast<std::uint64_t>(static_cast<unsigned char>(c));
-        h *= 0x100000001b3ULL;
+[[nodiscard]] constexpr std::uint64_t fnv1a_64(std::string_view text) noexcept {
+    std::uint64_t hash = 0xcbf29ce484222325ULL;
+    for (const char text_char : text) {
+        hash ^= static_cast<std::uint64_t>(static_cast<unsigned char>(text_char));
+        hash *= 0x100000001b3ULL;
     }
-    return h;
+    return hash;
 }
 
 // Compile-time fully-qualified type name of T, lifted out of the compiler's
@@ -139,8 +138,8 @@ template <typename T>
 // `const gw::core::TypeInfo&` exists. Populated by the GW_REFLECT macro
 // (see editor/reflect/reflect.hpp); silently nullptr for components without it.
 template <typename T>
-concept HasDescribe = requires (T* p) {
-    { describe(p) } -> std::convertible_to<const gw::core::TypeInfo&>;
+concept HasDescribe = requires (T* object_ptr) {
+    { describe(object_ptr) } -> std::convertible_to<const gw::core::TypeInfo&>;
 };
 
 template <typename T>
@@ -174,8 +173,8 @@ template <typename T>
             ::new (dst) T(std::move(*static_cast<T*>(src)));
         };
     }
-    info.destruct = [](void* p) noexcept {
-        static_cast<T*>(p)->~T();
+    info.destruct = [](void* object) noexcept {
+        static_cast<T*>(object)->~T();
     };
 
     return info;
@@ -187,20 +186,21 @@ template <typename T>
 inline ComponentTypeId ComponentRegistry::id_of() {
     static constexpr std::uint64_t hash =
         detail::fnv1a_64(detail::gw_type_name<T>());
-    auto it = lookup_cache_.find(hash);
-    if (it != lookup_cache_.end()) return it->second;
-    const auto id = register_raw(detail::make_info_for<T>());
-    lookup_cache_.emplace(hash, id);
-    return id;
+    const auto cache_hit = lookup_cache_.find(hash);
+    if (cache_hit != lookup_cache_.end()) {
+        return cache_hit->second;
+    }
+    const auto registered_id = register_raw(detail::make_info_for<T>());
+    lookup_cache_.emplace(hash, registered_id);
+    return registered_id;
 }
 
 template <typename T>
 inline ComponentTypeId ComponentRegistry::id_of_or_invalid() const noexcept {
     static constexpr std::uint64_t hash =
         detail::fnv1a_64(detail::gw_type_name<T>());
-    auto it = hash_to_id_.find(hash);
-    return (it == hash_to_id_.end()) ? kInvalidComponentTypeId : it->second;
+    const auto found = hash_to_id_.find(hash);
+    return (found == hash_to_id_.end()) ? kInvalidComponentTypeId : found->second;
 }
 
-} // namespace ecs
-} // namespace gw
+} // namespace gw::ecs

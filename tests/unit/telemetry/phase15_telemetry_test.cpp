@@ -157,6 +157,11 @@ TEST_CASE("phase15 — age gate CoreTelemetry under 13 unchanged") {
     CHECK(t == gw::telemetry::ConsentTier::CoreTelemetry);
 }
 
+TEST_CASE("phase15 — age gate Analytics under 13 clamps to CrashOnly") {
+    const auto t = gw::telemetry::apply_age_gate(gw::telemetry::ConsentTier::AnalyticsAllowed, 10, 13);
+    CHECK(t == gw::telemetry::ConsentTier::CrashOnly);
+}
+
 TEST_CASE("phase15 — consent FSM initial None on empty store") {
     auto store = gw::persist::make_sqlite_local_store(temp_store_db("fsm0"));
     REQUIRE(store->open_or_create());

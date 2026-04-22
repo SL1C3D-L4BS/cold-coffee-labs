@@ -4,10 +4,8 @@
 #include "component_registry.hpp"
 
 #include <stdexcept>
-#include <utility>
 
-namespace gw {
-namespace ecs {
+namespace gw::ecs {
 
 ComponentRegistry::ComponentRegistry() {
     infos_.reserve(64);
@@ -20,36 +18,38 @@ ComponentRegistry::~ComponentRegistry() = default;
 ComponentRegistry::ComponentRegistry(ComponentRegistry&&) noexcept            = default;
 ComponentRegistry& ComponentRegistry::operator=(ComponentRegistry&&) noexcept = default;
 
-const ComponentTypeInfo& ComponentRegistry::info(ComponentTypeId id) const {
-    if (id >= infos_.size()) {
+const ComponentTypeInfo& ComponentRegistry::info(ComponentTypeId component_type_id) const {
+    if (component_type_id >= infos_.size()) {
         throw std::out_of_range("ComponentRegistry::info: invalid ComponentTypeId");
     }
-    return infos_[id];
+    return infos_[component_type_id];
 }
 
 std::optional<ComponentTypeId>
 ComponentRegistry::lookup_by_hash(std::uint64_t stable_hash) const noexcept {
-    auto it = hash_to_id_.find(stable_hash);
-    if (it == hash_to_id_.end()) return std::nullopt;
-    return it->second;
+    const auto found = hash_to_id_.find(stable_hash);
+    if (found == hash_to_id_.end()) {
+        return std::nullopt;
+    }
+    return found->second;
 }
 
 ComponentTypeId ComponentRegistry::register_raw(const ComponentTypeInfo& info) {
-    if (auto it = hash_to_id_.find(info.stable_hash); it != hash_to_id_.end()) {
-        return it->second;
+    if (const auto found = hash_to_id_.find(info.stable_hash);
+        found != hash_to_id_.end()) {
+        return found->second;
     }
     if (infos_.size() >= kMaxComponentTypes) {
         throw std::runtime_error(
             "ComponentRegistry: kMaxComponentTypes exceeded; raise the limit "
             "in entity.hpp or stop registering new component types");
     }
-    const auto id = static_cast<ComponentTypeId>(infos_.size());
+    const auto new_component_type_id = static_cast<ComponentTypeId>(infos_.size());
     infos_.push_back(info);
-    infos_.back().id = id;
-    hash_to_id_.emplace(info.stable_hash, id);
-    lookup_cache_.emplace(info.stable_hash, id);
-    return id;
+    infos_.back().id = new_component_type_id;
+    hash_to_id_.emplace(info.stable_hash, new_component_type_id);
+    lookup_cache_.emplace(info.stable_hash, new_component_type_id);
+    return new_component_type_id;
 }
 
-} // namespace ecs
-} // namespace gw
+} // namespace gw::ecs

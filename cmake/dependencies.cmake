@@ -26,6 +26,11 @@ CPMAddPackage(
         "GLFW_BUILD_DOCS OFF"
         "GLFW_INSTALL OFF"
 )
+# GLFW is third-party C; clang warns heavily. Silence C TU warnings so our
+# build stays warning-clean without patching upstream.
+if(TARGET glfw)
+    target_compile_options(glfw PRIVATE $<$<COMPILE_LANGUAGE:C>:-w>)
+endif()
 
 # --- volk (Phase 1 — Vulkan function loader) ----------------------------------
 CPMAddPackage(
@@ -125,6 +130,14 @@ CPMAddPackage(
         "BASISU_SUPPORT_KTX2 ON"
         "SSE OFF"
 )
+foreach(_gw_basisu_tgt IN ITEMS basisu_encoder basisu)
+    if(TARGET ${_gw_basisu_tgt})
+        target_compile_options(
+            ${_gw_basisu_tgt}
+            PRIVATE
+                $<$<COMPILE_LANGUAGE:CXX>:-Wno-nontrivial-memcall -Wno-macro-redefined>)
+    endif()
+endforeach()
 
 # xxHash v0.8.2 — content-addressed cook keys (xxHash3-128, 10-15x faster
 # than SHA256, equivalent collision resistance for non-adversarial inputs).

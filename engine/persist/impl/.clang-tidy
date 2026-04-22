@@ -1,0 +1,11 @@
+---
+# SQLiteCpp glue: many tiny statements; keep safety checks, relax noisy style.
+InheritParentConfig: true
+Checks: >
+  -readability-identifier-length,
+  -readability-braces-around-statements,
+  -bugprone-easily-swappable-parameters,
+  -readability-redundant-member-init,
+  -bugprone-empty-catch
+WarningsAsErrors: '*'
+FormatStyle: file

@@ -18,8 +18,8 @@ namespace gw::editor {
 namespace {
 constexpr float kMinPitch   = -1.55f;   // ~-89°
 constexpr float kMaxPitch   =  1.55f;
-constexpr float kMinDist    =  0.05f;
-constexpr float kOrthoZoom  =  10.f;    // initial ortho half-size
+[[maybe_unused]] constexpr float kMinDist   = 0.05f;
+[[maybe_unused]] constexpr float kOrthoZoom = 10.f; // initial ortho half-size (Phase 10 ortho polish)
 }
 
 // ---------------------------------------------------------------------------

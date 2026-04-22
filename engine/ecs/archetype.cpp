@@ -17,7 +17,7 @@ Chunk::Chunk(ChunkAllocation allocation)
     : data_(allocation.total_bytes)
     , entities_(allocation.slots_per_chunk)
     , capacity_(allocation.slots_per_chunk) {
-    // Entities default-construct to Entity{0} (null) — fine.
+    // Entities default-construct to null — fine.
 }
 
 // ---------------------------------------------------------------------------

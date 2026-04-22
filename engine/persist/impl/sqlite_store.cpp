@@ -1,21 +1,13 @@
 // engine/persist/impl/sqlite_store.cpp — ADR-0058 (header quarantine).
 
 #include "engine/persist/local_store.hpp"
+#include "engine/persist/detail/sqlite_connection_pragmas.hpp"
 
 #include <SQLiteCpp/SQLiteCpp.h>
-
-#include <sstream>
 
 namespace gw::persist {
 
 namespace {
-
-void apply_pragmas(SQLite::Database& db) {
-    db.exec("PRAGMA journal_mode=WAL;");
-    db.exec("PRAGMA synchronous=NORMAL;");
-    db.exec("PRAGMA foreign_keys=ON;");
-    db.exec("PRAGMA analysis_limit=400;");
-}
 
 void create_schema_v1(SQLite::Database& db) {
     db.exec(R"SQL(
@@ -78,7 +70,7 @@ public:
     bool open_or_create() override {
         try {
             db_ = std::make_unique<SQLite::Database>(path_, SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
-            apply_pragmas(*db_);
+            detail::apply_sqlite_connection_pragmas(*db_);
             create_schema_v1(*db_);
             SQLite::Statement st(*db_, R"SQL(
 INSERT INTO schema_version(component, version) VALUES('persist_db', 1)

@@ -1,20 +1,34 @@
 # Greywater — clangd / IDE IntelliSense
 #
-# CMake exports compile_commands.json under build/<preset>/ (not at repo root).
-# Pointing clangd at that database is required so TU flags match clang-cl:
-# -IC:/.../cold-coffee-labs, doctest, imgui, bld headers, etc.
+# After `cmake --preset dev-win` (or dev-linux), root CMake mirrors
+# build/<preset>/compile_commands.json → ./compile_commands.json (gitignored).
 #
-# Windows: `cmake --preset dev-win` then reload the window (or restart clangd).
-# Linux: change CompilationDatabase below to `build/dev-linux`, or symlink
-#   build/<preset>/compile_commands.json → ./compile_commands.json at the root.
+# IDE often runs WarningsAsErrors='*' for clang-tidy, which floods the Problems
+# panel with style findings. Strip tidy from clangd entirely; CI still runs tidy.
+---
+Diagnostics:
+  ClangTidy:
+    Remove: '*'
 
+---
+# Fallback when compile_commands has no TU yet or paths drift. Duplicate -I entries
+# are harmless; clangd merges with compile_commands.json when present.
 If:
   PathMatch: .*
 CompileFlags:
-  CompilationDatabase: build/dev-win
   Add:
-    # Fallback when a file has no compile_commands entry yet.
     - -std=c++23
     - -I.
+    - -Ieditor
+    - -Ibld
+    # FetchContent deps (preset build dirs — keep in sync after CMake configure)
     - -Ibuild/dev-win/_deps/glm-src
     - -Ibuild/dev-linux/_deps/glm-src
+    - -Ibuild/dev-win/_deps/doctest-src
+    - -Ibuild/dev-linux/_deps/doctest-src
+    - -Ibuild/dev-win/_deps/volk-src
+    - -Ibuild/dev-linux/_deps/volk-src
+    - -Ibuild/dev-win/_deps/vulkan-headers-src/include
+    - -Ibuild/dev-linux/_deps/vulkan-headers-src/include
+    - -Ibuild/dev-win/_deps/vulkanmemoryallocator-src/include
+    - -Ibuild/dev-linux/_deps/vulkanmemoryallocator-src/include

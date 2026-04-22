@@ -63,8 +63,8 @@ public:
 private:
     std::filesystem::path input_root_;
     std::filesystem::path output_root_;
-    CookPlatform          platform_;
-    CookConfig            config_;
+    [[maybe_unused]] CookPlatform platform_{};
+    [[maybe_unused]] CookConfig   config_{};
 
     std::vector<CookNode> nodes_;
     std::unordered_map<std::string, std::size_t> source_to_index_;

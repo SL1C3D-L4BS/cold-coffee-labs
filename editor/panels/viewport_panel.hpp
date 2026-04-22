@@ -70,9 +70,9 @@ private:
 
     // Entity picking staging buffer — written to by GPU, read by CPU next frame.
     // Full picking pipeline wired in Phase 7 §6.4.
-    bool              picking_requested_   = false;
-    uint32_t          pick_pixel_x_        = 0;
-    uint32_t          pick_pixel_y_        = 0;
+    [[maybe_unused]] bool              picking_requested_   = false;
+    [[maybe_unused]] uint32_t          pick_pixel_x_        = 0;
+    [[maybe_unused]] uint32_t          pick_pixel_y_        = 0;
     EntityHandle      hovered_entity_      = kNullEntity;
 
     // Viewport window size recorded last frame.

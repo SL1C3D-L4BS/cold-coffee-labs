@@ -94,4 +94,15 @@ add_subdirectory(tools/gw_save_tool)
 # --- Unit + integration test suite -------------------------------------------
 add_subdirectory(tests)
 
+# clangd / IDE: mirror compile_commands.json to the repo root (ignored by git).
+# Clangd walks parents for a TU and picks this up without hard-coding a preset
+# path in .clangd; run `cmake --preset dev-win` (or dev-linux) after checkout.
+if(CMAKE_EXPORT_COMPILE_COMMANDS
+   AND EXISTS "${CMAKE_BINARY_DIR}/compile_commands.json")
+  execute_process(
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+            "${CMAKE_BINARY_DIR}/compile_commands.json"
+            "${CMAKE_SOURCE_DIR}/compile_commands.json")
+endif()
+
 message(STATUS "Greywater configure complete — ${CMAKE_BUILD_TYPE} on ${CMAKE_SYSTEM_NAME}, compiler ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")

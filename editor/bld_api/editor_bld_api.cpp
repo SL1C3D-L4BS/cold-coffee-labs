@@ -103,7 +103,7 @@ GW_EDITOR_API const char* gw_editor_version() {
 // ---------------------------------------------------------------------------
 GW_EDITOR_API uint64_t gw_editor_get_primary_selection() {
     if (!g_globals.selection) return 0u;
-    return g_globals.selection->primary().bits;
+    return g_globals.selection->primary().raw_bits();
 }
 
 GW_EDITOR_API uint32_t gw_editor_get_selection_count() {
@@ -116,7 +116,7 @@ GW_EDITOR_API void gw_editor_set_selection(const uint64_t* handles,
     if (!g_globals.selection || !handles || count == 0) return;
     g_globals.selection->clear();
     for (uint32_t i = 0; i < count; ++i)
-        g_globals.selection->toggle(gw::ecs::Entity{handles[i]});
+        g_globals.selection->toggle(gw::ecs::Entity::from_raw_bits(handles[i]));
 }
 
 // ---------------------------------------------------------------------------
@@ -126,12 +126,12 @@ GW_EDITOR_API uint64_t gw_editor_create_entity(const char* name) {
     g_globals.world->add_component(e,
         gw::editor::scene::NameComponent{name ? name : "Entity"});
     g_globals.world->add_component(e, gw::editor::scene::TransformComponent{});
-    return e.bits;
+    return e.raw_bits();
 }
 
 GW_EDITOR_API bool gw_editor_destroy_entity(uint64_t handle) {
     if (!g_globals.world) return false;
-    const gw::ecs::Entity e{handle};
+    const gw::ecs::Entity e = gw::ecs::Entity::from_raw_bits(handle);
     if (!g_globals.world->is_alive(e)) return false;
     g_globals.world->destroy_entity(e);
     return true;

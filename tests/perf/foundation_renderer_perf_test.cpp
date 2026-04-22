@@ -103,13 +103,13 @@ void test_fg_cycle_detection() {
     pa.reads.push_back(rb.value());
     pa.writes.push_back(ra.value());
     pa.execute = [](CommandBuffer&) {};
-    fg.add_pass(std::move(pa));
+    [[maybe_unused]] const auto pass_a = fg.add_pass(std::move(pa));
 
     PassDesc pb("PB");
     pb.reads.push_back(ra.value());
     pb.writes.push_back(rb.value());
     pb.execute = [](CommandBuffer&) {};
-    fg.add_pass(std::move(pb));
+    [[maybe_unused]] const auto pass_b = fg.add_pass(std::move(pb));
 
     auto comp = fg.compile();
     check(!comp.has_value(), "compile fails on cycle");
@@ -192,7 +192,7 @@ void test_fg_compile_time() {
         if (prev.has_value()) p.reads.push_back(prev.value());
         if (next.has_value()) p.writes.push_back(next.value());
         p.execute = [](CommandBuffer&) {};
-        fg.add_pass(std::move(p));
+        [[maybe_unused]] const auto pass = fg.add_pass(std::move(p));
         prev = next;
     }
 

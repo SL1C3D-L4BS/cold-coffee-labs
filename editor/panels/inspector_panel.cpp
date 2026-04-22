@@ -115,7 +115,7 @@ void InspectorPanel::on_imgui_render(EditorContext& ctx) {
         return;
     }
 
-    ImGui::Text("Entity  0x%llx", static_cast<unsigned long long>(primary.bits));
+    ImGui::Text("Entity  0x%llx", static_cast<unsigned long long>(primary.raw_bits()));
     ImGui::Separator();
 
     // Name (special-cased; no GW_REFLECT).

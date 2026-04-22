@@ -72,7 +72,7 @@ void OutlinerPanel::draw_entity_row(EditorContext& ctx, EntityHandle h) {
     if (!is_branch)  flags |= ImGuiTreeNodeFlags_Leaf;
     if (is_selected) flags |= ImGuiTreeNodeFlags_Selected;
 
-    ImGui::PushID(static_cast<int>(h.bits));
+    ImGui::PushID(static_cast<int>(h.raw_bits()));
     const bool open = ImGui::TreeNodeEx(label, flags);
 
     if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {

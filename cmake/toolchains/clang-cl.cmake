@@ -7,14 +7,15 @@
 set(CMAKE_C_COMPILER   clang-cl)
 set(CMAKE_CXX_COMPILER clang-cl)
 
+# Note: omit /Zc:preprocessor and /MP — they are MSVC cl.exe switches; clang-cl
+# accepts them but warns "argument unused during compilation", which breaks
+# our zero-warning policy. Ninja already parallelizes TUs across processes.
 add_compile_options(
     /W4
     /permissive-
-    /Zc:preprocessor
     /Zc:__cplusplus
     /utf-8
     /EHsc
-    /MP
     $<$<CONFIG:Debug>:/Od>
 )
 add_compile_definitions(

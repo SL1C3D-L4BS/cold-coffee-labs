@@ -63,7 +63,7 @@ private:
     GizmoOp    current_op_    = GizmoOp::Translate;
     GizmoSpace current_space_ = GizmoSpace::World;
     bool       using_gizmo_   = false;
-    bool       tx_open_       = false;   // command transaction open?
+    [[maybe_unused]] bool tx_open_ = false; // command transaction open? (undo wiring)
 
     glm::mat4  pivot_mat_ = glm::mat4{1.f};
     glm::mat4  delta_     = glm::mat4{1.f};

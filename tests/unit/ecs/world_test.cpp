@@ -124,13 +124,13 @@ TEST_CASE("World — for_each iterates matching archetypes") {
 
     std::unordered_set<std::uint64_t> seen;
     w.for_each<Position, Velocity>([&](Entity e, Position& /*p*/, Velocity& /*v*/) {
-        seen.insert(e.bits);
+        seen.insert(e.raw_bits());
     });
     CHECK(seen.size() == 1);
-    CHECK(seen.count(a.bits) == 1);
+    CHECK(seen.count(a.raw_bits()) == 1);
 
     seen.clear();
-    w.for_each<Position>([&](Entity e, Position& /*p*/) { seen.insert(e.bits); });
+    w.for_each<Position>([&](Entity e, Position& /*p*/) { seen.insert(e.raw_bits()); });
     CHECK(seen.size() == 3);
 }
 

@@ -74,7 +74,7 @@ std::size_t update_transforms(gw::ecs::World& w) {
         // Linear probe — n is small; cache-friendlier than an unordered_map
         // for the scales we care about (<4k entities).
         for (std::size_t i = 0; i < n; ++i) {
-            if (records[i].entity.bits == e.bits) return i;
+            if (records[i].entity.raw_bits() == e.raw_bits()) return i;
         }
         return static_cast<std::size_t>(-1);
     };
