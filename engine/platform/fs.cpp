@@ -51,5 +51,12 @@ std::uint64_t FileSystem::last_write_stamp(const std::filesystem::path& path) no
     return static_cast<std::uint64_t>(t.time_since_epoch().count());
 }
 
+bool FileSystem::bump_last_write_stamp(const std::filesystem::path& path) noexcept {
+    std::error_code ec;
+    const auto now = std::filesystem::file_time_type::clock::now();
+    std::filesystem::last_write_time(path, now, ec);
+    return !ec;
+}
+
 }  // namespace platform
 }  // namespace gw

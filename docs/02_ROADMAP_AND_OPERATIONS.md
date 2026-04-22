@@ -31,7 +31,7 @@ This document governs the schedule and day-to-day workflow for Greywater Engine 
 | 15 | Persistence & Telemetry | 096–101 | 6w | — | ✅ Complete (473/473 tests) |
 | 16 | Platform Services, i18n & a11y | 102–107 | 6w | *Ship Ready* | ✅ Complete (586/586 tests) |
 | 17 | Shader Pipeline, Materials & VFX | 108–113 | 6w | *Studio Renderer* | ✅ Complete (711/711 tests) |
-| 18 | Cinematics & Mods | 114–118 | 5w | *Studio Ready* | 🔜 Planned |
+| 18 | Cinematics & Mods | 114–118 | 5w | *Studio Ready* | ✅ Complete (18-C: `mod_api` / `ModRegistry`, `example_mod`, `sandbox_studio`, BLD seq gate) |
 | 19 | **Blacklake Core & Deterministic Genesis** | 119–126 | 8w | *Infinite Seed* | 🔜 Planned |
 | 20 | **Arena Topology, GPTM & Sacrilege LOD** | 127–134 | 8w | *Nine Circles Ground* | 🔜 Planned |
 | 21 | **Sacrilege Frame — Rendering, Atmosphere, Audio** | 135–142 | 8w | *Hell Frame* | 🔜 Planned |
@@ -197,12 +197,12 @@ One paragraph: what this builds on and why it exists.
 | *Two Client Night* (Ph 14) | GNS transport + ECS replication + 2-client integration | 2 clients sync 60 s |
 | *Ship Ready* (Ph 16) | WCAG 2.2 AA, 5 locales, Steamworks + EOS integration | Localized menu + a11y audit |
 | *Studio Renderer* (Ph 17) | Full VFX stack, PBR Neutral tone, bloom/TAA/DoF/CA/grain | Studio render of Sacrilege Circle |
-| *Studio Ready* (Ph 18) | Cinematic playback + mod loads | 30-second cinematic plays |
+| *Studio Ready* (Ph 18) | `.gwseq` playback, `sandbox_studio` exit gate, mod API + `example_mod` + BLD seq C-ABI | `sandbox_studio` prints STUDIO READY |
 | *Infinite Seed* (Ph 19) | HEC + SDR + arena gen from Hell Seed — deterministic | Same seed = same Circle, two machines |
 | *Nine Circles Ground* (Ph 20) | All 9 Circles generate, GPTM LOD correct | Circle flythrough at 144 FPS |
 | *Hell Frame* (Ph 21) | Full Sacrilege aesthetic + 144 FPS on RX 580 | Gameplay video |
 | *Martyrdom Online* (Ph 22) | 2-player combat, full Martyrdom loop, netcode | 2-player session, no desync |
-| *God Machine RC* (Ph 23) | Full Circle 9 end-to-end, God Machine boss | Complete playthrugh |
+| *God Machine RC* (Ph 23) | Full Circle 9 end-to-end, God Machine boss | Complete playthrough |
 | *Release Candidate* (Ph 24) | All above + certification + docs | 10-min board demo, no intervention |
 
 ---

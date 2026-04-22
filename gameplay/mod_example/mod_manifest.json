@@ -1,0 +1,6 @@
+{
+  "mod_id": "example_mod",
+  "display_name": "Example Mod",
+  "version": "0.1.0",
+  "engine_min_version": "0.18.0"
+}

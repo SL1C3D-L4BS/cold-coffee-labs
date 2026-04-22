@@ -15,13 +15,18 @@
 #include <cstdint>
 #include <functional>
 #include <mutex>
-#include <string>
 #include <unordered_map>
 #include <vector>
 
 namespace gw::render::hal { class VulkanDevice; }
 
 namespace gw::assets {
+
+/// Tag: mod/studio sandboxes with no GPU device. No background loader; `load_sync` returns an error
+/// for GPU-backed types until a full `AssetDatabase(VulkanDevice&, …)` is used.
+struct AssetDatabaseModHarnessTag {
+    explicit AssetDatabaseModHarnessTag() = default;
+};
 
 enum class AssetState : uint8_t {
     Unloaded,
@@ -47,6 +52,7 @@ class AssetDatabase {
 public:
     explicit AssetDatabase(render::hal::VulkanDevice& device,
                             vfs::VirtualFilesystem&    vfs);
+    explicit AssetDatabase(AssetDatabaseModHarnessTag, vfs::VirtualFilesystem& vfs) noexcept;
     ~AssetDatabase();
 
     AssetDatabase(const AssetDatabase&)            = delete;
@@ -91,7 +97,8 @@ private:
     void        enqueue_load(AssetHandle h);
     void        loader_thread_fn();
 
-    render::hal::VulkanDevice&              device_;
+    /// Null when `AssetDatabaseModHarnessTag` construction path is used.
+    render::hal::VulkanDevice*            device_{nullptr};
     vfs::VirtualFilesystem&                 vfs_;
     AssetLoaderRegistry                     loaders_;
 
@@ -134,7 +141,11 @@ AssetDatabase::load_sync(const AssetPath& cooked_path) {
         return std::unexpected(AssetError{AssetErrorCode::InvalidArgument,
                                           "no loader for asset type"});
 
-    auto result = loader->load(device_, raw);
+    if (device_ == nullptr) {
+        return std::unexpected(AssetError{AssetErrorCode::InvalidArgument,
+                                          "AssetDatabase: no GPU device (harness mode)"});
+    }
+    auto result = loader->load(*device_, raw);
     if (!result) {
         std::lock_guard lock{mutex_};
         slots_[h.index()].meta.state = AssetState::Error;
@@ -154,6 +165,9 @@ AssetDatabase::load_sync(const AssetPath& cooked_path) {
 
 template<typename T>
 TypedHandle<T> AssetDatabase::load_async(const AssetPath& cooked_path) {
+    if (device_ == nullptr) {
+        return {};
+    }
     AssetHandle h = register_or_find(cooked_path,
                                       static_cast<AssetType>(T::kAssetTypeTag));
     enqueue_load(h);

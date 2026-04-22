@@ -100,18 +100,23 @@ add_executable(gw_editor
     reflect/widget_drawer.cpp
     pie/gameplay_host.cpp
     bld_api/editor_bld_api.cpp
+    bld_api/bld_host_table.cpp
+    seq/seq_gwseq_rebuild.cpp
+    seq_panel/seq_panel.cpp
     undo/command_stack.cpp
 )
 
 target_include_directories(gw_editor PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/bld/include
 )
 
 target_link_libraries(gw_editor PRIVATE
     greywater::core
     greywater::assets
     engine_render
+    gw_seq
     bld_ffi
 )
 

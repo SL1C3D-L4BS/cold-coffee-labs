@@ -37,6 +37,8 @@ required-features = ["server"]
 default = []
 # `server` enables the MCP-over-stdio binary + the tokio runtime hop.
 server = ["bld-mcp/runtime", "dep:tracing-subscriber"]
+# Phase 18-B sequencer BLD tools (`seq.*`) — optional; pulls `bld-tools/seq-tools`.
+seq-tools = ["bld-tools/seq-tools"]
 
 [target.'cfg(any())'.dependencies]
 # Placeholder — stops cargo from inlining dead target cfg sections.

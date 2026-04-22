@@ -31,8 +31,12 @@
 #include "editor/panels/render_targets_panel.hpp"
 #include "editor/vscript/vscript_panel.hpp"
 #include "editor/agent_panel/agent_panel.hpp"
+#include "editor/seq_panel/seq_panel.hpp"
+#include "editor/bld_api/editor_bld_api.hpp"
 #include "editor/scene/components.hpp"
 #include "engine/ecs/hierarchy.hpp"
+#include "engine/scene/seq/seq_cut.hpp"
+#include "engine/scene/seq/sequencer_world.hpp"
 
 // volk must precede every Vulkan include in this TU so that imgui_impl_vulkan
 // picks up volk's dispatch tables (IMGUI_IMPL_VULKAN_USE_VOLK is set by the
@@ -48,8 +52,6 @@
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
-
-#include "engine/core/log.hpp"
 
 #include <algorithm>
 #include <array>
@@ -227,11 +229,16 @@ EditorApplication::EditorApplication()
     panels_.add(std::make_unique<VScriptPanel>());
     // Phase 9 week 048 — Brewed Logic Directive chat panel.
     panels_.add(std::make_unique<gw::editor::agent::AgentPanel>());
+    // Phase 18-B — Sequencer timeline + camera preview.
+    panels_.add(std::make_unique<gw::editor::seq::SeqPanel>());
 
     // Wire BLD API globals.
     gw::editor::bld_api::g_globals.selection = &selection_;
     gw::editor::bld_api::g_globals.cmd_stack = &cmd_stack_;
     gw::editor::bld_api::g_globals.world     = &scene_world_;
+    gw::editor::bld_api::g_globals.sequencer_world   = &sequencer_world_;
+    gw::editor::bld_api::g_globals.cinematic_system  = &cinematic_camera_;
+    gw::editor::bld_api::install_bld_host_callbacks();
 
     // Seed the scene with three demo entities so the Outliner and Inspector
     // have something to display on first launch. A root with two children
@@ -263,6 +270,10 @@ EditorApplication::EditorApplication()
 
     (void)scene_world_.reparent(childA, root);
     (void)scene_world_.reparent(childB, root);
+
+    seq_player_entity_ = scene_world_.create_entity();
+    scene_world_.add_component(seq_player_entity_, gw::seq::SeqPlayerComponent{});
+    gw::editor::bld_api::g_globals.seq_player_entity_bits = seq_player_entity_.raw_bits();
 }
 
 EditorApplication::~EditorApplication() {
@@ -330,13 +341,23 @@ void EditorApplication::run() {
             pie_time_.dt_s = 0.f;
         }
 
+        gw::seq::SequencerSystem::tick(sequencer_world_, scene_world_, nullptr, dt);
+        double play_head = 0.0;
+        scene_world_.for_each<gw::seq::SeqPlayerComponent>(
+            [&](const gw::ecs::Entity, const gw::seq::SeqPlayerComponent& pl) { play_head = pl.play_head_frame; });
+        gw::seq::CutSystem::tick(scene_world_, play_head);
+        cinematic_camera_.tick(scene_world_);
+
         EditorContext ctx{
             .selection    = selection_,
             .cmd_stack    = cmd_stack_,
             .world        = &scene_world_,
             .asset_db     = nullptr,   // Phase 8
             .delta_time_s = dt,
-            .in_pie       = pie_.in_play()
+            .in_pie       = pie_.in_play(),
+            .sequencer    = &sequencer_world_,
+            .cinematic    = &cinematic_camera_,
+            .scene_color_descriptor = reinterpret_cast<void*>(vk_->scene_imgui_ds),
         };
 
         build_ui();

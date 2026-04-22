@@ -19,3 +19,6 @@ add_subdirectory(sandbox_platform_services)
 
 # Phase 17 — Studio Renderer exit-demo (ADR-0082).
 add_subdirectory(sandbox_studio_renderer)
+
+# Phase 18 — Studio Ready (cinematics + mod + BLD seq surface).
+add_subdirectory(sandbox_studio)

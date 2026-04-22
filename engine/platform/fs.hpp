@@ -2,7 +2,6 @@
 
 #include <filesystem>
 #include <optional>
-#include <string>
 #include <vector>
 
 namespace gw {
@@ -23,6 +22,10 @@ public:
     // Returns 0 if the file does not exist or cannot be stat'd. Values are
     // only comparable for equality/ordering between calls for the same path.
     [[nodiscard]] static std::uint64_t last_write_stamp(const std::filesystem::path& path) noexcept;
+
+    /// Bumps the path's last-write time without rewriting file bytes (hot-reload tests;
+    /// Windows cannot truncate a mapped gameplay_module PE image while it is loaded).
+    [[nodiscard]] static bool bump_last_write_stamp(const std::filesystem::path& path) noexcept;
 };
 
 }  // namespace platform

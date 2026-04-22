@@ -19,10 +19,12 @@ TEST_CASE("engine/core/version: exposes non-null, non-empty version string") {
     CHECK(std::string_view(v).find("Greywater_Engine") != std::string_view::npos);
 }
 
-TEST_CASE("engine/core/version: compile-time version matches 0.0.1 at Phase 1") {
+TEST_CASE("engine/core/version: compile-time version matches project() at configure") {
     constexpr auto v = gw::core::version();
-    static_assert(v.major == 0);
-    static_assert(v.minor == 0);
-    static_assert(v.patch == 1);
-    CHECK(v.major == 0);
+    static_assert(v.major == GW_VERSION_MAJOR);
+    static_assert(v.minor == GW_VERSION_MINOR);
+    static_assert(v.patch == GW_VERSION_PATCH);
+    CHECK(v.major == GW_VERSION_MAJOR);
+    CHECK(v.minor == GW_VERSION_MINOR);
+    CHECK(v.patch == GW_VERSION_PATCH);
 }

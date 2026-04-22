@@ -758,6 +758,8 @@ dependencies = [
 name = "bld-tools"
 version = "0.9.0"
 dependencies = [
+ "bld-bridge",
+ "bld-ffi",
  "bld-governance",
  "bld-tools-macros",
  "inventory",

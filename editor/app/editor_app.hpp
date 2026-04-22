@@ -15,7 +15,10 @@
 #include "editor/pie/gameplay_host.hpp"
 #include "editor/undo/command_stack.hpp"
 #include "engine/core/time.hpp"
+#include "engine/ecs/entity.hpp"
 #include "engine/ecs/world.hpp"
+#include "engine/scene/seq/seq_camera.hpp"
+#include "engine/scene/seq/sequencer_world.hpp"
 
 #include <memory>
 
@@ -99,6 +102,11 @@ private:
     GameplayContext        pie_ctx_{};     // lives for the session; world/time filled lazily
     gw::TimeState          pie_time_{};    // handed to gameplay through pie_ctx_.time
     gw::ecs::World         scene_world_;   // authoring world — lives for the editor session
+
+    // Phase 18-B — `.gwseq` playback + cinematic view (editor session objects).
+    gw::seq::SequencerWorld            sequencer_world_{};
+    gw::seq::CinematicCameraSystem     cinematic_camera_{};
+    gw::ecs::Entity                    seq_player_entity_{};
 
     // Cockpit render settings (Phase 7 gate-E) — shared with the cockpit
     // panels and, once Phase 8 lands, with the frame-graph. Panels borrow a

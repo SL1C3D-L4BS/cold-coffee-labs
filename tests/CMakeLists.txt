@@ -19,6 +19,7 @@ add_executable(gw_tests
     # Phase 7 week 042 — BLD C-ABI v1 freeze smoke (ADR 0007 in docs/10_APPENDIX_ADRS_AND_REFERENCES.md)
     smoke/bld_abi_v1/bld_abi_smoke_test.cpp
     "${CMAKE_SOURCE_DIR}/editor/bld_api/editor_bld_api.cpp"
+    "${CMAKE_SOURCE_DIR}/editor/seq/seq_gwseq_rebuild.cpp"
     # Phase 7 gap-fill — ECS World (ADR 0004 in docs/10_APPENDIX_ADRS_AND_REFERENCES.md)
     unit/ecs/world_test.cpp
     # Phase 7 — ECS serialization (ADR 0006 in docs/10_APPENDIX_ADRS_AND_REFERENCES.md)
@@ -135,6 +136,8 @@ add_executable(gw_tests
     unit/render/post/phase17_taa_test.cpp
     unit/render/post/phase17_motion_blur_dof_test.cpp
     unit/runtime/phase17_runtime_integration_test.cpp
+    # Phase 18 — mod host + gameplay_module (ADR-adjacent mod surface)
+    mod/mod_loader_test.cpp
     test_main.cpp
 )
 
@@ -159,6 +162,9 @@ target_link_libraries(gw_tests
         doctest::doctest
         volk
         xxhash
+        # editor_bld_api.cpp (BLD dispatch) + seq codec / SequencerWorld
+        gw_seq
+        bld_ffi
 )
 
 # Pull in Vulkan/VMA headers that asset headers need.
@@ -171,6 +177,7 @@ target_include_directories(gw_tests PRIVATE
 # Phase 15 — privacy-UI test resolves `ui/privacy/en.locale.txt` at runtime.
 target_compile_definitions(gw_tests PRIVATE
     CCL_REPO_ROOT="${CMAKE_SOURCE_DIR}"
+    GW_MOD_BUILD="${CMAKE_BINARY_DIR}"
 )
 
 # Phase 7: GLM is needed for reflect macro tests (widget_drawer.hpp pulls glm).
@@ -183,11 +190,34 @@ set_target_properties(gw_tests PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
 
+# Phase 18: example mod dylib must be built before mod_loader tests.
+add_dependencies(gw_tests example_mod)
+
 # doctest CMake integration auto-registers each TEST_CASE with CTest.
 include("${doctest_SOURCE_DIR}/scripts/cmake/doctest.cmake")
 doctest_discover_tests(gw_tests
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
     PROPERTIES LABELS smoke;assets
+)
+
+# Phase 18-A — `.gwseq` codec + sequencer unit tests.
+add_executable(seq_tests
+    test_main.cpp
+    seq/seq_codec_test.cpp
+    seq/seq_spline_test.cpp
+)
+target_link_libraries(seq_tests PRIVATE gw_seq doctest::doctest)
+target_include_directories(seq_tests PRIVATE
+    "${CMAKE_SOURCE_DIR}"
+    "${CMAKE_BINARY_DIR}/_deps/volk-src"
+    "${CMAKE_BINARY_DIR}/_deps/VulkanMemoryAllocator-src/include"
+)
+set_target_properties(seq_tests PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
+doctest_discover_tests(seq_tests
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+    PROPERTIES LABELS seq
 )
 
 # Week 032 — Foundation Renderer milestone perf gate.

@@ -4,7 +4,6 @@
 #include "texture_asset.hpp"
 #include "engine/jobs/scheduler.hpp"
 
-#include <algorithm>
 #include <chrono>
 #include <thread>
 
@@ -12,7 +11,7 @@ namespace gw::assets {
 
 AssetDatabase::AssetDatabase(render::hal::VulkanDevice& device,
                               vfs::VirtualFilesystem&    vfs)
-    : device_(device)
+    : device_(&device)
     , vfs_(vfs)
 {
     slots_.reserve(4096);
@@ -20,6 +19,13 @@ AssetDatabase::AssetDatabase(render::hal::VulkanDevice& device,
     // Long-lived loader lives on a jobs-owned worker thread (NN #10, P2-1).
     loader_thread_ = gw::jobs::Scheduler::reserve_worker(
         [this]() { loader_thread_fn(); });
+}
+
+AssetDatabase::AssetDatabase(AssetDatabaseModHarnessTag, vfs::VirtualFilesystem& vfs) noexcept
+    : device_(nullptr)
+    , vfs_(vfs) {
+    slots_.reserve(256);
+    loaders_ = make_default_registry();
 }
 
 AssetDatabase::~AssetDatabase() {
@@ -120,7 +126,12 @@ void AssetDatabase::loader_thread_fn() {
             continue;
         }
 
-        auto result = loader->load(device_, raw);
+        if (device_ == nullptr) {
+            std::lock_guard lock{mutex_};
+            slots_[req.handle.index()].meta.state = AssetState::Error;
+            continue;
+        }
+        auto result = loader->load(*device_, raw);
         {
             std::lock_guard lock{mutex_};
             auto& slot = slots_[req.handle.index()];

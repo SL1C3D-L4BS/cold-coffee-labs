@@ -2,7 +2,6 @@
 
 #include <array>
 #include <cstddef>
-#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -29,6 +28,8 @@ private:
     std::size_t size_{0};
     bool heap_active_{false};
 };
+
+using String = Utf8String;
 
 }  // namespace gw
 }  // namespace core

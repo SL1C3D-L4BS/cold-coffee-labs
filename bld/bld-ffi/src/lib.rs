@@ -29,6 +29,8 @@
 use core::ffi::{c_char, c_void};
 use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
+use std::sync::Mutex;
+
 // =============================================================================
 // ABI version trail (ADR-0007, amended 2026-04-21)
 // =============================================================================
@@ -87,6 +89,38 @@ const BLD_GREETING: &[u8] = b"BLD online. Brewed slowly. Built deliberately.\0";
 #[unsafe(no_mangle)]
 pub extern "C" fn bld_hello() -> *const c_char {
     BLD_GREETING.as_ptr() as *const c_char
+}
+
+// =============================================================================
+// Phase 18-B — `seq.export_summary` handoff (C++ `run_command` → Rust tools)
+// =============================================================================
+
+static LAST_SEQ_EXPORT_JSON: Mutex<String> = Mutex::new(String::new());
+
+/// Editor calls this with the UTF-8 JSON from `run_command` opcode 0x0005
+/// (after building `seq_tool_last_json` on the C++ side).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn bld_ffi_seq_export_set_json(s: *const c_char) {
+    if s.is_null() {
+        return;
+    }
+    // SAFETY: C++ contract — null-terminated UTF-8, valid for the call.
+    let c = unsafe { std::ffi::CStr::from_ptr(s) };
+    let Ok(utf) = c.to_str() else {
+        return;
+    };
+    if let Ok(mut g) = LAST_SEQ_EXPORT_JSON.lock() {
+        g.clear();
+        g.push_str(utf);
+    }
+}
+
+/// Owned copy of the last JSON stashed for `seq.export_summary` BLD tools.
+pub fn bld_ffi_seq_export_json_clone() -> String {
+    LAST_SEQ_EXPORT_JSON
+        .lock()
+        .map(|g| g.as_str().to_owned())
+        .unwrap_or_default()
 }
 
 // =============================================================================

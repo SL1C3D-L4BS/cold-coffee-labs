@@ -13,6 +13,7 @@
 //   - Output strings are caller-owned, free via gw_free_string.
 
 #include <cstdint>
+#include <string>
 
 #ifdef _WIN32
 #  define GW_EDITOR_API extern "C" __declspec(dllexport)
@@ -127,6 +128,7 @@ GW_EDITOR_API void gw_editor_log_error(const char* message_utf8);
 namespace gw::editor       { class SelectionContext; }
 namespace gw::editor::undo { class CommandStack; }
 namespace gw::ecs          { class World; }
+namespace gw::seq        { class SequencerWorld; class CinematicCameraSystem; }
 
 namespace gw::editor::bld_api {
 
@@ -139,6 +141,13 @@ namespace gw::editor::bld_api {
         gw::editor::undo::CommandStack* cmd_stack = nullptr;
         gw::ecs::World*                world      = nullptr;
         LogSinkFn                      log_sink   = nullptr;
+        /// Optional: in-editor `.gwseq` cache + timeline driver (Phase 18-B).
+        gw::seq::SequencerWorld*         sequencer_world = nullptr;
+        gw::seq::CinematicCameraSystem* cinematic_system = nullptr;
+        /// Last JSON returned by `dispatch_run_command` for seq.export_summary.
+        std::string                    seq_tool_last_json{};
+        /// Entity carrying `SeqPlayerComponent` for BLD `seq.play` (see EditorApplication).
+        std::uint64_t                  seq_player_entity_bits = 0;
     };
 
     // Defined in editor_bld_api.cpp; written once by EditorApplication.
@@ -152,5 +161,12 @@ namespace gw::editor::bld_api {
     // Lookup for gw_editor_run_tool — tests want to poke this without
     // exporting more symbols.
     [[nodiscard]] bool invoke_tool(const char* tool_id);
+
+    /// Surface P v2 — called from `BldHostCallbacks::run_command` (bld_host_table.cpp).
+    [[nodiscard]] std::uint64_t dispatch_run_command(std::uint32_t opcode, const void* payload,
+                                                    std::uint32_t bytes) noexcept;
+
+    /// Installs the static host callback table via `bld_abi_install_host_callbacks`.
+    void install_bld_host_callbacks() noexcept;
 
 }  // namespace gw::editor::bld_api

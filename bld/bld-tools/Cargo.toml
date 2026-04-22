@@ -15,6 +15,8 @@ default = []
 # base build never pays the proc-macro compile cost in tests. Downstream
 # crates (bld-agent) enable it.
 macros = ["dep:bld-tools-macros"]
+# Phase 18-B: `#[bld_tool]` sequencer tools + host `run_command` + bld-ffi export buffer.
+seq-tools = ["macros", "dep:bld-bridge", "dep:bld-ffi"]
 
 [dependencies]
 serde        = { workspace = true }
@@ -26,3 +28,5 @@ inventory    = "0.3"
 
 bld-governance   = { path = "../bld-governance" }
 bld-tools-macros = { path = "../bld-tools-macros", optional = true }
+bld-bridge       = { path = "../bld-bridge", optional = true }
+bld-ffi          = { path = "../bld-ffi", optional = true }

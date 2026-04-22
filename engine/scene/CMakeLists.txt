@@ -12,3 +12,5 @@ target_sources(greywater_core
             scene_file.hpp
             migration.hpp
 )
+
+add_subdirectory(seq)

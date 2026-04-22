@@ -13,3 +13,5 @@ set_target_properties(greywater_gameplay PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
     PREFIX ""  # greywater_gameplay.dll / greywater_gameplay.so
 )
+
+add_subdirectory(mod_example)

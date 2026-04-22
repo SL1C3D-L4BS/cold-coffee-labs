@@ -87,6 +87,9 @@ add_subdirectory(a11y)
 # Phase 17 — Studio Renderer: VFX (materials + post live under render/).
 add_subdirectory(vfx)
 
+# Phase 18 — Mod surface + gameplay_module host (engine/scripting/).
+add_subdirectory(scripting)
+
 # Project version plumbed through a generated header so release binaries
 # and diagnostics report the exact build (git SHA landed in Phase 1 CI).
 configure_file(

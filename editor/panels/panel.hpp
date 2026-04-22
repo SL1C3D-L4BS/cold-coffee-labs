@@ -3,8 +3,6 @@
 // IPanel — the base interface for every docked editor panel.
 // Spec ref: Phase 7 §2 — panel.hpp
 
-#include <cstdint>
-
 // Forward declarations to keep this header lightweight.
 namespace gw::editor {
     struct EditorContext;
@@ -13,6 +11,7 @@ namespace gw::editor {
 namespace gw::editor::undo { class CommandStack; }
 namespace gw::ecs          { class World; }
 namespace gw::assets       { class AssetDatabase; class VirtualFilesystem; }
+namespace gw::seq { class SequencerWorld; class CinematicCameraSystem; }
 
 namespace gw::editor {
 
@@ -30,6 +29,11 @@ struct EditorContext {
     gw::assets::AssetDatabase* asset_db     = nullptr;
     float                      delta_time_s = 0.f;
     bool                       in_pie       = false;
+    /// Phase 18-B — optional; nullptr in headless tests.
+    gw::seq::SequencerWorld*          sequencer          = nullptr;
+    gw::seq::CinematicCameraSystem*   cinematic          = nullptr;
+    /// ImGui::Image handle for the main scene color target (viewport offscreen).
+    void*                             scene_color_descriptor = nullptr;
 };
 
 // ---------------------------------------------------------------------------

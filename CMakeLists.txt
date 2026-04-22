@@ -22,7 +22,7 @@ set(CMAKE_WARN_DEPRECATED OFF CACHE BOOL
     FORCE)
 
 project(greywater
-    VERSION 0.0.1
+    VERSION 0.18.0
     DESCRIPTION "Greywater_Engine by Cold Coffee Labs"
     HOMEPAGE_URL "https://github.com/SL1C3D-L4BS/cold-coffee-labs"
     LANGUAGES C CXX)

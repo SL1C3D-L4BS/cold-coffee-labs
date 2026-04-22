@@ -14,6 +14,11 @@
 #![warn(missing_docs)]
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
+// `#[bld_tool]` expands to `::bld_tools::...`; for tools defined inside this
+// crate (see `tools::seq_tools`), alias the crate so the macro resolves.
+#[cfg(feature = "seq-tools")]
+extern crate self as bld_tools;
+
 pub use inventory;
 
 use bld_governance::tier::Tier;
@@ -151,6 +156,10 @@ pub enum ToolError {
 
 #[cfg(feature = "macros")]
 pub use bld_tools_macros::{bld_component_tools, bld_tool};
+
+/// Sequencer and host-bridge tools (Phase 18-B). Enable with `--features seq-tools`.
+#[cfg(feature = "seq-tools")]
+pub mod tools;
 
 // The Phase 9 tool taxonomy — 78 additional stubs bring the registry to 79.
 pub mod taxonomy;

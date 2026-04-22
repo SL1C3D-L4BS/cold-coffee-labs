@@ -1,4 +1,5 @@
-//! The Phase 9 tool taxonomy — 79 stub tools across 13 categories.
+//! The Phase 9 tool taxonomy — 79 stub tools across 13 categories, plus
+//! 5 `seq.*` tools when built with the `seq-tools` feature (Phase 18-B).
 //!
 //! This file registers descriptors for every tool BLD exposes. The
 //! bodies are the concern of Wave 9B–9D; this wave ensures the registry,
@@ -27,10 +28,11 @@
 //! | `rag.*`      |    3  | Read                        |
 //! | `agent.*`    |    6  | Mutate                      |
 //! | `editor.*`   |    8  | Mutate                      |
-//! | **Total**    | **79**|                             |
+//! | `seq.*`      |    5  | Read / Mutate (18-B)         |
+//! | **Total**    | **84** (with `seq-tools`; else **79**)      |
 //!
 //! If this table is out of sync with the descriptors, the
-//! `taxonomy_count_is_79` unit test fails.
+//! `taxonomy_count_matches` unit test fails.
 
 use crate::ToolDescriptor;
 use bld_governance::tier::Tier;
@@ -190,14 +192,15 @@ mod tests {
     use crate::registry;
 
     #[test]
-    fn taxonomy_count_is_79() {
-        // The lib.rs seed tool `project.list_scenes` contributes 1; the
-        // 78 entries in this file plus that seed equals 79 exactly.
+    fn taxonomy_count_matches() {
+        // 78 entries in this file + `project.list_scenes` in lib.rs = 79 stubs.
+        // With `--features seq-tools`, five `seq.*` `#[bld_tool]`s add to that.
+        let expected = if cfg!(feature = "seq-tools") { 84 } else { 79 };
         let ids: Vec<_> = registry::all().map(|d| d.id).collect();
         assert_eq!(
             ids.len(),
-            79,
-            "taxonomy registry size must be 79 (got {}). Tools: {ids:?}",
+            expected,
+            "taxonomy registry size must be {expected} (got {}). Tools: {ids:?}",
             ids.len()
         );
     }
@@ -216,7 +219,7 @@ mod tests {
         const VALID: &[&str] = &[
             "scene.", "component.", "asset.", "code.", "vscript.",
             "build.", "runtime.", "project.", "debug.", "docs.",
-            "rag.", "agent.", "editor.",
+            "rag.", "agent.", "editor.", "seq.",
         ];
         for d in registry::all() {
             assert!(

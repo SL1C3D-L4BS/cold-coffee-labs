@@ -11,6 +11,12 @@
 #include "engine/ecs/world.hpp"
 #include "engine/scene/migration.hpp"
 #include "engine/scene/scene_file.hpp"
+#include "engine/scene/seq/gwseq_codec.hpp"
+#include "engine/scene/seq/sequencer_world.hpp"
+#include "engine/assets/asset_handle.hpp"
+#include "engine/memory/arena_allocator.hpp"
+#include "editor/seq/seq_gwseq_rebuild.hpp"
+#include "bld/include/bld_ffi_seq_export.h"
 
 #include <cstdint>
 #include <cstdio>
@@ -19,6 +25,7 @@
 #include <filesystem>
 #include <mutex>
 #include <span>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -337,4 +344,178 @@ GW_EDITOR_API void gw_editor_log(uint32_t level, const char* message_utf8) {
 
 GW_EDITOR_API void gw_editor_log_error(const char* message_utf8) {
     gw_editor_log(2u, message_utf8);
+}
+
+// ---------------------------------------------------------------------------
+// Surface P v2 run_command — sequencer BLD tools (Phase 18-B).
+// Opcode layout (stable, little-endian where applicable):
+//   0x0001  create_sequence   payload: u32 fr, u32 dur, then null-terminated name
+//   0x0002  add_transform     payload: u64 seq_handle_bits, u32 new_track_id (0 = auto)
+//   0x0003  add_keyframe      (reserved — panel + CommandStack path; returns 0)
+//   0x0004  play              payload: u64 seq_handle_bits, u8 loop
+//   0x0005  export_summary    payload: u64 seq_handle_bits; writes JSON to g_globals.seq_tool_last_json
+// ---------------------------------------------------------------------------
+namespace {
+
+[[nodiscard]] std::uint64_t next_synthetic_seq_bits() noexcept {
+    // Synthetic handle namespace for in-memory-only gwseq blobs (64-bit).
+    static std::uint64_t s = 0x0001'0000'0000'0001ull;
+    return s++;
+}
+
+}  // namespace
+
+std::uint64_t gw::editor::bld_api::dispatch_run_command(const std::uint32_t opcode, const void* payload,
+                                                        const std::uint32_t bytes) noexcept {
+    g_globals.seq_tool_last_json.clear();
+
+    switch (opcode) {
+        case 0x0001u: {
+            if (bytes < 8u || g_globals.sequencer_world == nullptr) return 0u;
+            const auto* p = static_cast<const std::uint8_t*>(payload);
+            const std::uint32_t fr  = static_cast<std::uint32_t>(p[0]) |
+                                     (static_cast<std::uint32_t>(p[1]) << 8u) |
+                                     (static_cast<std::uint32_t>(p[2]) << 16u) |
+                                     (static_cast<std::uint32_t>(p[3]) << 24u);
+            const std::uint32_t dur = static_cast<std::uint32_t>(p[4]) |
+                                     (static_cast<std::uint32_t>(p[5]) << 8u) |
+                                     (static_cast<std::uint32_t>(p[6]) << 16u) |
+                                     (static_cast<std::uint32_t>(p[7]) << 24u);
+            const char* name = reinterpret_cast<const char*>(p + 8u);
+            if (std::strlen(name) + 9u > bytes) return 0u;
+            (void)name;  // name reserved for on-disk path once AssetDatabase wiring lands
+            std::vector<std::uint8_t> blob;
+            gw::seq::GwseqWriter      w(blob);
+            if (!w.write_header(fr, dur).has_value()) return 0u;
+            if (!w.finalise().has_value()) return 0u;
+            const std::uint64_t       hbits = next_synthetic_seq_bits();
+            gw::assets::AssetHandle   h{};
+            h.bits = hbits;
+            if (!g_globals.sequencer_world->register_sequence(h, std::move(blob)).has_value()) return 0u;
+            return hbits;
+        }
+        case 0x0002u: {
+            if (bytes < 12u || g_globals.sequencer_world == nullptr) return 0u;
+            const auto* p  = static_cast<const std::uint8_t*>(payload);
+            const auto  hb = static_cast<std::uint64_t>(p[0]) | (static_cast<std::uint64_t>(p[1]) << 8u) |
+                            (static_cast<std::uint64_t>(p[2]) << 16u) |
+                            (static_cast<std::uint64_t>(p[3]) << 24u) |
+                            (static_cast<std::uint64_t>(p[4]) << 32u) |
+                            (static_cast<std::uint64_t>(p[5]) << 40u) |
+                            (static_cast<std::uint64_t>(p[6]) << 48u) |
+                            (static_cast<std::uint64_t>(p[7]) << 56u);
+            const std::uint32_t want = static_cast<std::uint32_t>(p[8]) |
+                                      (static_cast<std::uint32_t>(p[9]) << 8u) |
+                                      (static_cast<std::uint32_t>(p[10]) << 16u) |
+                                      (static_cast<std::uint32_t>(p[11]) << 24u);
+            gw::assets::AssetHandle in{};
+            in.bits = hb;
+            gw::seq::GwseqReader* r = g_globals.sequencer_world->reader_for(in);
+            if (r == nullptr) return 0u;
+            std::uint32_t new_id = want;
+            if (new_id == 0u) {
+                new_id = 1u;
+                for (const auto& t : r->tracks()) {
+                    if (t.track_id >= new_id) new_id = t.track_id + 1u;
+                }
+            }
+            std::vector<std::uint8_t> out;
+            if (const auto res = gw::editor::seq::append_empty_position_transform_track(*r, out, new_id);
+                !res.has_value()) {
+                return 0u;
+            }
+            g_globals.sequencer_world->unregister_sequence(in);
+            if (!g_globals.sequencer_world->register_sequence(in, std::move(out)).has_value()) return 0u;
+            return static_cast<std::uint64_t>(new_id);
+        }
+        case 0x0004u: {
+            if (bytes < 9u || g_globals.world == nullptr) return 0u;
+            const auto*         p   = static_cast<const std::uint8_t*>(payload);
+            const std::uint64_t hb  = static_cast<std::uint64_t>(p[0]) | (static_cast<std::uint64_t>(p[1]) << 8u) |
+                                     (static_cast<std::uint64_t>(p[2]) << 16u) |
+                                     (static_cast<std::uint64_t>(p[3]) << 24u) |
+                                     (static_cast<std::uint64_t>(p[4]) << 32u) |
+                                     (static_cast<std::uint64_t>(p[5]) << 40u) |
+                                     (static_cast<std::uint64_t>(p[6]) << 48u) |
+                                     (static_cast<std::uint64_t>(p[7]) << 56u);
+            const bool          loop = p[8] != 0u;
+            gw::assets::AssetHandle h{};
+            h.bits = hb;
+            if (g_globals.seq_player_entity_bits == 0u) return 0u;
+            const auto ent = gw::ecs::Entity::from_raw_bits(g_globals.seq_player_entity_bits);
+            if (auto* pl = g_globals.world->get_component<gw::seq::SeqPlayerComponent>(ent)) {
+                pl->seq_asset_id  = h;
+                pl->playing       = true;
+                pl->loop          = loop;
+                pl->play_head_frame = 0.0;
+            } else {
+                return 0u;
+            }
+            return 1u;
+        }
+        case 0x0005u: {
+            if (bytes < 8u || g_globals.sequencer_world == nullptr) return 0u;
+            const auto* p  = static_cast<const std::uint8_t*>(payload);
+            const auto  hb = static_cast<std::uint64_t>(p[0]) | (static_cast<std::uint64_t>(p[1]) << 8u) |
+                            (static_cast<std::uint64_t>(p[2]) << 16u) |
+                            (static_cast<std::uint64_t>(p[3]) << 24u) |
+                            (static_cast<std::uint64_t>(p[4]) << 32u) |
+                            (static_cast<std::uint64_t>(p[5]) << 40u) |
+                            (static_cast<std::uint64_t>(p[6]) << 48u) |
+                            (static_cast<std::uint64_t>(p[7]) << 56u);
+            gw::assets::AssetHandle h{};
+            h.bits = hb;
+            gw::seq::GwseqReader* reader = g_globals.sequencer_world->reader_for(h);
+            if (reader == nullptr) return 0u;
+            gw::memory::ArenaAllocator arena(64u * 1024u);
+            std::uint32_t            kf_total = 0u;
+            std::ostringstream       o;
+            o << "{\"frame_rate\":" << reader->header().frame_rate
+              << ",\"duration_frames\":" << reader->header().duration_frames
+              << ",\"tracks\":[";
+            bool first = true;
+            for (const auto& tr : reader->tracks()) {
+                if (!first) o << ',';
+                first = false;
+                if (tr.track_type == gw::seq::GwseqTrackType::Transform) {
+                    gw::seq::GwseqTrackView<gw::seq::Vec3_f64> v3{};
+                    if (const auto rr = reader->read_track(tr.track_id, arena, v3);
+                        rr.has_value() && !v3.empty()) {
+                        o << "{\"id\":" << tr.track_id << ",\"kind\":\"transform_pos\",\"keyframes\":" << v3.frames.size()
+                          << "}";
+                        kf_total += static_cast<std::uint32_t>(v3.frames.size());
+                    } else {
+                        arena.reset();
+                        gw::seq::GwseqTrackView<gw::seq::GwseqQuat> qv{};
+                        if (const auto rq = reader->read_track(tr.track_id, arena, qv); rq.has_value()) {
+                            o << "{\"id\":" << tr.track_id << ",\"kind\":\"transform_rot\",\"keyframes\":" << qv.frames.size()
+                              << "}";
+                            kf_total += static_cast<std::uint32_t>(qv.frames.size());
+                        }
+                    }
+                } else if (tr.track_type == gw::seq::GwseqTrackType::Float) {
+                    gw::seq::GwseqTrackView<float> fv{};
+                    (void)reader->read_track(tr.track_id, arena, fv);
+                    o << "{\"id\":" << tr.track_id << ",\"kind\":\"float\",\"keyframes\":" << fv.frames.size() << "}";
+                    kf_total += static_cast<std::uint32_t>(fv.frames.size());
+                } else {
+                    o << "{\"id\":" << tr.track_id << ",\"kind\":\"other\",\"keyframes\":" << tr.keyframe_count
+                      << "}";
+                    kf_total += tr.keyframe_count;
+                }
+                arena.reset();
+            }
+            o << "],\"keyframe_count\":" << kf_total
+              << ",\"duration_s\":" << (reader->header().frame_rate > 0u
+                                            ? static_cast<double>(reader->header().duration_frames) /
+                                                  static_cast<double>(reader->header().frame_rate)
+                                            : 0.0)
+              << "}";
+            g_globals.seq_tool_last_json = o.str();
+            bld_ffi_seq_export_set_json(g_globals.seq_tool_last_json.c_str());
+            return 1u;
+        }
+        case 0x0003u: return 0u;
+        default: return 0u;
+    }
 }
