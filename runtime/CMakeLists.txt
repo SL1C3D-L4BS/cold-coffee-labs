@@ -26,6 +26,9 @@ target_link_libraries(greywater_runtime
         greywater::physics
         greywater::persist
         greywater::telemetry
+        greywater::platform_services
+        greywater::i18n
+        greywater::a11y
 )
 
 add_library(greywater::runtime ALIAS greywater_runtime)

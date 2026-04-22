@@ -13,3 +13,6 @@ add_subdirectory(sandbox_netplay)
 
 # Phase 15 — Persistence & telemetry exit-demo (ADR-0064).
 add_subdirectory(sandbox_persistence)
+
+# Phase 16 — Platform Services / i18n / a11y SHIP READY exit-demo (ADR-0073).
+add_subdirectory(sandbox_platform_services)

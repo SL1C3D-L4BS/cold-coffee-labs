@@ -186,7 +186,9 @@ These systems are built for the Greywater game specifically, but use the engine'
 | Color-blind modes   | `engine/a11y/`             | Custom (lighting-integrated)                  | 16    | B    |
 | Text scaling        | `engine/a11y/`             | RmlUi + custom                                | 16    | B    |
 | Subtitles           | `engine/a11y/`             | Custom with speaker attribution               | 16    | B    |
-| Screen-reader hooks | `engine/a11y/`             | Platform APIs                                 | 16    | B    |
+| Screen-reader hooks | `engine/a11y/`             | AccessKit-C (UIA / AT-SPI / NSAccessibility)  | 16    | B    |
+| Motion reduction    | `engine/a11y/`             | Custom (respects `a11y.motion_reduce` CVar)   | 16    | B    |
+| Photosensitivity safe mode | `engine/a11y/`      | Custom (clamps flash rate, disables strobes)  | 16    | B    |
 
 ## 10. Persistence (Tier A–B)
 

@@ -115,6 +115,12 @@ add_executable(gw_tests
     unit/persist/phase15_extras_test.cpp
     unit/telemetry/phase15_telemetry_test.cpp
     unit/telemetry/phase15_privacy_ui_test.cpp
+    # Phase 16 — Platform Services, i18n, a11y (ADR-0065..0073)
+    unit/platform_services/phase16_platform_services_test.cpp
+    unit/i18n/phase16_gwstr_test.cpp
+    unit/i18n/phase16_bidi_format_test.cpp
+    unit/i18n/phase16_i18n_world_test.cpp
+    unit/a11y/phase16_a11y_test.cpp
     test_main.cpp
 )
 
@@ -133,6 +139,9 @@ target_link_libraries(gw_tests
         greywater::runtime
         greywater::persist
         greywater::telemetry
+        greywater::platform_services
+        greywater::i18n
+        greywater::a11y
         doctest::doctest
         volk
         xxhash

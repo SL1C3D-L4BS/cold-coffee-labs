@@ -8,6 +8,8 @@
 // Headers pulled here are all "engine-public" — no OS, no RmlUi, no audio
 // backend headers. Implementation lives in runtime/engine.cpp.
 
+#include "engine/a11y/a11y_cvars.hpp"
+#include "engine/a11y/a11y_world.hpp"
 #include "engine/audio/audio_service.hpp"
 #include "engine/audio/audio_types.hpp"
 #include "engine/console/console_service.hpp"
@@ -15,12 +17,16 @@
 #include "engine/core/config/standard_cvars.hpp"
 #include "engine/core/events/event_bus.hpp"
 #include "engine/core/events/events_core.hpp"
+#include "engine/i18n/i18n_cvars.hpp"
+#include "engine/i18n/i18n_world.hpp"
 #include "engine/input/input_service.hpp"
 #include "engine/input/input_types.hpp"
 #include "engine/persist/persist_cvars.hpp"
 #include "engine/persist/persist_world.hpp"
 #include "engine/physics/physics_cvars.hpp"
 #include "engine/physics/physics_world.hpp"
+#include "engine/platform_services/platform_cvars.hpp"
+#include "engine/platform_services/platform_services_world.hpp"
 #include "engine/telemetry/telemetry_world.hpp"
 #include "engine/ui/font_library.hpp"
 #include "engine/ui/glyph_atlas.hpp"
@@ -95,6 +101,9 @@ public:
     [[nodiscard]] const physics::PhysicsWorld& physics() const noexcept { return *physics_; }
     [[nodiscard]] persist::PersistWorld&       persist() noexcept { return *persist_; }
     [[nodiscard]] telemetry::TelemetryWorld&   telemetry() noexcept { return *telemetry_; }
+    [[nodiscard]] platform_services::PlatformServicesWorld& platform() noexcept { return *platform_; }
+    [[nodiscard]] i18n::I18nWorld&                          i18n() noexcept { return *i18n_; }
+    [[nodiscard]] a11y::A11yWorld&                          a11y() noexcept { return *a11y_; }
 
     // Event buses (one per subscribable event type).
     [[nodiscard]] events::EventBus<events::ConfigCVarChanged>&      bus_cvars()   noexcept { return bus_cvars_; }
@@ -121,6 +130,9 @@ private:
     config::StandardCVars                                  std_cvars_{};
     physics::PhysicsCVars                                  physics_cvars_{};
     persist::PersistCVars                                  persist_cvars_{};
+    platform_services::PlatformCVars                       platform_cvars_{};
+    i18n::I18nCVars                                        i18n_cvars_{};
+    a11y::A11yCVars                                        a11y_cvars_{};
     events::EventBus<events::ConfigCVarChanged>            bus_cvars_{};
     events::EventBus<events::ConsoleCommandExecuted>       bus_console_{};
     events::EventBus<events::WindowResized>                bus_resize_{};
@@ -142,6 +154,9 @@ private:
     std::unique_ptr<physics::PhysicsWorld>     physics_;
     std::unique_ptr<persist::PersistWorld>     persist_;
     std::unique_ptr<telemetry::TelemetryWorld> telemetry_;
+    std::unique_ptr<platform_services::PlatformServicesWorld> platform_;
+    std::unique_ptr<i18n::I18nWorld>           i18n_;
+    std::unique_ptr<a11y::A11yWorld>           a11y_;
 };
 
 } // namespace gw::runtime

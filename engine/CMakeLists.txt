@@ -79,6 +79,11 @@ add_subdirectory(net)
 add_subdirectory(persist)
 add_subdirectory(telemetry)
 
+# Phase 16 — Platform Services, i18n, a11y (ADR-0065..0073).
+add_subdirectory(platform_services)
+add_subdirectory(i18n)
+add_subdirectory(a11y)
+
 # Project version plumbed through a generated header so release binaries
 # and diagnostics report the exact build (git SHA landed in Phase 1 CI).
 configure_file(

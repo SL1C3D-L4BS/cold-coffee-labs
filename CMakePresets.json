@@ -174,6 +174,32 @@
                 "GW_ENABLE_ZSTD": "ON",
                 "GW_ENABLE_CPR": "ON"
             }
+        },
+        {
+            "name": "ship-linux",
+            "inherits": "persist-linux",
+            "displayName": "Ship Linux (Phase 16 Steam/EOS/ICU/HarfBuzz/AccessKit ON)",
+            "description": "ADR-0073: SHIP READY — every Phase-16 dependency enabled for Linux shipping builds.",
+            "cacheVariables": {
+                "GW_ENABLE_STEAMWORKS": "ON",
+                "GW_ENABLE_EOS":        "ON",
+                "GW_ENABLE_ICU":        "ON",
+                "GW_ENABLE_HARFBUZZ":   "ON",
+                "GW_ENABLE_ACCESSKIT":  "ON"
+            }
+        },
+        {
+            "name": "ship-win",
+            "inherits": "persist-win",
+            "displayName": "Ship Windows (Phase 16 Steam/EOS/ICU/HarfBuzz/AccessKit ON)",
+            "description": "ADR-0073: SHIP READY — every Phase-16 dependency enabled for Windows shipping builds.",
+            "cacheVariables": {
+                "GW_ENABLE_STEAMWORKS": "ON",
+                "GW_ENABLE_EOS":        "ON",
+                "GW_ENABLE_ICU":        "ON",
+                "GW_ENABLE_HARFBUZZ":   "ON",
+                "GW_ENABLE_ACCESSKIT":  "ON"
+            }
         }
     ],
     "buildPresets": [
@@ -193,7 +219,9 @@
         { "name": "netplay-linux", "configurePreset": "netplay-linux" },
         { "name": "netplay-win",   "configurePreset": "netplay-win" },
         { "name": "persist-linux", "configurePreset": "persist-linux" },
-        { "name": "persist-win",   "configurePreset": "persist-win" }
+        { "name": "persist-win",   "configurePreset": "persist-win" },
+        { "name": "ship-linux",    "configurePreset": "ship-linux" },
+        { "name": "ship-win",      "configurePreset": "ship-win" }
     ],
     "testPresets": [
         {
@@ -241,6 +269,18 @@
         {
             "name": "living-win",
             "configurePreset": "living-win",
+            "output": { "outputOnFailure": true },
+            "execution": { "noTestsAction": "error", "stopOnFailure": false }
+        },
+        {
+            "name": "ship-linux",
+            "configurePreset": "ship-linux",
+            "output": { "outputOnFailure": true },
+            "execution": { "noTestsAction": "error", "stopOnFailure": false }
+        },
+        {
+            "name": "ship-win",
+            "configurePreset": "ship-win",
             "output": { "outputOnFailure": true },
             "execution": { "noTestsAction": "error", "stopOnFailure": false }
         }
@@ -308,6 +348,22 @@
                 { "type": "configure", "name": "living-win" },
                 { "type": "build",     "name": "living-win" },
                 { "type": "test",      "name": "living-win" }
+            ]
+        },
+        {
+            "name": "ship-linux",
+            "steps": [
+                { "type": "configure", "name": "ship-linux" },
+                { "type": "build",     "name": "ship-linux" },
+                { "type": "test",      "name": "ship-linux" }
+            ]
+        },
+        {
+            "name": "ship-win",
+            "steps": [
+                { "type": "configure", "name": "ship-win" },
+                { "type": "build",     "name": "ship-win" },
+                { "type": "test",      "name": "ship-win" }
             ]
         }
     ]

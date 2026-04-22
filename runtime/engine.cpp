@@ -11,8 +11,11 @@
 
 #include "runtime/engine.hpp"
 
+#include "engine/a11y/console_commands.hpp"
+#include "engine/i18n/console_commands.hpp"
 #include "engine/persist/console_commands.hpp"
 #include "engine/physics/console_commands.hpp"
+#include "engine/platform_services/console_commands.hpp"
 #include "engine/telemetry/console_commands.hpp"
 #include "engine/telemetry/telemetry_config.hpp"
 
@@ -79,9 +82,12 @@ void seed_english_strings(ui::LocaleBridge& lb) {
 
 Engine::Engine(const EngineConfig& cfg) : cfg_(cfg) {
     // --- Tier-0: standard CVars + bus wiring ---
-    std_cvars_     = config::register_standard_cvars(cvars_);
-    physics_cvars_ = physics::register_physics_cvars(cvars_);
-    persist_cvars_ = persist::register_persist_and_telemetry_cvars(cvars_);
+    std_cvars_      = config::register_standard_cvars(cvars_);
+    physics_cvars_  = physics::register_physics_cvars(cvars_);
+    persist_cvars_  = persist::register_persist_and_telemetry_cvars(cvars_);
+    platform_cvars_ = platform_services::register_platform_cvars(cvars_);
+    i18n_cvars_     = i18n::register_i18n_cvars(cvars_);
+    a11y_cvars_     = a11y::register_a11y_cvars(cvars_);
     cvars_.set_bus(&bus_cvars_);
 
     // --- Tier-1: UI substrate ---
@@ -143,6 +149,25 @@ Engine::Engine(const EngineConfig& cfg) : cfg_(cfg) {
 
     persist::register_persist_console_commands(*console_, *persist_);
     telemetry::register_telemetry_console_commands(*console_, *telemetry_, persist_->local_store());
+
+    // --- Phase 16 — Platform Services, i18n, a11y ---
+    platform_ = std::make_unique<platform_services::PlatformServicesWorld>();
+    platform_services::PlatformServicesConfig pscfg{};
+    pscfg.backend = cvars_.get_string_or("plat.backend", std::string{"local"});
+    (void)platform_->initialize(pscfg, &cvars_, nullptr, nullptr);
+    platform_services::register_platform_console_commands(*console_, *platform_);
+
+    i18n_ = std::make_unique<i18n::I18nWorld>();
+    i18n::I18nConfig i18ncfg{};
+    i18ncfg.default_locale  = cfg_.locale.empty() ? std::string{"en-US"} : cfg_.locale;
+    i18ncfg.fallback_locale = cvars_.get_string_or("i18n.fallback_locale", std::string{"en-US"});
+    (void)i18n_->initialize(i18ncfg, &cvars_, nullptr, nullptr);
+    i18n::register_i18n_console_commands(*console_, *i18n_);
+
+    a11y_ = std::make_unique<a11y::A11yWorld>();
+    a11y::A11yConfig a11y_cfg{};
+    (void)a11y_->initialize(a11y_cfg, &cvars_, nullptr, nullptr);
+    a11y::register_a11y_console_commands(*console_, *a11y_);
 }
 
 Engine::~Engine() = default;
@@ -191,6 +216,9 @@ void Engine::tick(double dt_seconds) {
     if (telemetry_) {
         telemetry_->step(dt_seconds);
     }
+    if (platform_) platform_->step(dt_seconds);
+    if (i18n_)      i18n_->step(dt_seconds);
+    if (a11y_)      a11y_->step(dt_seconds, static_cast<std::int64_t>(frame_index_ * static_cast<std::uint64_t>(dt_seconds * 1000.0)));
 
     ++frame_index_;
 }
