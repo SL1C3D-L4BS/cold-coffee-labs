@@ -121,6 +121,20 @@ add_executable(gw_tests
     unit/i18n/phase16_bidi_format_test.cpp
     unit/i18n/phase16_i18n_world_test.cpp
     unit/a11y/phase16_a11y_test.cpp
+    # Phase 17 — Shader pipeline maturity, Materials & VFX (ADR-0074..0082)
+    unit/render/shader/phase17_permutation_test.cpp
+    unit/render/shader/phase17_slang_smoke_test.cpp
+    unit/render/material/phase17_material_template_test.cpp
+    unit/render/material/phase17_material_instance_test.cpp
+    unit/render/material/phase17_gwmat_test.cpp
+    unit/vfx/phase17_particles_test.cpp
+    unit/vfx/phase17_ribbons_test.cpp
+    unit/vfx/phase17_decals_test.cpp
+    unit/render/post/phase17_bloom_test.cpp
+    unit/render/post/phase17_tonemap_test.cpp
+    unit/render/post/phase17_taa_test.cpp
+    unit/render/post/phase17_motion_blur_dof_test.cpp
+    unit/runtime/phase17_runtime_integration_test.cpp
     test_main.cpp
 )
 

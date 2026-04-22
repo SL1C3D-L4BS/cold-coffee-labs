@@ -56,3 +56,27 @@ set_tests_properties(phase15_budgets_perf PROPERTIES
     TIMEOUT    60
     RUN_SERIAL TRUE
 )
+
+# Phase 17 — Studio Renderer micro-benchmarks (ADR-0081 §budgets).
+add_executable(gw_perf_gate_phase17
+    phase17_budgets_perf_test.cpp
+)
+target_link_libraries(gw_perf_gate_phase17
+    PRIVATE
+        greywater::core
+        greywater::material
+        greywater::render_post
+        greywater::vfx
+)
+set_target_properties(gw_perf_gate_phase17 PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
+add_test(NAME phase17_budgets_perf
+    COMMAND gw_perf_gate_phase17
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+)
+set_tests_properties(phase17_budgets_perf PROPERTIES
+    LABELS     "phase17;perf"
+    TIMEOUT    60
+    RUN_SERIAL TRUE
+)

@@ -16,3 +16,6 @@ add_subdirectory(sandbox_persistence)
 
 # Phase 16 — Platform Services / i18n / a11y SHIP READY exit-demo (ADR-0073).
 add_subdirectory(sandbox_platform_services)
+
+# Phase 17 — Studio Renderer exit-demo (ADR-0082).
+add_subdirectory(sandbox_studio_renderer)

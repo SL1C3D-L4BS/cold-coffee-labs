@@ -29,6 +29,9 @@ target_link_libraries(greywater_runtime
         greywater::platform_services
         greywater::i18n
         greywater::a11y
+        greywater::material
+        greywater::render_post
+        greywater::vfx
 )
 
 add_library(greywater::runtime ALIAS greywater_runtime)

@@ -269,14 +269,18 @@ Six-wave cadence (mirrors Phase 15 structure — facade before backends, null/de
 
 ### Phase 17 — Shader Pipeline Maturity, Materials & VFX (weeks 108–113)
 
-| Week | Deliverable                                                                | Tier |
-| ---- | -------------------------------------------------------------------------- | ---- |
-| 108  | Shader pipeline maturity: cooked permutation matrix                        | A    |
-| 109  | Material system: data-driven instances over shader templates               | A    |
-| 110  | Material authoring: hot-reload + editor material-browser                   | A    |
-| 111  | VFX: GPU compute particle system                                           | B    |
-| 112  | VFX: ribbon trails, decals                                                 | B    |
-| 113  | VFX: screen-space post (bloom, DoF, motion blur, CA, grain)                | B    |
+| Wave | Week | Deliverable                                                                              | Tier | ADR(s)            |
+| ---- | ---- | ---------------------------------------------------------------------------------------- | ---- | ----------------- |
+| 17A  | 108  | Shader pipeline maturity: permutation matrix + Slang (gated) + SPIRV-Reflect + LRU cache | A    | 0074              |
+| 17B  | 109  | Material system: `MaterialWorld` + `MaterialTemplate`/`Instance` + `.gwmat` v1 + glTF PBR | A    | 0075, 0076        |
+| 17C  | 110  | Material authoring: hot-reload chain + ImGui material-browser + preview sphere           | A    | 0075 §authoring   |
+| 17D  | 111  | VFX particles: compute emit/simulate/compact + curl noise + indirect draw + 1 M budget   | B    | 0077              |
+| 17E  | 112  | VFX ribbons (GPU tessellated) + screen-space deferred decals (Wronski 2015)              | B    | 0078              |
+| 17F  | 113  | Post pipeline: dual-Kawase bloom + k-DOP TAA + McGuire MB + CoC DoF + PBR Neutral tonemap | B    | 0079, 0080, 0081, 0082 |
+
+Doctrine: ADRs **0074–0082**; perf: `docs/perf/phase17_budgets.md`.
+
+**Status (2026-04-21): completed.** Phase 17 exit gate ticked: `MaterialWorld` + `ParticleWorld` (owns particles, ribbons, decals) + `PostWorld` PIMPL facades ship with header-quarantined Slang / SPIRV-Reflect / DXC backends behind `GW_ENABLE_SLANG`/`GW_ENABLE_SPIRV_REFLECT`/`GW_ENABLE_DXC`; shader permutation matrix enforces ≤ 64-per-template ceiling via `PermutationBudget` with content-hash LRU cache (ADR-0074); `.gwmat` v1 binary (FNV-1a-64 + Fibonacci diffusion footer, ADR-0076) round-trips across Windows + Linux; ≥ 36 `mat.*`/`r.shader.*`/`vfx.*`/`post.*` CVars TOML-round-trip; 24 Phase-17 console commands registered + discoverable; frozen render sub-phase ordering `shader_reload → material_upload → particle_simulate → scene → decals → post(bloom→taa→mb→dof→chromatic→tonemap→grain)` wired in `runtime/engine.cpp::tick`; new `studio-{win,linux}` CMake presets flip Slang/SPIRV-Reflect/DXC/SM69 ON for CI; `gw_perf_gate_phase17` enforces §Perf budgets; `sandbox_studio_renderer` prints `STUDIO RENDERER — shader_cache_hit=97% material_instances=64 particles=1048576 bloom=dual_kawase taa=kdop_clip mb=mcguire dof=coc tonemap=pbr_neutral grain=on post_ms=… material_ms=… particle_ms=… gpu_frame=…ms` on `dev-win`; `dev-win` CTest count **711** (from 586 baseline, +125 new Phase-17 cases, +21% above the ≥94 target and vaulting the ≥680 floor). Hand-off to Phase 20 in ADR-0082: planetary rendering inherits the frozen `MaterialTemplate` schema, the `IParticleSystem` contract, and the post-chain ordering as immutable tick-loop inputs.
 
 ### Phase 18 — Cinematics & Mods (weeks 114–118)
 

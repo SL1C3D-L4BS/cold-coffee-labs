@@ -27,7 +27,13 @@
 #include "engine/physics/physics_world.hpp"
 #include "engine/platform_services/platform_cvars.hpp"
 #include "engine/platform_services/platform_services_world.hpp"
+#include "engine/render/material/material_cvars.hpp"
+#include "engine/render/material/material_world.hpp"
+#include "engine/render/post/post_cvars.hpp"
+#include "engine/render/post/post_world.hpp"
 #include "engine/telemetry/telemetry_world.hpp"
+#include "engine/vfx/particles/particle_world.hpp"
+#include "engine/vfx/vfx_cvars.hpp"
 #include "engine/ui/font_library.hpp"
 #include "engine/ui/glyph_atlas.hpp"
 #include "engine/ui/locale_bridge.hpp"
@@ -104,6 +110,9 @@ public:
     [[nodiscard]] platform_services::PlatformServicesWorld& platform() noexcept { return *platform_; }
     [[nodiscard]] i18n::I18nWorld&                          i18n() noexcept { return *i18n_; }
     [[nodiscard]] a11y::A11yWorld&                          a11y() noexcept { return *a11y_; }
+    [[nodiscard]] render::material::MaterialWorld&          materials() noexcept { return *materials_; }
+    [[nodiscard]] vfx::particles::ParticleWorld&            vfx() noexcept { return *vfx_; }
+    [[nodiscard]] render::post::PostWorld&                  post() noexcept { return *post_; }
 
     // Event buses (one per subscribable event type).
     [[nodiscard]] events::EventBus<events::ConfigCVarChanged>&      bus_cvars()   noexcept { return bus_cvars_; }
@@ -133,6 +142,10 @@ private:
     platform_services::PlatformCVars                       platform_cvars_{};
     i18n::I18nCVars                                        i18n_cvars_{};
     a11y::A11yCVars                                        a11y_cvars_{};
+    render::material::MaterialCVars                        material_cvars_{};
+    render::material::ShaderCVars                          shader_cvars_{};
+    render::post::PostCVars                                post_cvars_{};
+    vfx::VfxCVars                                          vfx_cvars_{};
     events::EventBus<events::ConfigCVarChanged>            bus_cvars_{};
     events::EventBus<events::ConsoleCommandExecuted>       bus_console_{};
     events::EventBus<events::WindowResized>                bus_resize_{};
@@ -157,6 +170,9 @@ private:
     std::unique_ptr<platform_services::PlatformServicesWorld> platform_;
     std::unique_ptr<i18n::I18nWorld>           i18n_;
     std::unique_ptr<a11y::A11yWorld>           a11y_;
+    std::unique_ptr<render::material::MaterialWorld>          materials_;
+    std::unique_ptr<vfx::particles::ParticleWorld>            vfx_;
+    std::unique_ptr<render::post::PostWorld>                  post_;
 };
 
 } // namespace gw::runtime

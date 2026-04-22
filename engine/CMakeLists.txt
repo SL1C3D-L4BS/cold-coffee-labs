@@ -84,6 +84,9 @@ add_subdirectory(platform_services)
 add_subdirectory(i18n)
 add_subdirectory(a11y)
 
+# Phase 17 — Studio Renderer: VFX (materials + post live under render/).
+add_subdirectory(vfx)
+
 # Project version plumbed through a generated header so release binaries
 # and diagnostics report the exact build (git SHA landed in Phase 1 CI).
 configure_file(

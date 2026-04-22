@@ -16,6 +16,11 @@ target_sources(engine_render
         hal/vulkan_descriptor.cpp
         # Shader system (Week 028)
         shader/shader_manager.cpp
+        # Phase 17 Wave 17A — Shader pipeline maturity (ADR-0074)
+        shader/permutation.cpp
+        shader/reflect.cpp
+        shader/slang_backend.cpp
+        shader/permutation_cache.cpp
 )
 
 # Include directories (volk.h lives under CPM build tree; matches greywater_core)
@@ -50,6 +55,10 @@ add_subdirectory(ibl)
 
 # Milestone validation (Week 032)
 add_subdirectory(validation)
+
+# Phase 17 Waves 17B/17C/17F — material + post
+add_subdirectory(material)
+add_subdirectory(post)
 
 # Add render target to main engine target
 target_link_libraries(greywater_core PRIVATE engine_render)

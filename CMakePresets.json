@@ -200,6 +200,30 @@
                 "GW_ENABLE_HARFBUZZ":   "ON",
                 "GW_ENABLE_ACCESSKIT":  "ON"
             }
+        },
+        {
+            "name": "studio-linux",
+            "inherits": "ship-linux",
+            "displayName": "Studio Linux (Phase 17 Slang + SPIRV-Reflect + full post-chain ON)",
+            "description": "ADR-0082 §CI: Studio Renderer — Phase 17 gated feature flags enabled for studio CI builds.",
+            "cacheVariables": {
+                "GW_ENABLE_SLANG":         "ON",
+                "GW_ENABLE_SPIRV_REFLECT": "ON",
+                "GW_ENABLE_DXC":           "ON",
+                "GW_FEATURE_SM69":         "ON"
+            }
+        },
+        {
+            "name": "studio-win",
+            "inherits": "ship-win",
+            "displayName": "Studio Windows (Phase 17 Slang + SPIRV-Reflect + full post-chain ON)",
+            "description": "ADR-0082 §CI: Studio Renderer — Phase 17 gated feature flags enabled for studio CI builds.",
+            "cacheVariables": {
+                "GW_ENABLE_SLANG":         "ON",
+                "GW_ENABLE_SPIRV_REFLECT": "ON",
+                "GW_ENABLE_DXC":           "ON",
+                "GW_FEATURE_SM69":         "ON"
+            }
         }
     ],
     "buildPresets": [
@@ -221,7 +245,9 @@
         { "name": "persist-linux", "configurePreset": "persist-linux" },
         { "name": "persist-win",   "configurePreset": "persist-win" },
         { "name": "ship-linux",    "configurePreset": "ship-linux" },
-        { "name": "ship-win",      "configurePreset": "ship-win" }
+        { "name": "ship-win",      "configurePreset": "ship-win" },
+        { "name": "studio-linux",  "configurePreset": "studio-linux" },
+        { "name": "studio-win",    "configurePreset": "studio-win" }
     ],
     "testPresets": [
         {
@@ -281,6 +307,18 @@
         {
             "name": "ship-win",
             "configurePreset": "ship-win",
+            "output": { "outputOnFailure": true },
+            "execution": { "noTestsAction": "error", "stopOnFailure": false }
+        },
+        {
+            "name": "studio-linux",
+            "configurePreset": "studio-linux",
+            "output": { "outputOnFailure": true },
+            "execution": { "noTestsAction": "error", "stopOnFailure": false }
+        },
+        {
+            "name": "studio-win",
+            "configurePreset": "studio-win",
             "output": { "outputOnFailure": true },
             "execution": { "noTestsAction": "error", "stopOnFailure": false }
         }
@@ -364,6 +402,22 @@
                 { "type": "configure", "name": "ship-win" },
                 { "type": "build",     "name": "ship-win" },
                 { "type": "test",      "name": "ship-win" }
+            ]
+        },
+        {
+            "name": "studio-linux",
+            "steps": [
+                { "type": "configure", "name": "studio-linux" },
+                { "type": "build",     "name": "studio-linux" },
+                { "type": "test",      "name": "studio-linux" }
+            ]
+        },
+        {
+            "name": "studio-win",
+            "steps": [
+                { "type": "configure", "name": "studio-win" },
+                { "type": "build",     "name": "studio-win" },
+                { "type": "test",      "name": "studio-win" }
             ]
         }
     ]

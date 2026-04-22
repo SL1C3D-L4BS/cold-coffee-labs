@@ -16,8 +16,10 @@
 #include "engine/persist/console_commands.hpp"
 #include "engine/physics/console_commands.hpp"
 #include "engine/platform_services/console_commands.hpp"
+#include "engine/render/material/console_commands.hpp"
 #include "engine/telemetry/console_commands.hpp"
 #include "engine/telemetry/telemetry_config.hpp"
+#include "engine/vfx/console_commands.hpp"
 
 #include <string>
 #include <string_view>
@@ -88,6 +90,10 @@ Engine::Engine(const EngineConfig& cfg) : cfg_(cfg) {
     platform_cvars_ = platform_services::register_platform_cvars(cvars_);
     i18n_cvars_     = i18n::register_i18n_cvars(cvars_);
     a11y_cvars_     = a11y::register_a11y_cvars(cvars_);
+    material_cvars_ = render::material::register_material_cvars(cvars_);
+    shader_cvars_   = render::material::register_shader_cvars(cvars_);
+    post_cvars_     = render::post::register_post_cvars(cvars_);
+    vfx_cvars_      = vfx::register_vfx_cvars(cvars_);
     cvars_.set_bus(&bus_cvars_);
 
     // --- Tier-1: UI substrate ---
@@ -168,6 +174,25 @@ Engine::Engine(const EngineConfig& cfg) : cfg_(cfg) {
     a11y::A11yConfig a11y_cfg{};
     (void)a11y_->initialize(a11y_cfg, &cvars_, nullptr, nullptr);
     a11y::register_a11y_console_commands(*console_, *a11y_);
+
+    // --- Phase 17 — Studio Renderer (materials + VFX + post) ---
+    materials_ = std::make_unique<render::material::MaterialWorld>();
+    render::material::MaterialConfig mat_cfg{};
+    (void)materials_->initialize(mat_cfg, &cvars_, nullptr, nullptr);
+    render::material::register_material_console_commands(*console_, *materials_);
+
+    vfx_ = std::make_unique<vfx::particles::ParticleWorld>();
+    vfx::particles::ParticleWorldConfig vfx_cfg{};
+    vfx_cfg.surface_width  = cfg_.width_px;
+    vfx_cfg.surface_height = cfg_.height_px;
+    (void)vfx_->initialize(vfx_cfg, &cvars_, nullptr);
+    vfx::register_vfx_console_commands(*console_, *vfx_);
+
+    post_ = std::make_unique<render::post::PostWorld>();
+    render::post::PostConfig post_cfg{};
+    post_cfg.width  = cfg_.width_px;
+    post_cfg.height = cfg_.height_px;
+    (void)post_->initialize(post_cfg, &cvars_, nullptr);
 }
 
 Engine::~Engine() = default;
@@ -219,6 +244,13 @@ void Engine::tick(double dt_seconds) {
     if (platform_) platform_->step(dt_seconds);
     if (i18n_)      i18n_->step(dt_seconds);
     if (a11y_)      a11y_->step(dt_seconds, static_cast<std::int64_t>(frame_index_ * static_cast<std::uint64_t>(dt_seconds * 1000.0)));
+
+    // 7) Phase 17 render sub-phase (ADR-0082 §frozen-ordering):
+    //    shader_reload → material_upload → particle_simulate → (scene/decals owned by engine_render)
+    //    → post(bloom → taa → mb → dof → chromatic → tonemap → grain).
+    if (materials_) materials_->step(dt_seconds);
+    if (vfx_)        vfx_->step(dt_seconds);
+    if (post_)       post_->step(dt_seconds);
 
     ++frame_index_;
 }
