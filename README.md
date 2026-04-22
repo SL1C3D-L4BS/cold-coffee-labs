@@ -8,7 +8,7 @@ This repository is the monorepo for:
 - ***Sacrilege*** — flagship game; program spec and vision in `docs/07_SACRILEGE.md`.  
 - **BLD** (Brewed Logic Directive) — Rust copilot subsystem linked through a narrow C-ABI.
 
-**Hardware baseline:** AMD Radeon RX 580 8GB @ 1080p / 60 FPS. Every Tier A feature runs there.
+**Hardware baseline:** AMD Radeon RX 580 8GB @ 1080p. ***Sacrilege* Tier A:** **144 FPS** (see `docs/01_CONSTITUTION_AND_PROGRAM.md` §2.1). **Engine reference / renderer harnesses:** **≥ 60 FPS** where `docs/05_RESEARCH_BUILD_AND_STANDARDS.md` §1.4 applies — not the flagship ship bar.
 **Languages:** C++23 (engine) · Rust stable, 2024 edition (BLD only).
 **Compiler:** Clang/LLVM 18+ (clang-cl on Windows, clang on Linux). MSVC and GCC are not supported.
 **Build:** CMake 3.28+ with Presets + Ninja · Corrosion for Cargo ↔ CMake · CPM.cmake for pinned C++ deps.
@@ -33,7 +33,7 @@ This repository is the monorepo for:
 
 1. **Read** [`CLAUDE.md`](CLAUDE.md) — the cold-start primer for every session.
 2. **Build** per [`docs/05_RESEARCH_BUILD_AND_STANDARDS.md`](docs/05_RESEARCH_BUILD_AND_STANDARDS.md) *(merged `BUILDING.md`)*.
-3. **Read** [`docs/README.md`](docs/README.md) — map of the **eleven** Markdown files under `docs/`.
+3. **Read** [`docs/README.md`](docs/README.md) — map of the **eleven** canonical Markdown files under `docs/` (plus auxiliary `docs/COMPOSER_CONTEXT.md`).
 
 ```bash
 # Linux
@@ -75,7 +75,7 @@ Engine code never `#include`s from `gameplay/`. The engine/game boundary is enfo
 
 ## The canonical set (binding)
 
-The `docs/` folder is intentionally **eleven Markdown files** (see [`docs/README.md`](docs/README.md)).
+The `docs/` folder is intentionally **eleven canonical** Markdown files plus **`docs/COMPOSER_CONTEXT.md`** as an auxiliary Composer primer (see [`docs/README.md`](docs/README.md)).
 
 | | |
 | --- | --- |
@@ -87,7 +87,7 @@ The `docs/` folder is intentionally **eleven Markdown files** (see [`docs/README
 | [`docs/05_RESEARCH_BUILD_AND_STANDARDS.md`](docs/05_RESEARCH_BUILD_AND_STANDARDS.md) | Vulkan/C++/Rust guides, build, coding standards |
 | [`docs/06_ARCHITECTURE.md`](docs/06_ARCHITECTURE.md) | Blueprint + core architecture (merged) |
 | [`docs/07_SACRILEGE.md`](docs/07_SACRILEGE.md) | Flagship program spec |
-| [`docs/08_BLACKLAKE_AND_RIPPLE.md`](docs/08_BLACKLAKE_AND_RIPPLE.md) | Blacklake + GWE × Ripple studio specs |
+| [`docs/08_BLACKLAKE.md`](docs/08_BLACKLAKE.md) | Blacklake — arena generation (HEC, SDR, GPTM) |
 | [`docs/09_NETCODE_DETERMINISM_PERF.md`](docs/09_NETCODE_DETERMINISM_PERF.md) | Netcode, determinism, perf annexes |
 | [`docs/10_APPENDIX_ADRS_AND_REFERENCES.md`](docs/10_APPENDIX_ADRS_AND_REFERENCES.md) | Glossary, appendix, **all ADRs** |
 

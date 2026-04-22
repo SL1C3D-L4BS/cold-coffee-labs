@@ -70,6 +70,19 @@ add_shader_library(post_shaders
     OUTPUT_DIR ${CMAKE_BINARY_DIR}/shaders/post
 )
 
+# Phase 20-A — GPTM terrain (HLSL shared header under engine/render/shaders).
+set(WORLD_SHADER_SOURCES
+    world/terrain.vert.hlsl
+    world/terrain.frag.hlsl
+)
+
+add_shader_library(world_shaders
+    SOURCE_BASE "${CMAKE_CURRENT_SOURCE_DIR}"
+    SOURCES ${WORLD_SHADER_SOURCES}
+    INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/engine/render/shaders
+    OUTPUT_DIR ${CMAKE_BINARY_DIR}/shaders/world
+)
+
 # Hot-reload target for development (optional)
 if(GREYWATER_DEVELOPMENT_MODE)
     add_shader_hot_reload(all_shaders

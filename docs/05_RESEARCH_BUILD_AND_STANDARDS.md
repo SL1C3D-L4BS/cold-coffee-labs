@@ -1,16 +1,9 @@
 # 05 — Research, Build & Coding Standards
 
-**Status:** Reference · Operational  
-**Precedence:** L6 — build detail and language discipline; specific decisions superseded by ADRs
+**Status:** Reference · Operational · Last revised 2026-04-22  
+**Precedence:** L6
 
----
-
----
-
-
----
-
-## Vulkan 1.2-Baseline Research Guide
+**Scope:** Vulkan 1.2-baseline with opportunistic 1.3 features as Greywater's graphics API. Staged learning path, feature commitments, capability gates, and the shader toolchain. **Hardware baseline: AMD Radeon RX 580 8 GB** (Polaris, GCN 4.0, 2016).
 
 ---
 
@@ -48,14 +41,22 @@ On hardware that reports support for these features, we light them up behind `RH
 
 ### 1.4 Target performance
 
-- **1080p @ 60 FPS** on RX 580 reference hardware for the full simulation:
-  - Sponza-class terrain geometry.
-  - 2 km visible view distance.
-  - 10 000 active ECS entities.
-  - Full atmospheric scattering + volumetric clouds.
-  - Cascaded shadow maps.
-  - PBR materials + IBL.
-- Perf regression ≥ 5 % on the canonical scene **fails CI**.
+**Two bars — do not conflate them:**
+
+1. ***Sacrilege* Tier A (L1 ship bar):** **1080p @ 144 FPS** on RX 580 for flagship combat, Martyrdom stack, and Blacklake-facing arenas. This is the binding target in `docs/01_CONSTITUTION_AND_PROGRAM.md` §2.1 and `docs/07_SACRILEGE.md`.
+
+2. **Engine reference / stress scenes (historical CI gates):** **1080p @ ≥ 60 FPS** on RX 580 for the *full simulation* row below — used for renderer and subsystem regression harnesses (e.g. Sponza-class workload, heavy atmosphere). Milestones such as *Foundation Renderer* may record **60 FPS** exit proof; that is **not** the *Sacrilege* ship bar.
+
+**Engine reference harness (item 2 above)** — full simulation row:
+
+- Sponza-class terrain geometry.
+- 2 km visible view distance.
+- 10 000 active ECS entities.
+- Full atmospheric scattering + volumetric clouds.
+- Cascaded shadow maps.
+- PBR materials + IBL.
+
+**CI:** perf regression ≥ 5 % on the canonical scene **fails CI**.
 
 ---
 
@@ -262,7 +263,7 @@ Benchmarks run nightly in CI on an RX-580-class reference runner and compare to 
 
 Beyond the general renderer patterns, Greywater uses Vulkan for game-specific workloads:
 
-- **GPU terrain / mesh generation** — compute shaders generate meshes from deterministic fields (arenas, circles, Blacklake GPTM slices). See `docs/08_BLACKLAKE_AND_RIPPLE.md` and `docs/04_SYSTEMS_INVENTORY.md`.
+- **GPU terrain / mesh generation** — compute shaders generate meshes from deterministic fields (arenas, circles, Blacklake GPTM slices). See `docs/08_BLACKLAKE.md` and `docs/04_SYSTEMS_INVENTORY.md`.
 - **Atmospheric and volumetric effects** — scattering and fog paths that fit RX 580; *Sacrilege* pushes local volumetrics and horror reads (GW-SAC-001). See `docs/06_ARCHITECTURE.md` rendering chapters.
 - **Raymarched volumetric clouds** — compute shader, 3D Perlin-Worley density texture.
 - **GPU procedural vegetation** — compute shader emits `VkDrawIndexedIndirectCommand` buffers; culling + LOD selection on GPU.
@@ -285,13 +286,14 @@ Beyond the general renderer patterns, Greywater uses Vulkan for game-specific wo
 
 *Rendered deliberately. Vulkan 1.2 is the baseline. RX 580 is the target. Do not write features that shut out the player base.*
 
+---
 
 ---
 
+# 04_LANGUAGE_RESEARCH_GUIDE — Greywater_Engine
 
----
-
-## Language Research Guide (C++23 + Rust)
+**Status:** Reference
+**Scope:** The C++23 discipline used across the engine **and** the Rust patterns used inside BLD. Greywater is a dual-language codebase with a narrow FFI seam — the disciplines differ and both must be understood.
 
 ---
 
@@ -617,13 +619,11 @@ Greywater does not maintain an external curriculum of C++ or Rust books here. En
 
 *Two languages. One codebase. Both disciplined.*
 
+---
 
 ---
 
-
----
-
-## Build Instructions
+# BUILDING — Greywater_Engine
 
 **Audience:** anyone who has just cloned the repo and wants a working build.
 **Status:** Operational · Phase 1 minimum. Phase 2+ adds per-subsystem detail.
@@ -734,13 +734,11 @@ Everything beyond the Phase 1 smoke. Run `git log` for landed work. The phase-ga
 
 *Built deliberately. Clang-only. Ninja-only. Windows + Linux equal. Shipped by Cold Coffee Labs.*
 
+---
 
 ---
 
-
----
-
-## Coding Standards (Quick Reference)
+# CODING_STANDARDS — Greywater
 
 **Status:** Operational
 **Derived from:** `docs/01_CONSTITUTION_AND_PROGRAM.md` §3 + `docs/05_RESEARCH_BUILD_AND_STANDARDS.md` + `docs/03_PHILOSOPHY_AND_ENGINEERING.md`
@@ -882,9 +880,7 @@ Non-conforming PRs are blocked on CI. See `12` §J for the exhaustive review rub
 
 *Standardized deliberately. Every rule here is a scar someone already paid for. Honor the scar.*
 
-
 ---
-
 
 ---
 
@@ -892,9 +888,7 @@ Non-conforming PRs are blocked on CI. See `12` §J for the exhaustive review rub
 mkdir -p engine/{platform,memory,core/{command,events,config},math,jobs,ecs,render/{hal,shader,material},assets,scene,scripting,vscript,audio,net,physics,anim,input,ui,i18n,a11y,persist,telemetry,console,gameai,vfx,sequencer,mod,platform_services} bld/{bld-mcp,bld-tools,bld-provider,bld-rag,bld-agent,bld-governance,bld-bridge,bld-ffi} editor/{agent_panel,bld_bridge,vscript_panel} sandbox runtime gameplay tools/cook tests content assets third_party cmake/packaging docs/{daily,snippets,architecture,adr}
 ```
 
-
 ---
-
 
 ---
 
@@ -954,9 +948,7 @@ inline void register_gameplay_systems(ecs::World& world)
 } // namespace gw::gameplay
 ```
 
-
 ---
-
 
 ---
 

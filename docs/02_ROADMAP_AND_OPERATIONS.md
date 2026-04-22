@@ -1,12 +1,10 @@
 # 02 — Roadmap & Operations
 
 **Status:** Operational — updated as phases complete  
-**Horizon:** 162 weeks · ~37 months · 25 phases (24 build + LTS)  
-**Start:** 2026-04-20 (Phase 1, week 001) · **Planned RC:** 2029-05-28 (Phase 24, week 162)
+**Horizon:** 162 weeks · ~37 months · 25 phases  
+**Start:** 2026-04-20 · **Planned RC:** 2029-05-28
 
-> **The phase is the contract. The week is the budget.**
-
-This document governs the schedule and day-to-day workflow for Greywater Engine + *Sacrilege*. Phases 1–18 build the engine and general-purpose subsystems. Phases 19–23 build Blacklake + *Sacrilege*-facing systems. Phase 24 hardens and ships. Phase 25 sustains.
+> **The phase is the contract. The week is the budget. The milestone is the proof.**
 
 ---
 
@@ -16,149 +14,152 @@ This document governs the schedule and day-to-day workflow for Greywater Engine 
 |-------|------|-------|----------|-----------|--------|
 | 1 | Scaffolding & CI/CD | 001–004 | 4w | *First Light* | ✅ Complete |
 | 2 | Platform & Core Utilities | 005–009 | 5w | — | ✅ Complete |
-| 3 | Math, ECS, Jobs & Reflection | 010–016 | 7w | *Foundations Set* | ✅ Complete (pulled fwd through Ph7) |
+| 3 | Math, ECS, Jobs & Reflection | 010–016 | 7w | *Foundations Set* | ✅ Complete |
 | 4 | Renderer HAL & Vulkan Bootstrap | 017–024 | 8w | — | ✅ Complete |
 | 5 | Frame Graph & Reference Renderer | 025–032 | 8w | *Foundation Renderer* | ✅ Complete |
 | 6 | Asset Pipeline & Content Cook | 033–036 | 4w | — | ✅ Complete |
-| 7 | Editor Foundation | 037–042 | 6w | *Editor v0.1* | ✅ Complete (demo gate pending) |
+| 7 | Editor Foundation | 037–042 | 6w | *Editor v0.1* | ✅ Complete |
 | 8 | Scene Serialization & Visual Scripting | 043–047 | 5w | — | ✅ Complete |
 | 9 | BLD (Brewed Logic Directive, Rust) | 048–059 | 12w | *Brewed Logic* | ✅ Complete |
 | 10 | Runtime I — Audio & Input | 060–065 | 6w | — | ✅ Complete |
-| 11 | Runtime II — UI, Events, Config, Console | 066–071 | 6w | *Playable Runtime* | ✅ Complete (271/271 tests) |
+| 11 | Runtime II — UI, Events, Config, Console | 066–071 | 6w | *Playable Runtime* | ✅ Complete (271/271) |
 | 12 | Physics | 072–077 | 6w | — | ✅ Complete |
-| 13 | Animation & Game AI Framework | 078–083 | 6w | *Living Scene* | ✅ Complete (347/347 tests) |
-| 14 | Networking & Multiplayer | 084–095 | 12w | *Two Client Night* | ✅ Complete (394/394 tests) |
-| 15 | Persistence & Telemetry | 096–101 | 6w | — | ✅ Complete (473/473 tests) |
-| 16 | Platform Services, i18n & a11y | 102–107 | 6w | *Ship Ready* | ✅ Complete (586/586 tests) |
-| 17 | Shader Pipeline, Materials & VFX | 108–113 | 6w | *Studio Renderer* | ✅ Complete (711/711 tests) |
-| 18 | Cinematics & Mods | 114–118 | 5w | *Studio Ready* | ✅ Complete (18-C: `mod_api` / `ModRegistry`, `example_mod`, `sandbox_studio`, BLD seq gate) |
-| 19 | **Blacklake Core & Deterministic Genesis** | 119–126 | 8w | *Infinite Seed* | ✅ Complete (19-C: `sandbox_infinite_seed` exit gate, Murmur3 *Hell Seed* `GoldenHashes`, `resource_distributor`, `determinism_validator`; **26** `universe_tests` — resource + proof-vector suite) |
-| 20 | **Arena Topology, GPTM & Sacrilege LOD** | 127–134 | 8w | *Nine Circles Ground* | 🔜 Planned |
-| 21 | **Sacrilege Frame — Rendering, Atmosphere, Audio** | 135–142 | 8w | *Hell Frame* | 🔜 Planned |
+| 13 | Animation & Game AI Framework | 078–083 | 6w | *Living Scene* | ✅ Complete (347/347) |
+| 14 | Networking & Multiplayer | 084–095 | 12w | *Two Client Night* | ✅ Complete (394/394) |
+| 15 | Persistence & Telemetry | 096–101 | 6w | — | ✅ Complete (473/473) |
+| 16 | Platform Services, i18n & a11y | 102–107 | 6w | *Ship Ready* | ✅ Complete (586/586) |
+| 17 | Shader Pipeline, Materials & VFX | 108–113 | 6w | *Studio Renderer* | ✅ Complete (711/711) |
+| 18 | Cinematics & Editor Toolchain | 114–118 | 5w | *Studio Ready* | ✅ Complete |
+| 19 | **Blacklake Core: HEC, SDR, Chunk Streaming** | 119–126 | 8w | *Infinite Seed* | ✅ Complete (26 universe_tests) |
+| 20 | **GPTM, Nine Circles Geometry, Floating Origin** | 127–134 | 8w | *Nine Circles Ground* | 🔜 Active |
+| 21 | **Hell Frame: Horror Post, Decals, HUD, Audio** | 135–142 | 8w | *Hell Frame* | 🔜 Planned |
 | 22 | **Martyrdom Combat & Player Stack** | 143–148 | 6w | *Martyrdom Online* | 🔜 Planned |
-| 23 | **Damned Host, Circles Pipeline & Boss** | 149–154 | 6w | *God Machine RC* | 🔜 Planned |
+| 23 | **Damned Host, Encounters, God Machine Boss** | 149–154 | 6w | *God Machine RC* | 🔜 Planned |
 | 24 | Hardening & Release | 155–162 | 8w | *Release Candidate* | 🔜 Planned |
-| 25 | LTS Sustenance | 163–∞ | Ongoing | Quarterly LTS cuts | 🔜 Ongoing |
+| 25 | LTS Sustenance | 163–∞ | Ongoing | Quarterly LTS | 🔜 Ongoing |
 
 ---
 
-## Week-by-Week Schedule (Active Phases)
+## Active Phase: Phase 20 — GPTM, Nine Circles Geometry, Floating Origin
 
-### Phase 18 — Cinematics & Mods (weeks 114–118)
-
-| Week | Deliverable | Tier |
-|------|-------------|------|
-| 114 | `.gwseq` sequencer format + timeline ECS integration | A |
-| 115 | Cinematic camera system — splines, cuts, blend modes | A |
-| 116 | Mod sandbox: `gameplay_module` hot-reload as mod surface | B |
-| 117 | Mod API documentation + BLD tool surface for sequencer | B |
-| 118 | *Studio Ready* demo: cinematic plays + mod loads cleanly | A |
-
-### Phase 19 — Blacklake Core & Deterministic Genesis (weeks 119–126)
+### Week-by-Week
 
 | Week | Deliverable | Tier |
 |------|-------------|------|
-| 119 | 256-bit universe seed + HEC protocol implementation | A |
-| 120 | SDR Noise primitive — Gabor wavelet superposition | A |
-| 121 | Hierarchical galaxy → system → planet seed derivation | A |
-| 122 | Chunk streaming foundation: 32 m chunks, LRU, time-sliced | A |
-| 123 | Biome classification: temperature + humidity + soil parameters | A |
-| 124 | Resource distribution: geological-rule placement from seed | A |
-| 125 | Determinism validation suite: hash cross-platform | A |
-| 126 | *Infinite Seed* milestone: arena gen from Hell Seed, deterministic | A |
+| 127 | `GptmVertex` / `GptmTile` types; `GptmMeshBuilder` Lod0 implementation | A |
+| 128 | `GptmMeshBuilder` full LOD chain (Lod1–Lod4); SVO cave skeleton | A |
+| 129 | LOD selector — screen-space error metric; LOD handoff shader | A |
+| 130 | Circle SDR profile integration: all 9 `CircleProfile` constexprs driving terrain | A |
+| 131 | `FloatingOrigin` — recentre at 2048m; `OriginShiftEvent` broadcast; all subscribers | A |
+| 132 | Vegetation instancing — GPU indirect draw, 4 LOD levels, 256 instances/chunk | A |
+| 133 | `GptmTileRenderer` — 5 draw calls total for all terrain; `terrain.hlsl` | A |
+| 134 | *Nine Circles Ground* exit gate: `sandbox_nine_circles` — all 9 Circles generate, LOD correct, floating origin fires | A |
 
-### Phase 20 — Arena Topology, GPTM & Sacrilege LOD (weeks 127–134)
+### Phase 20 Acceptance Criteria
 
-| Week | Deliverable | Tier |
-|------|-------------|------|
-| 127 | GPTM quad-sphere topology model implementation | A |
-| 128 | Heightmap + sparse voxel octree hybrid | A |
-| 129 | LOD handoff shader: seamless transition at clipmap boundary | A |
-| 130 | Nine Circles base geography generation from SDR | A |
-| 131 | Floating origin system: recentering at configurable threshold | A |
-| 132 | Vegetation instancing: GPU indirect draw, 4 LOD levels | A |
-| 133 | Circle-specific SDR parameter tables (Limbo → Treachery) | A |
-| 134 | *Nine Circles Ground* milestone: all 9 circles generate, LOD correct | A |
+- [ ] All 9 `CircleProfile` constants produce visually distinct terrain (distinct mean/variance in height distribution)
+- [ ] LOD selector returns Lod0 at < 32m, Lod4 at > 2km — verified by test
+- [ ] `FloatingOrigin` fires when camera moves > 2048m; all subscribers receive `OriginShiftPayload`
+- [ ] Vegetation instances > 0 for all non-void chunks in all 9 Circles
+- [ ] `sandbox_nine_circles` prints: `NINE CIRCLES GROUND — circles=9 chunks=81 lod=OK veg=OK origin=OK`
+- [ ] CI green on dev-win + dev-linux
+- [ ] No Vulkan validation errors in any phase of the exit gate
 
-### Phase 21 — Sacrilege Frame (weeks 135–142)
+---
 
-| Week | Deliverable | Tier |
-|------|-------------|------|
-| 135 | Atmospheric scattering: physically-based raymarched single-pass | A |
-| 136 | Horror post stack: chromatic aberration, film grain, screen shake | A |
-| 137 | GPU-driven blood decal system: stamp + drip compute shaders | A |
-| 138 | Dynamic BPM-sync audio layer crossfade (Combo Meter hook) | A |
-| 139 | Sin/Mantra visual feedback: red tendril shader, choir mix | A |
-| 140 | Diegetic HUD: blood vial health, runic Sin meter, Mantra counter | A |
-| 141 | Performance gate: RX 580 @ 1080p / 144 FPS with full horror post | A |
-| 142 | *Hell Frame* milestone: playable frame with full Sacrilege aesthetic | A |
+## Upcoming Phase: Phase 21 — Hell Frame
 
-### Phase 22 — Martyrdom Combat & Player Stack (weeks 143–148)
+*The phase that makes Greywater Engine look and sound like Sacrilege.*
+
+### Week-by-Week
 
 | Week | Deliverable | Tier |
 |------|-------------|------|
-| 143 | ECS components: SinComponent, MantraComponent, RaptureState, RuinState, StatModifier | A |
-| 144 | Martyrdom systems: Sin accrual, Blasphemy expenditure, Rapture auto-trigger at 100 | A |
-| 145 | Ruin aftermath system: 12s debuff, stat modifier application | A |
-| 146 | Player controller: custom swept-AABB; bunny hop, slide, wall kick | A |
-| 147 | Grapple hook + blood surf mechanics | A |
-| 148 | *Martyrdom Online* milestone: 2-player Martyrdom loop with netcode | A |
+| 135 | `horror_post.hlsl` — chromatic aberration, film grain, screen shake in single pass | A |
+| 136 | Sin tendril vignette shader; Ruin desaturation; Rapture whiteout (post-process CVars) | A |
+| 137 | `BloodDecalSystem` — compute stamp + drip; 512-entry ring buffer; `DecalComponent` | A |
+| 138 | Circle-specific fog parameters — per-biome ambient, fog colour, visibility range | A |
+| 139 | `MartyrdomAudioController` — Sin choir, Rapture thunder, Ruin drone, BPM layer crossfade | A |
+| 140 | Diegetic HUD — blood vial, runic Sin ring, Mantra counter in RmlUi | A |
+| 141 | Performance gate: RX 580 @ 1080p / 144 FPS with full horror post stack | A |
+| 142 | *Hell Frame* exit gate: `sandbox_hell_frame` — Violence Circle, full post, decals, HUD | A |
 
-### Phase 23 — Damned Host, Circles Pipeline & Boss (weeks 149–154)
+---
 
-| Week | Deliverable | Tier |
-|------|-------------|------|
-| 149 | Enemy ECS archetypes: Cherubim, Deacon, Leviathan, Warden (behavior trees) | A |
-| 150 | Enemy ECS archetypes: Martyr, Hell Knight, Painweaver, Abyssal | A |
-| 151 | Persistent dismemberment: limb entities, simplified collision, nav interaction | A |
-| 152 | Full weapon roster: all 6 weapons, alt-fires, Sin/Mantra coupling | A |
-| 153 | God Machine boss: 4-phase fight, arena collapse, Martyrdom economy | A |
-| 154 | *God Machine RC* milestone: full Circle 9 (Treachery) playable end-to-end | A |
+## Upcoming Phase: Phase 22 — Martyrdom Combat & Player Stack
 
-### Phase 24 — Hardening & Release (weeks 155–162)
+*The phase where Sacrilege becomes playable.*
+
+### Week-by-Week
 
 | Week | Deliverable | Tier |
 |------|-------------|------|
-| 155–156 | Full regression suite: 711+ tests green on all presets | A |
-| 157 | WCAG 2.2 AA audit pass; all a11y toggles functional | A |
-| 158 | Platform certification builds: Windows installer + Linux AppImage/DEB | A |
-| 159 | BLD ships with ~60 tools; RAG index shipped as asset | A |
-| 160 | Sponza at 144 FPS @ 1440p; multiplayer sandbox 4-client OK | A |
-| 161 | Engineering handbook, onboarding guide, LTS runbook indexable by BLD | A |
-| 162 | *Release Candidate* — 10-minute board demo, no intervention | A |
+| 143 | Martyrdom ECS components: `SinComponent`, `MantraComponent`, `RaptureState`, `RuinState`, `ResolvedStats` | A |
+| 144 | `SinAccrualSystem`, `MantraAccrualSystem`, `RaptureCheckSystem`, `RaptureTickSystem`, `RuinTickSystem` | A |
+| 145 | `BlasphemySystem` — all 5 Blasphemies; `StatCompositionSystem` | A |
+| 146 | Player controller: swept-AABB, bunny hop, slide, wall kick | A |
+| 147 | Grapple hook, blood surf, Glory Kill trigger | A |
+| 148 | *Martyrdom Online* exit gate: 2-player session, full Martyrdom loop, no desync over 5 min | A |
+
+---
+
+## Upcoming Phase: Phase 23 — Damned Host, Encounters, God Machine
+
+*The phase that makes Sacrilege a game, not a tech demo.*
+
+### Week-by-Week
+
+| Week | Deliverable | Tier |
+|------|-------------|------|
+| 149 | Enemy archetypes: Cherubim, Deacon, Leviathan, Warden — ECS + BT wiring | A |
+| 150 | Enemy archetypes: Martyr, Hell Knight, Painweaver, Abyssal — ECS + BT wiring | A |
+| 151 | Gore system: dismemberment, limb entities as nav obstacles, blood decal placement on hit | A |
+| 152 | Full weapon roster: all 6 weapons, hitscan/projectile/melee, alt-fires, Sin/Mantra coupling | A |
+| 153 | God Machine boss: 4 phases, arena collapse, Martyrdom economy gating | A |
+| 154 | *God Machine RC* exit gate: Circle IX (Treachery) end-to-end playable; God Machine defeatable | A |
+
+---
+
+## Phase 24 — Hardening & Release
+
+| Week | Deliverable | Tier |
+|------|-------------|------|
+| 155–156 | Full regression: 711+ tests green all presets; zero sanitizer warnings | A |
+| 157 | WCAG 2.2 AA audit pass; post-effect accessibility toggles all functional | A |
+| 158 | Platform builds: Windows installer + Linux AppImage/DEB, signed | A |
+| 159 | BLD ships ~60 tools; RAG index shipped as asset; all editor tools functional | A |
+| 160 | 4-client co-op session stable 15+ min; voice chat works | B |
+| 161 | Engineering handbook, LTS runbook, onboarding guide — all indexable by BLD | A |
+| 162 | *Release Candidate* — all 9 Circles completable; God Machine defeatable; 10-min demo | A |
 
 ---
 
 ## Kanban Operations
 
-### Board Columns
+### Board
 
 ```
 Backlog → Ready → In Progress (WIP ≤ 2) → Review → Done
 ```
 
-- **WIP limit of 2** is a hard rule, not a guideline. Never exceed it.
-- A card stays In Progress until CI is green and review is passing.
-- Blocked cards move to Blocked with a written reason.
+WIP limit of 2 is a **hard rule**. Never exceed it. Exceeding it splits focus and guarantees both cards regress.
 
 ### Card Format
 
 ```markdown
-## [PHASE-WEEK-NN] Brief title
+## [P20-W127] GptmVertex types and Lod0 mesh builder
 
-**Tier:** A / B / C
-**Phase:** N
-**Week:** NNN
-**ADR:** NNNN (if architectural decision required)
+**Tier:** A  **Phase:** 20  **Week:** 127  **ADR:** 0087 (if new decision)
 
 ### Context
-One paragraph: what this builds on and why it exists.
+One paragraph explaining what this builds on and why it matters now.
 
 ### Acceptance criteria
-- [ ] Criterion 1 (concrete, testable)
-- [ ] Criterion 2
-- [ ] CI green on dev-linux + dev-win
-- [ ] Perf gate: [specific budget from 09_NETCODE_DETERMINISM_PERF.md]
+- [ ] `sizeof(GptmVertex) == 32` (static_assert)
+- [ ] Lod0 mesh for a test chunk has correct vertex count
+- [ ] All vertex normals are unit vectors (within 1e-5)
+- [ ] Build time < 3ms for Lod0 on dev hardware
+- [ ] CI green dev-win + dev-linux
 ```
 
 ### Rituals
@@ -166,44 +167,44 @@ One paragraph: what this builds on and why it exists.
 | Ritual | Cadence | Duration | Rule |
 |--------|---------|----------|------|
 | Daily focus | Each working day | 90 min × 1–2 blocks | One card. No multitasking. |
-| Commit | End of each focus block | 5 min | Small commits. Conventional Commits format. |
-| Weekly retro | Sunday | 30 min | Read 7 daily logs. No coding during retro. |
-| Phase gate review | End of each phase | 60 min | Demo the milestone. Update `docs/`. Write phase closeout note. |
+| Commit | End of each block | 5 min | Conventional Commits format. CI stays green. |
+| Weekly retro | Sunday | 30 min | Read 7 daily logs. **No coding during retro.** |
+| Phase gate | End of each phase | 60 min | Run the exit gate binary. Update `docs/`. Write closeout note. |
 
-### Anti-Patterns (These block the merge)
+### Anti-Patterns (merge-blocking)
 
-| Anti-pattern | Why it's blocked |
-|--------------|-----------------|
-| WIP > 2 cards | Splitting focus guarantees both fail |
-| Skipping the cold-start checklist | You will code the wrong thing |
-| "I'll write the tests later" | The phase gate requires CI green. Later never comes. |
-| Direct commits to `main` | CI must gate every change. Branch + PR always. |
-| ADR written after the code | Decisions made under implementation pressure are bad decisions. ADR first. |
+| Anti-pattern | Rule |
+|---|---|
+| WIP > 2 | Splits focus → both cards fail |
+| Skipping cold-start checklist | You will code the wrong thing |
+| "Tests later" | Phase gate requires CI green. Later never comes. |
+| Direct commit to `main` | Branch + PR always. CI gates every change. |
+| ADR written after code | Decisions under implementation pressure are bad decisions. ADR first. |
 | Sunday coding | Rest days are load-bearing. Burnout is the #1 project risk. |
 
 ---
 
 ## Milestone Definitions
 
-| Milestone | Required deliverables | Demo |
-|-----------|----------------------|------|
-| *First Light* (Ph 1) | Hello-triangle sandbox + hello-BLD C-ABI smoke test | Recorded 2-min video |
-| *Foundations Set* (Ph 3) | ECS World, CommandStack, Job scheduler, serialization — 101/101 tests | Entities + undo in editor |
-| *Foundation Renderer* (Ph 5) | Frame graph + Forward+ reference; Sponza @ 60 FPS on RX 580 | Recorded scene |
-| *Editor v0.1* (Ph 7) | Docking panels, scene hierarchy, vscript node graph, BLD chat panel | 5-min walkthrough |
-| *Brewed Logic* (Ph 9) | BLD full 9A–9F waves; MCP tools; RAG; local inference | BLD authors vscript IR live |
-| *Playable Runtime* (Ph 11) | RmlUi HUD, event system, console, config, audio — runtime ships | Sandbox plays audio + UI |
-| *Living Scene* (Ph 13) | Animation blend trees + behavior trees + navmesh | 100 animated characters pathfind |
-| *Two Client Night* (Ph 14) | GNS transport + ECS replication + 2-client integration | 2 clients sync 60 s |
-| *Ship Ready* (Ph 16) | WCAG 2.2 AA, 5 locales, Steamworks + EOS integration | Localized menu + a11y audit |
-| *Studio Renderer* (Ph 17) | Full VFX stack, PBR Neutral tone, bloom/TAA/DoF/CA/grain | Studio render of Sacrilege Circle |
-| *Studio Ready* (Ph 18) | `.gwseq` playback, `sandbox_studio` exit gate, mod API + `example_mod` + BLD seq C-ABI | `sandbox_studio` prints STUDIO READY |
-| *Infinite Seed* (Ph 19) | HEC + SDR + arena gen from Hell Seed — deterministic | Same seed = same Circle, two machines |
-| *Nine Circles Ground* (Ph 20) | All 9 Circles generate, GPTM LOD correct | Circle flythrough at 144 FPS |
-| *Hell Frame* (Ph 21) | Full Sacrilege aesthetic + 144 FPS on RX 580 | Gameplay video |
-| *Martyrdom Online* (Ph 22) | 2-player combat, full Martyrdom loop, netcode | 2-player session, no desync |
-| *God Machine RC* (Ph 23) | Full Circle 9 end-to-end, God Machine boss | Complete playthrough |
-| *Release Candidate* (Ph 24) | All above + certification + docs | 10-min board demo, no intervention |
+| Milestone | Required | Exit Proof |
+|-----------|----------|------------|
+| *First Light* (Ph 1) | Hello-triangle + BLD C-ABI smoke test | 2-min recorded video |
+| *Foundations Set* (Ph 3) | ECS World, CommandStack, Jobs — 101/101 tests | Entities + undo in editor |
+| *Foundation Renderer* (Ph 5) | Frame graph + Forward+; Sponza @ ≥ 60 FPS RX 580 (engine reference gate — not the *Sacrilege* 144 FPS ship bar; see `05` §1.4) | Recorded scene |
+| *Editor v0.1* (Ph 7) | 3D viewport, asset browser, BLD panel, play mode | 5-min walkthrough |
+| *Brewed Logic* (Ph 9) | BLD MCP tools; RAG; local inference; editor wired | BLD places enemy in editor live |
+| *Playable Runtime* (Ph 11) | Audio, HUD, console, config — runtime ships | Sandbox plays audio + UI |
+| *Living Scene* (Ph 13) | Animation blend trees + BTs + navmesh | 100 animated enemies pathfind |
+| *Two Client Night* (Ph 14) | GNS transport + ECS replication + 2-client test | 2 clients sync 60s |
+| *Ship Ready* (Ph 16) | WCAG 2.2 AA, 5 locales, Steamworks/EOS integration | Localized menu + audit |
+| *Studio Renderer* (Ph 17) | Full VFX, PBR Neutral, bloom/TAA/DoF/CA/grain | Studio render of Sacrilege Circle |
+| *Studio Ready* (Ph 18) | `.gwseq` playback, mod API, BLD seq tools, `sandbox_studio` | `sandbox_studio` prints STUDIO READY |
+| *Infinite Seed* (Ph 19) | HEC + SDR + chunk streaming — deterministic | Same seed = same terrain, 2 machines |
+| *Nine Circles Ground* (Ph 20) | All 9 Circles generate; GPTM LOD correct; floating origin | `sandbox_nine_circles` exit gate |
+| *Hell Frame* (Ph 21) | Horror post, blood decals, diegetic HUD, 144 FPS RX 580 | `sandbox_hell_frame` + recorded gameplay |
+| *Martyrdom Online* (Ph 22) | Full Martyrdom loop; player controller; 2-player no-desync | 2-player session video |
+| *God Machine RC* (Ph 23) | All 9 Circles completable; God Machine defeatable | Full playthrough video |
+| *Release Candidate* (Ph 24) | All above + cert builds + docs | 10-min board demo, no intervention |
 
 ---
 

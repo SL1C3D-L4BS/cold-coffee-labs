@@ -229,6 +229,7 @@ add_executable(universe_tests
     world/biome_test.cpp
     world/determinism_test.cpp
     world/resource_distributor_test.cpp
+    world/gptm_test.cpp
 )
 target_link_libraries(universe_tests PRIVATE greywater::world doctest::doctest)
 target_include_directories(universe_tests PRIVATE "${CMAKE_SOURCE_DIR}")

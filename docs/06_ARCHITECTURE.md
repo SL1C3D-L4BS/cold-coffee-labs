@@ -1,16 +1,9 @@
 # 06 — Architecture
 
-**Status:** Draft — pending stakeholder sign-off  
-**Version:** 0.3 · 2026-04-21  
-**Precedence:** L3 — platform shape and module topology; narrowed by ADRs in `10_APPENDIX_ADRS_AND_REFERENCES.md`
+**Status:** Draft — pending stakeholder sign-off · Last revised 2026-04-22  
+**Precedence:** L3 — platform shape; narrowed by ADRs
 
-> ADRs record decisions that narrow or supersede narrative architecture where they conflict. Trust the ADR over older prose.
-
----
-
----
-
-# `docs/06_ARCHITECTURE.md` — Greywater Engine architecture
+> ADRs in `10_APPENDIX_ADRS_AND_REFERENCES.md` narrow or supersede narrative where they conflict.
 
 **Layer:** L3 in `docs/README.md`.
 
@@ -18,12 +11,12 @@
 
 | Document | Role |
 | -------- | ---- |
-| `grey-water-engine-blueprint.md` | Formal, board-ready blueprint — subsystems, risks, stakeholder view |
-| `greywater-engine-core-architecture.md` | Narrative walkthrough of how the engine hangs together |
+| `docs/02_ROADMAP_AND_OPERATIONS.md` | Phased schedule, week rows, exit gates, Kanban — **stakeholder milestone truth** |
+| `docs/06_ARCHITECTURE.md` *(this file)* | Narrative blueprint + deep architecture (merged); ADRs in `docs/10_APPENDIX_ADRS_AND_REFERENCES.md` narrow where they conflict |
 
 ## Unified program context
 
-**Cold Coffee Labs → Greywater Engine → *Sacrilege*.** These architecture docs describe the **platform**. Product-facing mandates for the debut title live in `docs/07_SACRILEGE.md`. Mathematical / procedural depth for **Blacklake:** `docs/08_BLACKLAKE_AND_RIPPLE.md`. GWE × Ripple / RSL: `docs/08_BLACKLAKE_AND_RIPPLE.md` (reconcile with shipped editor + `vscript` via ADRs).
+**Cold Coffee Labs → Greywater Engine → *Sacrilege*.** These architecture docs describe the **platform**. Product-facing mandates for the debut title live in `docs/07_SACRILEGE.md`. **Blacklake** (arena generation math, HEC/SDR/GPTM): `docs/08_BLACKLAKE.md`. Visual scripting typed IR and editor graph projection: `engine/vscript/` + ADRs in `docs/10_APPENDIX_ADRS_AND_REFERENCES.md` (search **ADR-0008**, **ADR-0009**, **vscript**).
 
 ## Engineering status
 
@@ -33,6 +26,9 @@ Implementation progress and phase gates are **operational truth** in `docs/02_RO
 
 *Architecture explains the machine. The map of all docs is `docs/README.md`.*
 
+---
+
+---
 
 # Greywater — Architectural Blueprint & Phased Execution Plan
 
@@ -41,7 +37,7 @@ Implementation progress and phase gates are **operational truth** in `docs/02_RO
 | **Project**        | Greywater Engine + *Sacrilege* (unified program)          |
 | **Engine**         | Greywater_Engine                                        |
 | **Game**           | *Sacrilege* (debut title)                               |
-| **Hardware baseline** | AMD Radeon RX 580 8GB @ 1080p / 60 FPS              |
+| **Hardware baseline** | AMD Radeon RX 580 8GB @ 1080p — *Sacrilege* Tier A: **144 FPS** (`docs/01_CONSTITUTION_AND_PROGRAM.md` §2.1); engine reference scenes: **≥ 60 FPS** where `docs/05_RESEARCH_BUILD_AND_STANDARDS.md` §1.4 applies |
 | **Art direction**  | *Sacrilege* — crunchy low-poly horror (GW-SAC-001)      |
 | **Document Owner** | Principal Engine Architect, Cold Coffee Labs            |
 | **Audience**       | Executive Stakeholders, Engineering Leads, Technical Ops |
@@ -54,7 +50,7 @@ Implementation progress and phase gates are **operational truth** in `docs/02_RO
 
 ## 1. Executive Summary
 
-Cold Coffee Labs is chartering **Greywater Engine** — the proprietary C++23/Vulkan platform — and its debut flagship title, ***Sacrilege*** (**supra-AAA** bar: `docs/01_CONSTITUTION_AND_PROGRAM.md` §0.1). Procedural depth is delivered through the **Blacklake** framework (`docs/08_BLACKLAKE_AND_RIPPLE.md`). The engine is **purpose-built** to ship *Sacrilege* first, targets the **AMD Radeon RX 580 8GB at 1080p / 60 FPS** as its baseline hardware, and maintains a clean engine/game code separation so future Cold Coffee Labs titles can ship on the same stack.
+Cold Coffee Labs is chartering **Greywater Engine** — the proprietary C++23/Vulkan platform — and its debut flagship title, ***Sacrilege*** (**supra-AAA** bar: `docs/01_CONSTITUTION_AND_PROGRAM.md` §0.1). Procedural depth is delivered through the **Blacklake** framework (`docs/08_BLACKLAKE.md`). The engine is **purpose-built** to ship *Sacrilege* first on **AMD Radeon RX 580 8GB @ 1080p / 144 FPS** for Tier A flagship content (L1), while **engine reference and renderer milestone harnesses** may continue to cite **≥ 60 FPS** budgets per `docs/05_RESEARCH_BUILD_AND_STANDARDS.md` §1.4. The stack maintains a clean engine/game code separation so future Cold Coffee Labs titles can ship on the same platform.
 
 Greywater is not an attempt to compete feature-for-feature with the large commercial engines. It is a focused, **data-oriented, tool-agnostic, hardware-accessible** technology stack designed to give Cold Coffee Labs the following durable advantages:
 
@@ -62,7 +58,7 @@ Greywater is not an attempt to compete feature-for-feature with the large commer
 2. **Deterministic, reproducible builds** on every developer machine and CI runner — identical toolchain on Windows and Linux, enforced by policy.
 3. **Performance headroom** through Data-Oriented Design (DOD) and a native Entity Component System (ECS) at the core. Our cache-line layout is a deliberate decision, not an accident of object graphs.
 4. **A single-language, single-process editor experience.** No managed-runtime bridges, no inter-language marshalling, no "editor team" and "engine team" drifting apart.
-5. **Hardware-accessible GPU strategy** — a thin Hardware Abstraction Layer (HAL) over **Vulkan 1.2 baseline with 1.3 features opportunistic**, targeting the RX 580 Polaris architecture at 1080p / 60 FPS. Ray tracing, mesh shaders, and GPU work graphs are **hardware-gated** (Tier G, post-v1). A WebGPU backend slots in for web and sandboxed targets, post-v1.
+5. **Hardware-accessible GPU strategy** — a thin Hardware Abstraction Layer (HAL) over **Vulkan 1.2 baseline with 1.3 features opportunistic**, targeting the RX 580 Polaris architecture at **1080p / 144 FPS** for *Sacrilege* Tier A. Ray tracing, mesh shaders, and GPU work graphs are **hardware-gated** (Tier G, post-v1). A WebGPU backend slots in for web and sandboxed targets, post-v1.
 6. **Brewed Logic Directive (BLD)** — a first-class, native AI copilot agent baked into the engine as a **Rust crate**, linked into the editor via a narrow C-ABI boundary. Chat-driven, MCP-protocol, with authoritative tool-use over the engine's public surface. BLD is **not an editor plugin** — it is an engine subsystem. Rust is chosen **only for BLD** (not the engine core) because the Rust ecosystem decisively wins on three things that matter to the agent: proc-macro-generated tool surfaces (`#[bld_tool]`) beat libclang codegen outright, `rmcp` (the official Rust MCP SDK) is ahead of any C++ MCP SDK, and the Rust ML ecosystem (`candle`, `llama-cpp-rs`, `async-openai`) leads on embeddings and inference. **This is our primary competitive differentiator.** No other engine in 2026 treats an agentic AI copilot as a core subsystem with undo-stack integration and compile-time-generated tool surfaces.
 
 This document is the blueprint for Phase 1 through Phase 24 of Greywater Engine construction (plus Phase 25 LTS). Phases 1–18 build general-purpose engine subsystems. Phases 19–23 build **Blacklake + *Sacrilege***-facing subsystems (see `docs/02_ROADMAP_AND_OPERATIONS.md`). Phase 24 hardens and ships. Approval authorizes implementation against the milestones in §5.
@@ -96,7 +92,7 @@ This section states the architectural choices that shape every other section of 
 | **Pure C** as the implementation language.                                  | C++23 gives us `constexpr`, `consteval`, concepts, modules, and reflection-adjacent metaprogramming without runtime cost. Rejecting those gains is a self-inflicted handicap. |
 | Hand-rolled batch / bash scripts as the primary build system.             | Fine for a single maintainer; unacceptable for a studio. Does not scale to multiple configurations, sanitizer builds, CI matrices, or onboarding.   |
 | Ad-hoc, un-phased development.                                            | Replaced by a phased, milestone-gated plan (§5).                                                                                                     |
-| Targeting top-of-line GPUs only.                                          | Shuts out the larger player base. The RX 580 is our floor; every Tier A feature must run at 1080p/60 on it.                                         |
+| Targeting top-of-line GPUs only.                                          | Shuts out the larger player base. The RX 580 is our floor; every Tier A *Sacrilege* feature must run at **1080p / 144 FPS** on it (L1). Engine reference harnesses may use separate 60 FPS rows in `05` §1.4 — see §1.4 there.                                         |
 | Ray tracing, mesh shaders, and GPU work graphs as baseline features.      | Not supported on our baseline hardware. Tier G — capability-gated and post-v1 at the earliest.                                                       |
 
 ---
@@ -899,7 +895,7 @@ BLD is the engine's primary competitive differentiator. Implemented as a Rust cr
 
 ### *Sacrilege* / Blacklake phases (19–23)
 
-Phases 19–23 build engine-side capabilities for **Blacklake** procedural genesis and the ***Sacrilege*** debut title. They consume prior platform work (Phases 1–18) and extend `engine/world/`, gameplay facades, and content pipelines. **Authoritative week rows:** `docs/02_ROADMAP_AND_OPERATIONS.md`. **Flagship spec:** `docs/07_SACRILEGE.md`. **Procedural depth:** `docs/08_BLACKLAKE_AND_RIPPLE.md`.
+Phases 19–23 build engine-side capabilities for **Blacklake** procedural genesis and the ***Sacrilege*** debut title. They consume prior platform work (Phases 1–18) and extend `engine/world/`, gameplay facades, and content pipelines. **Authoritative week rows:** `docs/02_ROADMAP_AND_OPERATIONS.md`. **Flagship spec:** `docs/07_SACRILEGE.md`. **Procedural depth:** `docs/08_BLACKLAKE.md`.
 
 ### Phase 19 — Blacklake Core & Deterministic Genesis · 8 weeks · World Systems Lead
 
@@ -1045,6 +1041,9 @@ This blueprint is submitted for stakeholder sign-off. Approval authorizes the En
 
 *End of document.*
 
+---
+
+---
 
 # Greywater_Engine × Cold Coffee Labs — Core Architecture
 
@@ -1052,7 +1051,7 @@ This blueprint is submitted for stakeholder sign-off. Approval authorizes the En
 
 **Author:** Principal Engine Architect, Cold Coffee Labs
 **Date:** 2026-04-21
-**Companion document:** [`grey-water-engine-blueprint.md`](grey-water-engine-blueprint.md) (the formal stakeholder blueprint)
+**Companion document:** [`docs/02_ROADMAP_AND_OPERATIONS.md`](02_ROADMAP_AND_OPERATIONS.md) (phased schedule, exit gates, stakeholder-facing milestones)
 
 ---
 
@@ -1081,7 +1080,7 @@ What we **are** doing:
 - Building a **data-oriented, cache-aware, native C++23** runtime. C++ is the language for the engine core, editor, sandbox, runtime, and gameplay module.
 - Building an editor that is **the same language, the same toolchain, and the same process boundary** as the runtime it edits. UI is locked to **Dear ImGui + docking + viewports + ImNodes + ImGuizmo** — no custom UI framework.
 - Building a **cross-platform-from-day-one** pipeline so that "it works on my machine" is never a credible bug report.
-- **Targeting the RX 580 (Polaris, 2016, 8 GB, Vulkan 1.2/1.3)** as the baseline. Every Tier A visual feature runs at 1080p / 60 FPS on this card. No ray tracing, no mesh shaders, no GPU work graphs as baseline — all are Tier G (hardware-gated, post-v1).
+- **Targeting the RX 580 (Polaris, 2016, 8 GB, Vulkan 1.2/1.3)** as the baseline. Every Tier A *Sacrilege* visual feature runs at **1080p / 144 FPS** on this card (L1). Engine-only reference scenes may use **≥ 60 FPS** harness rows (`05` §1.4). No ray tracing, no mesh shaders, no GPU work graphs as baseline — all are Tier G (hardware-gated, post-v1).
 - **Baking a first-class, native AI copilot — the Brewed Logic Directive (BLD) — into the engine as a Rust crate**, linked into the editor via a narrow C-ABI. Rust is used **only for BLD**; the rest of the engine is C++23.
 - **Visual scripting is text-first, AI-native, and graph-visualized.** A typed text IR is the ground-truth serialized form; the node graph is a reversible projection with a sidecar layout file. BLD reads and writes the IR directly.
 - **Purpose-built for *Sacrilege* first.** Greywater_Engine is designed around the debut title’s needs (Martyrdom loop, Blacklake hellscapes, BLD-authored content) — with a clean engine/game code boundary so the engine remains reusable for future Cold Coffee Labs titles.
@@ -1616,7 +1615,7 @@ With this architecture signed off:
 - **Phase 24 — Hardening & Release (8w).** Perf regression gates, libFuzzer, cargo-mutants, BLD eval harness, CPack + signing, anti-cheat boundary, LTS process, board-room demo → *Release Candidate*.
 - **Phase 25 — LTS Sustenance (ongoing).** Quarterly LTS cuts, 12-month backport SLA, security advisories, dependency upgrades, deprecation policy.
 
-**Total buildout: 162 weeks (~37 months)** from first commit to RC, plus ongoing LTS. The phases and their exit criteria live in [`grey-water-engine-blueprint.md`](grey-water-engine-blueprint.md). That document is the one stakeholders sign. This document is the one engineers read on day one.
+**Total buildout: 162 weeks (~37 months)** from first commit to RC, plus ongoing LTS. The phases and their exit criteria live in [`docs/02_ROADMAP_AND_OPERATIONS.md`](02_ROADMAP_AND_OPERATIONS.md). Stakeholders sign off on roadmap phases; this document is the engineering blueprint engineers read on day one.
 
 ---
 

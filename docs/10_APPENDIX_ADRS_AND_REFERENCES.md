@@ -1,17 +1,10 @@
-# 10 — Appendix: Glossary, Research References & Architecture Decision Records
+# 10 — Appendix: Glossary, References & Architecture Decision Records
 
-**Status:** Reference — living document updated as decisions land  
-**Precedence:** L7 — ADRs narrow or supersede narrative architecture where they conflict; always trust the ADR over prose
+**Status:** Reference — living document · Last revised 2026-04-22  
+**Precedence:** L7 — ADRs always win over prose
 
-> Every ADR is a decision made once, documented so it is never re-litigated without cause.
+> Every ADR is a decision made once, so it is never re-litigated without cause.
 
----
-
----
-
-# 08_GLOSSARY — Greywater_Engine
-
-**Status:** Reference
 **Convention:** Alphabetical. Each term: name, one-to-three-sentence definition, citation or context.
 
 ---
@@ -46,7 +39,7 @@
 
 **Brew Doctrine.** Greywater Engine's philosophy statement. See `docs/03_PHILOSOPHY_AND_ENGINEERING.md`.
 
-**Blacklake Framework (BLF).** Cold Coffee Labs' deterministic procedural stack hosted in Greywater Engine — **HEC** (Hierarchical Entropy Cascade) seeding, **SDR** (Stratified Domain Resonance) noise, **GPTM** (Greywater Planetary Topology Model), **TEBS** (Tessellated Evolutionary Biology System). Authoritative math/spec: `docs/08_BLACKLAKE_AND_RIPPLE.md`. Flagship use: *Sacrilege*'s Nine Inverted Circles and arena genesis.
+**Blacklake Framework (BLF).** Cold Coffee Labs' deterministic procedural stack hosted in Greywater Engine — **HEC** (Hierarchical Entropy Cascade) seeding, **SDR** (Stratified Domain Resonance) noise, **GPTM** (Greywater Planetary Topology Model — **acronym retained**; arena-scale terrain meshing for *Sacrilege*, not a planet simulator — see `docs/08_BLACKLAKE.md`), **TEBS** (Tessellated Evolutionary Biology System). Authoritative math/spec: `docs/08_BLACKLAKE.md`. Flagship use: *Sacrilege*'s Nine Inverted Circles and arena genesis.
 
 ## C
 
@@ -264,17 +257,17 @@
 
 **Vulkan 1.2 baseline.** Greywater's target graphics API. Dynamic rendering, timeline semaphores, bindless descriptors, buffer device address are all in Vulkan 1.2 and baseline. Vulkan 1.3 features (`synchronization_2`, etc.) are opportunistic via `RHICapabilities`. Ray tracing, mesh shaders, and work graphs are hardware-gated (Tier G, post-v1).
 
-**RX 580 / Polaris.** AMD Radeon RX 580 8GB (GCN 4.0, 2016). Greywater's baseline development hardware and target player platform. Performance budget: 1080p / 60 FPS. No ray-tracing cores, no mesh-shader support.
+**RX 580 / Polaris.** AMD Radeon RX 580 8GB (GCN 4.0, 2016). Greywater's baseline development hardware and target player platform. ***Sacrilege* Tier A:** **1080p / 144 FPS** (`docs/01_CONSTITUTION_AND_PROGRAM.md` §2.1). **Engine reference harnesses:** **≥ 60 FPS** where `docs/05_RESEARCH_BUILD_AND_STANDARDS.md` §1.4 applies — not the flagship ship bar. No ray-tracing cores, no mesh-shader support on this SKU.
 
-**Atmospheric scattering.** Greywater's physically-based atmospheric scattering model — single compute-pass, no high-dimensional lookup tables, renders accurately from ground to space. Implementation in `engine/world/atmosphere/`.
+**Atmospheric scattering.** Greywater's physically-based atmospheric scattering model for **reference / studio renderer** workloads lives under `engine/world/atmosphere/`. ***Sacrilege*** is **arena-scale** — per-circle fog and simplified atmosphere per `docs/08_BLACKLAKE.md` and `docs/04_SYSTEMS_INVENTORY.md`; no planetary ground-to-orbit simulation (`docs/01_CONSTITUTION_AND_PROGRAM.md` §2.6).
 
-**Floating origin.** A technique for maintaining `float32` render precision at planetary or interstellar scale: the world's origin is periodically recentered on the player, with all entities translated. Required for Earth-class planets.
+**Floating origin.** Recenters world and entity transforms when the camera travels far so local `float` precision stays stable. For ***Sacrilege***, this fires within **large arenas** (see `docs/08_BLACKLAKE.md`, Phase 20 `FloatingOrigin`). Broader planetary use, if any, is outside the debut title mandate.
 
-**Quad-tree cube-sphere.** A planet-subdivision scheme with 6 root quad faces (one per cube face) that recursively subdivide based on LOD. Greywater's planet mesh topology.
+**Quad-tree cube-sphere.** A six-face cube-sphere subdivision scheme for **planetary-scale** meshes. **Not in *Sacrilege* v1 scope** (Nine Circles are bounded arenas — `docs/01_CONSTITUTION_AND_PROGRAM.md` §2.6).
 
-**`float64` / `f64`.** Double precision. Required for all world-space positions in Greywater due to planetary scale. Converted to `float` only for local-to-chunk math and GPU vertex attributes (via subtraction from a floating camera origin).
+**`float64` / `f64`.** Double precision for **arena-scale** world-space and chunk coordinates where `float` error would be visible (`docs/01_CONSTITUTION_AND_PROGRAM.md` §2.6). Converted to `float` for local-to-chunk math and GPU attributes after origin subtraction.
 
-**Deterministic procedural universe.** The principle that given the same universe seed and spatial coordinates, any two machines will produce byte-identical content. Enables infinite-without-storage worlds and rollback netcode.
+**Deterministic procedural arenas.** Given the same **Hell Seed**, circle index, and chunk coordinates, any two machines produce **byte-identical** Blacklake output — speedrun parity and rollback-friendly simulation (`docs/08_BLACKLAKE.md`, `docs/09_NETCODE_DETERMINISM_PERF.md`).
 
 **Chunk streaming.** On-demand generation and caching of 32 m³ world chunks, with LRU eviction and time-sliced generation across multiple frames. Never blocks the main thread.
 
@@ -303,6 +296,8 @@
 ---
 
 *Terminology deliberately. If a term is used in the codebase or docs and is not here, add it.*
+
+---
 
 ---
 
@@ -429,7 +424,7 @@ Greywater's own canonical documents — the ones to read rather than to summaris
 | `docs/05_RESEARCH_BUILD_AND_STANDARDS.md` | Vulkan capability table, C++23 / Rust idioms, build & coding standards |
 | `docs/06_ARCHITECTURE.md` | Stakeholder blueprint + narrative core architecture |
 | `docs/07_SACRILEGE.md` | *Sacrilege* program spec (GW-SAC-001) |
-| `docs/08_BLACKLAKE_AND_RIPPLE.md` | Blacklake (BLF) + GWE × Ripple studio specifications |
+| `docs/08_BLACKLAKE.md` | Blacklake (BLF) + GWE × Ripple studio specifications |
 | `docs/09_NETCODE_DETERMINISM_PERF.md` | Netcode contract, perf budgets, determinism / replay annexes |
 | `docs/10_APPENDIX_ADRS_AND_REFERENCES.md` | Glossary, this appendix, **ADR archive** |
 
@@ -9710,11 +9705,11 @@ Studio directives: (1) **supra-AAA** production language in canonical docs; (2) 
 ## Decision
 
 1. **Rename and relocate** (from former `docs/ref/`):
-   - `Blacklake Framework x Cold Coffee Labs.md` → **`docs/08_BLACKLAKE_AND_RIPPLE.md`**
-   - `Greywater Engine x Ripple IDE Architecture Spec.md` → **`docs/08_BLACKLAKE_AND_RIPPLE.md`**
+   - `Blacklake Framework x Cold Coffee Labs.md` → **`docs/08_BLACKLAKE.md`** (canonical Blacklake / arena generation).
+   - `Greywater Engine x Ripple IDE Architecture Spec.md` → **superseded** by `docs/06_ARCHITECTURE.md` + ADRs (vscript, editor topology); do not expect a separate top-level file. Blacklake math remains **`docs/08_BLACKLAKE.md`**.
 2. **Delete** the `docs/ref/` directory (including its README).
 3. **Update** `README.md`, `README.md`, `CLAUDE.md`, cross-links in architecture, roadmap, GW-SAC-001, ADRs, and guides to use the new paths.
-4. **Classify** both files as **canonical** studio specifications (L3b), same change discipline as `docs/06_ARCHITECTURE.md`.
+4. **Classify** the Blacklake spec as **canonical** (L3b: `docs/08_BLACKLAKE.md`), same change discipline as `docs/06_ARCHITECTURE.md`. Editor / Ripple IDE narrative is **L3** in `docs/06_ARCHITECTURE.md` + ADRs.
 
 ## Consequences
 

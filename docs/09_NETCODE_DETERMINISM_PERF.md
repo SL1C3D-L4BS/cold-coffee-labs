@@ -1,20 +1,10 @@
 # 09 — Netcode, Determinism & Performance Budgets
 
-**Status:** Reference — binding rules for simulation code in rollback or lockstep paths  
-**Precedence:** L5 — subsystem contracts; narrowed by ADRs 0047–0055 (networking) and 0031–0038 (physics)
+**Status:** Reference — binding rules for rollback/lockstep code · Last revised 2026-04-22  
+**Precedence:** L5
 
 > Pure in the rewind window. Deterministic in the lockstep path.
 
----
-
----
-
-
----
-
-# Netcode & determinism contract
-
-**Status:** Reference — binding rules for simulation code that participates in rollback or lockstep.  
 **Program:** Greywater Engine ships ***Sacrilege*** first; networking stacks must support fast FPS combat and reproducible simulation.
 
 ---
@@ -45,6 +35,7 @@ ECS replication, interest management, and snapshot encoding are specified in **`
 
 *Pure in the rewind window. Deterministic in the lockstep path.*
 
+---
 
 ---
 
@@ -110,6 +101,7 @@ The exit-demo `sandbox_physics` runs a composite scene (rigid stack, hinge door,
 
 Any row may be raised by up to 10% in a single ADR note; larger raises require a new ADR. Lowering a budget is always free.
 
+---
 
 ---
 
@@ -156,6 +148,7 @@ All `pose_hash`, `bt_state_hash`, `nav_content_hash` calls on the null backend r
 
 Any pin bump (Ozz / ACL / Recast) reruns **all 16 gates** as part of the PR. Table updates land in this file + ADR-0046 §1.
 
+---
 
 ---
 
@@ -213,6 +206,7 @@ The DRR scheduler (ADR-0049) debits bytes against `net.send_budget_kbps` on ever
 
 Any pin bump (GNS / Opus / Steam Audio) reruns **all 19 gates** as part of the PR. Table updates land in this file + ADR-0055 §1.
 
+---
 
 ---
 
@@ -242,6 +236,7 @@ CI enforcement target: label `phase15` (see ADR-0064). Measurements use `gw_perf
 
 `tests/perf/phase15_budgets_perf_test.cpp` multiplies the Release ceilings by **20× in Debug** (`kDebugSlack`) so `dev-win` Debug CI stays within envelope. The **BLAKE3-256 2 MiB** micro-benchmark additionally uses **best-of-8** wall-clock samples after a warm-up and applies a **4× extra Debug-only slack** (effective Debug ceiling 200 ms) because the reference BLAKE3 path is pathologically slow without SIMD optimizations. **Release** enforcement remains the 2.5 ms row above.
 
+---
 
 ---
 
@@ -266,6 +261,7 @@ The `gw_perf_gate_phase16` binary loops each operation `N=1024` times,
 takes the median, and fails if any target is breached. Debug builds
 apply a 4× slack to stay green on sanitizer presets.
 
+---
 
 ---
 
@@ -317,6 +313,7 @@ simulation (GPU timing stubbed to 0). The gate therefore validates:
 
 True GPU timings come from the nightly `studio-*` matrix.
 
+---
 
 ---
 
@@ -441,6 +438,7 @@ build/dev-win/bin/sandbox_physics.exe --replay=out.gwreplay --enforce-hash
 
 `sandbox_physics --print-hash` prints the determinism hash of the final frame — useful for quick parity checks outside the full `.gwreplay` flow.
 
+---
 
 ---
 
@@ -551,6 +549,7 @@ Both commands ship in Phase-13 Wave 13F.
 
 `.gwreplay` v2 is backward-compatible with v1 readers that ignore unknown tags. Any schema bump is ADR-worthy.
 
+---
 
 ---
 
@@ -611,6 +610,7 @@ Verified manually with vendor-provided device traces (`tests/fixtures/input/adap
 
 Signed — _(founder signature at Phase-10 close)_
 
+---
 
 ---
 
@@ -684,6 +684,7 @@ Phase 11 is deliberately *before* the formal WCAG 2.2 audit (Phase 16) — but w
 
 Signed — _(founder signature at Phase-11 close)_
 
+---
 
 ---
 
@@ -745,6 +746,7 @@ Phase 12 adds physics + character movement + physics debug draw. The only player
 
 Signed — _(founder signature at Phase-12 close)_
 
+---
 
 ---
 
@@ -790,6 +792,7 @@ Every Phase-13 PR that introduces a new UI/debug surface runs through this check
 
 Checklist reviewed at start of each Phase-13 wave (13A..13F) and at the end of Phase 13 as part of the roadmap closeout. Results logged in `docs/a11y/phase13_sweep_<date>.md`.
 
+---
 
 ---
 
@@ -849,6 +852,7 @@ Every Phase-14 PR that introduces a new UI or debug surface runs through this ch
 
 Checklist reviewed at start of each Phase-14 wave (14A..14L) and at the end of Phase 14 as part of the roadmap closeout. Results logged in `docs/a11y/phase14_sweep_<date>.md`.
 
+---
 
 ---
 
@@ -865,6 +869,7 @@ Use before merging RmlUi changes under `ui/privacy/`.
 - [ ] Save slot list exposes row summaries for AT (slot id, name, timestamp, size).
 - [ ] No audio-only consent path; audio cues have text + visual equivalents.
 
+---
 
 ---
 

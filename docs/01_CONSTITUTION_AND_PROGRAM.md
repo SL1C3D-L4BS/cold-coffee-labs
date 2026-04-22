@@ -1,7 +1,7 @@
 # 01 — Constitution, Program Mandate & Session Handoff
 
-**Status:** Canonical · Non-negotiable · Last revised 2026-04-21  
-**Precedence:** L1 — overrides all other documents except `README.md`
+**Status:** Canonical · Non-negotiable · Last revised 2026-04-22  
+**Precedence:** L1 — overrides all other documents
 
 > *"For I stand on the ridge of the universe and await nothing."*
 
@@ -9,154 +9,173 @@
 
 ## §0. Project Identity
 
-**One unified program:**
+**One program:**
 
 - **Cold Coffee Labs** — the studio.
 - **Greywater Engine** — the proprietary C++23 / Vulkan platform.
-- ***Sacrilege*** — the debut title; what the engine ships first; the forcing function for all priorities.
+- ***Sacrilege*** — the game. The only reason the engine exists. The only thing that ships.
 
-The engine is purpose-built to ship *Sacrilege*. The engine/game code separation in §7 is absolute — the engine never imports from the game, and the engine remains reusable for future Cold Coffee Labs titles.
+The engine exists to ship *Sacrilege*. Every feature decision, every architectural choice, every hour of work is evaluated against one question: **does this make *Sacrilege* better?**
 
-**Binding product documentation:** `07_SACRILEGE.md` · **Netcode/determinism:** `09_NETCODE_DETERMINISM_PERF.md` · **Inventory:** `04_SYSTEMS_INVENTORY.md`
+### §0.1 What We Are Building
 
-### §0.1 Supra-AAA Production Bar
+***Sacrilege*** is a **3D first-person action game**. Fast. Gory. Procedurally infinite. The spiritual heir of 1990s arena shooters — Quake's movement, Doom's aggression, built from scratch in 2026 on a custom engine with a custom toolchain.
 
-**"AAA"** means publisher-scale polish on the surface — not our ceiling. Cold Coffee Labs targets **supra-AAA**: a bar *above* conventional licensed-engine blockbuster development, measured on axes major studios rarely combine:
+- Nine Inverted Circles of Hell, each procedurally generated from a Hell Seed
+- Same seed = same level, always — shareable, speedrun-verifiable
+- Persistent gore, severed limbs, blood that stains the geometry
+- The Martyrdom Engine — a dual-resource Sin/Mantra system unique to *Sacrilege*
+- 144 FPS on an RX 580. No exceptions.
 
-1. **Stack sovereignty** — full engine, tools, procedural stack, and AI authoring (BLD) in-house; no royalty ceiling, no vendor roadmap veto.
-2. **Deterministic scale** — Blacklake-class procedural generation (HEC / SDR / GPTM / TEBS) with byte-stable seeds, not a hand-painted open world with proc garnish.
-3. **Agent-native pipeline** — text-IR truth, MCP, and compile-time tool surfaces so human + machine throughput matches a team an order of magnitude larger.
-4. **Inclusive performance** — Tier A experiences proven on RX 580-class hardware; high-end is a resolution/FPS ladder, not a separate "PC ultra only" build.
-5. **IP-grade systems** — architecture and math documented for patent and trade-secret posture where applicable; we ship novelty, not checklists cloned from GDC slides.
+**All gameplay logic is C++23.** There is no scripting language. There is no node graph for gameplay. There is no Lua. There is no Python **in engine, editor, gameplay, or BLD binaries** (see §2.2.1 for the offline `tools/` carve-out). There is no custom language called Ripple Script in the shipping game. Logic is compiled C++ code.
 
-*Sacrilege* is the first proof of this bar — not a demo reel, a **shipping** title on a **custom** stack.
+### §0.2 What The Editor Is
+
+The **Greywater Editor** is the level editor, encounter editor, and asset browser for building *Sacrilege* content. It is:
+
+- A native C++ application embedded in the engine runtime
+- Real-time 3D viewport — what you see in the editor is what ships
+- Encounter placement, patrol path editing, behavior tree wiring (visual, but backed by C++ behavior trees)
+- Circle parameter tuning — SDR noise, biome blending, enemy density
+- Asset browser for cooked 3D meshes, textures, audio
+- BLD AI panel for authoring assistance
+
+It is **not** a scripting IDE. It is **not** a general-purpose game editor. It serves *Sacrilege*.
+
+### §0.3 Supra-AAA Production Bar
+
+1. **Stack sovereignty** — full engine, tools, and AI authoring (BLD) in-house.
+2. **Deterministic infinite levels** — Blacklake-class arena generation with byte-stable seeds.
+3. **Agent-native pipeline** — BLD + C-ABI tool surfaces so authoring velocity exceeds what team size suggests.
+4. **Inclusive performance** — 144 FPS proven on RX 580 for *Sacrilege*.
+5. **IP-grade systems** — Martyrdom Engine, HEC seeding, SDR noise — documented for patent posture.
 
 ---
 
 ## §1. Core Directive
 
-Claude is authorized to act as **Principal Engine Architect** and **Senior Systems Engineer** on the Greywater project. This includes:
+Claude is authorized to act as **Principal Engine Architect** and **Senior Game Engineer** on the Greywater / *Sacrilege* project:
 
-- Designing and implementing engine subsystems in C++23 and Rust (BLD only).
-- Authoring `.gwscene` scenes, `vscript` IR, shaders (HLSL primary), build files (CMake, Cargo), and tests.
-- Implementing *Sacrilege*-driven game subsystems per `07_SACRILEGE.md`.
-- Diagnosing bugs, refactoring systems, proposing ADRs.
+- Designing and implementing engine subsystems in C++23
+- Implementing *Sacrilege* gameplay: Martyrdom system, player movement, enemies, weapons, Nine Circles
+- Implementing the Blacklake arena generation pipeline
+- Authoring `.gwscene` scenes, shaders (HLSL primary), CMake build files, doctest tests
+- Building the Greywater Editor: viewport, encounter editor, circle editor, asset browser
+- Diagnosing bugs, refactoring systems, proposing ADRs
 
 Claude is **not** authorized to:
 
-- Introduce a new compiler, build system, UI framework, or scripting language without an approved ADR.
-- Propose features that cannot run on the RX 580 baseline as Tier A content.
-- Weaken any non-negotiable in §2.
-- Commit secrets, API keys, or credentials.
-- Rewrite canonical documents without explicit instruction.
+- Introduce a scripting language, scripting VM, or custom language for gameplay logic
+- Introduce Lua, Python, JavaScript, or any managed runtime into gameplay code, the engine/editor/runtime link graph, or BLD (except the §2.2.1 offline-tooling carve-out)
+- Propose planet-scale, orbital-scale, or galaxy-scale simulation — *Sacrilege* is arena-scale
+- Propose survival mechanics, base building, or territory systems — this is a fast FPS
+- Introduce a new compiler, build system, or UI framework without an approved ADR
+- Propose features that cannot run at 144 FPS on the RX 580 as Tier A
 
 ---
 
 ## §2. Technical Constraints (Non-Negotiable)
 
-### §2.1 Hardware Baseline — RX 580
+### §2.1 Hardware Baseline — RX 580 @ 144 FPS
 
-The **AMD Radeon RX 580 8 GB** (Polaris, 2016, GCN 4.0, Vulkan 1.2/1.3) is the baseline development and target platform. Every design decision is filtered through what this GPU can do.
+The **AMD Radeon RX 580 8 GB** is the baseline. *Sacrilege* targets **144 FPS at 1080p** on this card. Every Tier A feature must hit this target.
 
 **Tier A — ships on RX 580:**
-- Vulkan 1.2 core + Vulkan 1.3 features (dynamic rendering, timeline semaphores, `VK_KHR_synchronization2`, descriptor indexing, buffer device address).
-- Compute shaders, async compute queue, hardware tessellation.
-- Bindless descriptors via `VK_EXT_descriptor_indexing`.
-- VMA-managed 8 GB VRAM budget.
-- 1080p @ 60 FPS target for the full simulation.
+- Vulkan 1.2 core + 1.3 features (dynamic rendering, timeline semaphores, sync2, descriptor indexing, BDA)
+- Compute shaders, async compute queue, hardware tessellation
+- Bindless descriptors via `VK_EXT_descriptor_indexing`
+- 1080p @ 144 FPS for *Sacrilege* arenas
 
 **Tier G — hardware-gated, post-v1:**
-- Ray tracing (`VK_KHR_ray_tracing_pipeline`, `VK_KHR_acceleration_structure`, `VK_KHR_ray_query`).
-- Mesh shaders (`VK_EXT_mesh_shader`).
-- GPU work graphs (Vulkan 1.4).
-- AV1 hardware decode.
-
-Advanced features are gated by `gw::render::RHICapabilities`. The baseline renderer path never depends on Tier G features.
+- Ray tracing, mesh shaders, GPU work graphs — not required for *Sacrilege*
 
 ### §2.2 Language and Toolchain
 
-| Domain | Language | Standard | Compiler |
-|--------|----------|----------|----------|
-| Engine core, editor, sandbox, runtime, gameplay, tools, tests | C++23 | ISO/IEC 14882:2024 | Clang / LLVM 18+ (`clang-cl` on Windows) |
-| BLD AI copilot | Rust 2024 edition | stable 1.80+ | rustc via Cargo + Corrosion |
-| Shaders | HLSL (primary), GLSL (ports) | — | DXC → SPIR-V |
+| Domain | Language | Rule |
+|--------|----------|------|
+| Engine core, editor, gameplay, all *Sacrilege* logic | **C++23** | No exceptions — not the keyword, not the concept |
+| BLD AI copilot only | **Rust 2024** | Only in `bld/`. Nowhere else. |
+| Shaders | **HLSL** → DXC → SPIR-V | GLSL for ports |
 
-- **No STL in engine hot paths** — use `gw::core::Array`, `gw::core::HashMap`, `gw::core::String`. STL allowed in editor, tools, tests.
-- **Rust only for BLD.** Nowhere else in the codebase.
-- **MSVC and GCC are not supported.** This is not negotiable.
-- **CMake 3.28+** with Presets + Ninja. Corrosion bridges Cargo into CMake.
-- **Vulkan 1.2 baseline** with 1.3 features opportunistic. WebGPU backend planned post-v1. DirectX 12 and Metal: post-scope.
-- **Windows (x64) + Linux (x64)** from day one. macOS, consoles, mobile: post-scope.
+- **No scripting VM.** No Lua. No JavaScript. No custom language. Gameplay is C++23. **No Python** in shipped binaries or runtime-loaded code paths (see §2.2.1).
+- **Clang / LLVM 18+ only.** `clang-cl` on Windows. MSVC and GCC are not supported.
+- **CMake 3.28+** with Presets + Ninja. Corrosion for Rust.
+- **Windows (x64) + Linux (x64)** from day one. macOS and consoles: post-scope.
+
+### §2.2.1 Offline tooling — Python carve-out
+
+**Python (and similar interpreted helpers) are allowed only when all are true:**
+
+1. They live under `tools/`, `.github/` workflows, or **short-lived** maintenance scripts at the repository root.  
+2. They are **build-time, test-time, or doc-time only** — never linked into `greywater_core`, the editor, runtime, gameplay dylib, or `bld/` crates.  
+3. They **do not** implement *Sacrilege* mechanics, engine subsystems, or BLD logic.
+
+Examples: doc lint gates, link checkers, namespace or markdown migration scripts. **Expanding Python beyond this boundary requires an ADR.** BLD remains **Rust-only** in `bld/`.
 
 ### §2.3 UI Stack — Locked
 
 | Context | Library |
 |---------|---------|
 | Editor UI | Dear ImGui + docking + viewports + ImNodes + ImGuizmo |
-| In-game UI (HUD, menus) | RmlUi + HarfBuzz + FreeType |
+| In-game UI (HUD) | RmlUi + HarfBuzz + FreeType |
 
-**No custom UI framework.** This is a permanent commitment. Do not propose one.
+No custom UI framework. These choices are permanent.
 
 ### §2.4 ECS & Core
 
 - **In-house archetype ECS** in `engine/ecs/`. No EnTT, no flecs.
-- **Custom fiber-based work-stealing scheduler** in `engine/jobs/`. No `std::async`, no raw `std::thread`.
+- **Custom fiber-based work-stealing scheduler** in `engine/jobs/`.
 - **No global `new`/`delete`** in engine code. Allocators passed explicitly.
-- **OS headers** only inside `engine/platform/`. Enforced by custom `clang-tidy` check.
+- **OS headers** only inside `engine/platform/`.
 
-### §2.5 BLD, Scripting, MCP
+### §2.5 Gameplay Logic — C++23 Only
 
-- **BLD** lives outside `greywater_core` as a Rust crate. The engine core cannot depend on Rust code.
-- **MCP (Model Context Protocol) spec `2025-11-25`** via `rmcp`. BLD is the MCP server.
-- **Visual scripting:** typed text IR is ground-truth. Node graph is a reversible projection with a sidecar layout file.
-- **Hot-reload:** only the gameplay module (C++ dylib). Engine core and BLD do not hot-reload.
+All *Sacrilege* gameplay — Martyrdom Engine, player movement, enemy behavior, weapons, level events, boss phases — is implemented as **compiled C++23 code** in `gameplay/`. The editor wires data; the code implements behavior. There is no runtime-interpreted gameplay language.
 
-### §2.6 *Sacrilege* / Engine-World Mandates
+Enemy behavior trees are **data-driven** (tree structure loaded from `.gwbt` files) but the **node implementations** (attack, patrol, flee, etc.) are compiled C++ registered functions. Designers wire trees in the editor; programmers write the node code in C++.
 
-- **Procedural generation is deterministic.** Same seed + same coordinates = identical output, every run, every machine. No wall-clock dependence, no unseeded RNG.
-- **"If it is not near the player, it does not exist."** On-demand, chunk-based streaming; nothing simulated beyond its relevance window.
-- **World-space math uses `float64`** where scale demands it. Jitter from precision is a bug.
-- **Floating origin** is mandatory whenever the camera traverses large extents.
-- **Flagship art direction:** *Sacrilege* — authoritative in `07_SACRILEGE.md` (GW-SAC-001).
+### §2.6 *Sacrilege* Mandates
+
+- **Procedural generation is deterministic.** Same Hell Seed + same Circle index = identical level, every run, every machine.
+- **Arena-scale only.** The Nine Circles are bounded 3D arenas, not planets. No orbital mechanics. No atmospheric layers. No ground-to-orbit. No galaxy hierarchy. The "universe" is Hell — nine arenas connected by a descent narrative.
+- **World-space math uses `f64` for arena-scale positions** where floating-point error would be visible.
+- **Floating origin** fires when the camera travels far within a large arena.
+- **"If it is not near the player, it does not exist."** On-demand streaming of arena chunks. Nothing simulated outside the player's relevance window.
+- **All custom assets.** No licensed art packs. All 3D meshes, textures, and audio are authored by Cold Coffee Labs.
 
 ---
 
 ## §3. Code Generation Style Guide
 
-### C++
+### C++23
 
 ```
-Type names:       PascalCase          VulkanDevice, World, EntityHandle
-Functions:        snake_case          create_swapchain, register_component
-Member vars:      trailing underscore device_, frame_index_
-Namespaces:       snake_case          gw::render, gw::ecs, gw::jobs
-Macros:           GW_UPPER_SNAKE      GW_ASSERT, GW_LOG, GW_UNREACHABLE
-Enums:            enum class always   BlasphemyType::Stigmata
-Files:            .hpp / .cpp         #pragma once in all headers
+Type names:         PascalCase       SinComponent, GptmTile, HellKnight
+Functions/methods:  snake_case       apply_sin_accrual, spawn_enemy, build_lod_mesh
+Member variables:   trailing_        device_, sin_value_, time_remaining_
+Namespaces:         snake_case       gw::render, gw::ecs, gw::sacrilege
+Macros:             GW_UPPER_SNAKE   GW_ASSERT, GW_LOG, GW_UNREACHABLE
+Enums:              enum class       BlasphemyType::Stigmata, CircleId::Gluttony
+Files:              .hpp / .cpp      #pragma once in all headers
 ```
 
-- No exceptions in engine code. Use `Result<T, E>` or `std::expected`.
-- No RTTI in hot paths.
+Binding rules (all enforced at review):
+
+- No exceptions. Use `Result<T, E>` or `std::expected`.
 - No raw `new` / `delete`. Use `std::unique_ptr`, `gw::Ref<T>`, or stack scope.
-- No two-phase `init()` / `shutdown()` on public APIs.
-- No C-style casts.
-- `std::string_view` never passed to a C API.
-- Lambda captures always explicit — no `[=]`, no `[&]`.
-- All world-space positions `float64`. Single-precision `float` only for local-to-chunk math.
+- No C-style casts. `static_cast` / `reinterpret_cast` with `// SAFETY:` comments.
+- No `[=]` or `[&]` lambda captures. Explicit capture only.
+- No `std::async`, no raw `std::thread`. All concurrency through `engine/jobs/`.
+- All ECS components are POD structs. No virtual functions in components.
+- All gameplay systems are pure functions over component spans.
+- World-space positions are `f64` where scale demands it.
 
 ### Rust (BLD only)
 
-- Edition: 2024. Style: `rustfmt` defaults; `clippy -D warnings`.
-- `snake_case` everywhere except types (`PascalCase`) and constants (`SCREAMING_SNAKE`).
-- `unsafe` requires a `// SAFETY:` comment. Enforced by custom clippy lint.
+- Edition 2024. `rustfmt` defaults. `clippy -D warnings`.
+- `unsafe` requires `// SAFETY:` comment.
 - No `unwrap`/`expect` in `bld-ffi` or `bld-governance`.
-- Tool definitions: `#[bld_tool]` proc macro always. No hand-written schemas.
-
-### Shaders
-
-- HLSL primary via DXC → SPIR-V. GLSL supported for ports.
-- Permutations generated at cook time.
-- Flat shading or subtle-gradient shading by default.
+- `#[bld_tool]` proc macro for every MCP tool.
 
 ---
 
@@ -164,31 +183,34 @@ Files:            .hpp / .cpp         #pragma once in all headers
 
 | Allocator | Use |
 |-----------|-----|
-| `gw::memory::FrameAllocator` | Transient per-frame work. Reset once per frame. |
-| Arena allocators | Scoped to subsystems, levels, or load phases. |
-| Pool allocators | Fixed-size hot component types and particle systems. |
-| System heap | Last resort. Permitted only at startup or for OS-owned buffers. |
+| `gw::memory::FrameAllocator` | Transient per-frame scratch. Reset once per frame. |
+| Arena allocators | Subsystem-scoped, level-scoped, load-phase-scoped. |
+| Pool allocators | Fixed-size hot ECS components, particle systems. |
+| System heap | Startup only. Never in game loop. |
 
-- No STL containers in hot paths.
-- Chunk streaming: LRU caching, time-sliced generation (no single-frame stalls).
-- VRAM budget: 8 GB total (RX 580). Per-subsystem budget enforced in engine config.
 - **Perf regression ≥ 5% on canonical scenes fails CI.**
-- Target: 1080p @ 60 FPS on RX 580 for the full simulation.
+- **Target: 1080p @ 144 FPS** on RX 580 for *Sacrilege* full arena: 512 active enemies + Gore system + blood decals + Martyrdom post stack.
 
 ---
 
-## §5. AI Context Awareness
+## §5. The Editor as a Game Tool
 
-| Model | Role |
-|-------|------|
-| Opus 4.7 (1M context) | Deep architectural work, long-context review |
-| Sonnet 4.6 | Iterative coding, PR review |
-| Haiku 4.5 | Short tasks, doc queries |
+The Greywater Editor is purpose-built for *Sacrilege* authoring. It is the equivalent of a 1990s level editor — but native, real-time, and tightly integrated with the game engine.
 
-- Claude starts every session by reading `CLAUDE.md` at repo root, then `docs/README.md`.
-- Claude never commits without running the full test suite on the affected module.
-- Claude writes commit messages in Conventional Commits format.
-- Claude writes ADRs before committing architectural decisions, not after.
+**Editor capabilities for Sacrilege content:**
+
+- **Circle Editor:** Set SDR noise parameters per Circle. Preview procedural terrain in real time. Tweak biome blending. All changes update the viewport immediately.
+- **Encounter Editor:** Place enemy spawn points, patrol nodes, trigger volumes. Wire enemies to event scripts (C++ registered callbacks). Set encounter difficulty parameters.
+- **Asset Browser:** Browse cooked `.gwmesh`, `.gwtex`, `.gwaudio` assets. Drag to place in 3D scene. Preview meshes with material applied.
+- **Behavior Tree Wiring:** Visual graph for connecting behavior tree nodes (patrol → alert → attack → retreat). Node *implementations* are C++; the *graph* is data.
+- **BLD Panel:** Ask the AI to "add 3 Cherubim flanking spawns on the east wall" or "generate variation of this corridor." BLD submits changes via the command stack — fully undoable.
+- **Play Mode:** F5 launches the game from current cursor position. Esc returns to editor with session state preserved.
+
+**The editor does NOT have:**
+- A scripting IDE
+- A code editor
+- A node graph for gameplay logic
+- Any Ripple Script or RSL surface
 
 ---
 
@@ -197,47 +219,57 @@ Files:            .hpp / .cpp         #pragma once in all headers
 ```
 greywater/
 ├── engine/
-│   ├── core/            Logger, assertions, Result<T,E>, containers, strings, events, config
-│   ├── math/            Vec/Mat/Quat/Transform + SIMD
-│   ├── memory/          Frame, arena, pool allocators
-│   ├── platform/        Window, input, timing, dynamic-lib — OS headers live ONLY here
-│   ├── jobs/            Fiber-based work-stealing scheduler
-│   ├── ecs/             Archetype ECS — World, queries, systems
-│   ├── render/          HAL, Vulkan backend, frame graph, Forward+, materials, VFX
-│   ├── audio/           miniaudio + Steam Audio
-│   ├── input/           SDL3 + action maps
-│   ├── ui/              RmlUi + HarfBuzz + FreeType (in-game only)
-│   ├── scripting/       Hot-reload + vscript IR / interpreter
-│   ├── net/             GameNetworkingSockets + ECS replication
-│   ├── physics/         Jolt facade + ECS bridge
-│   ├── anim/            Ozz + ACL + blend trees + IK
-│   ├── ai/              BehaviorTree + Navmesh (Recast/Detour)
-│   ├── persistence/     Save/load, migration, telemetry facades
-│   ├── i18n/            ICU + HarfBuzz locale runtime
-│   ├── a11y/            WCAG 2.2 AA hooks
-│   ├── assets/          Asset database, cook pipeline
-│   ├── scene/           .gwscene codec + live scene view
-│   └── world/           Blacklake + Sacrilege world stack (Phases 19–23)
-├── bld/                 Rust Cargo workspace — BLD AI copilot
-│   ├── bld-ffi/         C-ABI boundary (cbindgen, Miri-validated)
-│   ├── bld-bridge/      C++ side RAII wrappers
-│   ├── bld-mcp/         MCP wire protocol (rmcp, spec 2025-11-25)
-│   ├── bld-tools/       #[bld_tool] proc macro + tool registry
-│   ├── bld-provider/    ILLMProvider — Anthropic cloud + local backends
-│   ├── bld-rag/         RAG pipeline (tree-sitter, sqlite-vec, petgraph)
-│   ├── bld-agent/       Main agent loop
-│   └── bld-governance/  HITL approval, audit log
-├── editor/              Dear ImGui editor (Phase 7)
-├── sandbox/             Engine feature test-bed (Phase 1)
-├── runtime/             Shipping executable (Phase 11)
-├── gameplay/            Hot-reloadable C++ dylib
-├── tools/cook/          gw_cook content cooker (Phase 6)
-├── tests/               Integration, perf, fuzz, BLD evals
-├── content/             Source assets (gitignored)
-├── assets/              Cooked deterministic runtime assets
-├── third_party/         CPM-managed, SHA-pinned
-├── cmake/               dependencies.cmake, toolchains/, packaging/
-├── docs/                This directory — eleven-file suite
+│   ├── core/           Logger, assertions, Result<T,E>, containers, strings, events, config
+│   ├── math/           Vec/Mat/Quat/Transform + SIMD, f64 world-space types
+│   ├── memory/         Frame, arena, pool allocators
+│   ├── platform/       Window, input, timing — OS headers live ONLY here
+│   ├── jobs/           Fiber-based work-stealing scheduler
+│   ├── ecs/            Archetype ECS — World, queries, systems, POD components
+│   ├── render/         HAL, Vulkan backend, frame graph, Forward+, materials, VFX
+│   │   └── shaders/    HLSL source — terrain.hlsl, horror_post.hlsl, blood_decal.hlsl, etc.
+│   ├── audio/          miniaudio + Steam Audio + Martyrdom audio controller
+│   ├── input/          SDL3 device layer + action maps
+│   ├── ui/             RmlUi + HarfBuzz + FreeType (in-game HUD only)
+│   ├── net/            GameNetworkingSockets + ECS replication + rollback
+│   ├── physics/        Jolt facade + ECS bridge + swept-AABB player controller
+│   ├── anim/           Ozz + ACL + blend trees + IK
+│   ├── ai/             BehaviorTree nodes + Navmesh (Recast/Detour)
+│   ├── assets/         Asset database, gw_cook pipeline
+│   ├── scene/          .gwscene codec + .gwseq sequencer
+│   └── world/          Blacklake arena generation stack (Phases 19–23)
+│       ├── universe/   HEC seeding, PCG64, seed manager
+│       ├── sdr/        SDR Noise primitive
+│       ├── streaming/  ChunkStreamer, ChunkCoord, LRU cache
+│       ├── biome/      BiomeClassifier, Circle-specific profiles
+│       ├── gptm/       GptmMeshBuilder, LOD selector, tile renderer
+│       ├── resources/  ResourceDistributor, resource node placement
+│       └── origin/     FloatingOrigin, OriginShiftEvent
+├── bld/                Rust Cargo workspace — BLD AI copilot
+│   ├── bld-ffi/        C-ABI boundary
+│   ├── bld-mcp/        MCP wire protocol
+│   ├── bld-tools/      #[bld_tool] proc macro + tool registry
+│   ├── bld-provider/   LLM provider abstraction
+│   ├── bld-rag/        Retrieval-augmented generation
+│   ├── bld-agent/      Main agent loop
+│   └── bld-governance/ HITL approval
+├── editor/             Dear ImGui editor — viewport, circle editor, encounter editor
+├── sandbox/            Engine feature test-bed
+├── runtime/            Shipping executable
+├── gameplay/           Hot-reloadable C++23 dylib — ALL Sacrilege game logic lives here
+│   ├── martyrdom/      Sin, Mantra, Blasphemies, Rapture/Ruin systems
+│   ├── player/         Player controller, movement (bunny hop, slide, grapple, surf)
+│   ├── weapons/        All 6 weapons, alt-fires, hit detection
+│   ├── enemies/        Enemy ECS archetypes, behavior tree registrations
+│   ├── circles/        Circle-specific event scripts, encounter sequences
+│   ├── hud/            Diegetic HUD — blood vial, Sin ring, Mantra counter
+│   └── boss/           God Machine — 4-phase fight
+├── tools/cook/         gw_cook content pipeline
+├── tests/              doctest unit + integration + perf gates
+├── content/            Source assets (gitignored)
+├── assets/             Cooked runtime assets — .gwmesh, .gwtex, .gwaudio, .gwbt
+├── third_party/        CPM-managed, SHA-pinned
+├── cmake/              dependencies.cmake, toolchains/
+├── docs/               This directory
 ├── CMakeLists.txt
 ├── CMakePresets.json
 ├── CLAUDE.md
@@ -248,131 +280,80 @@ greywater/
 
 ## §7. Engine / Game Code Boundary
 
-This boundary is **load-bearing and enforced by the build system:**
-
-- `greywater_core` has **no dependency on any editor or game code**. It must build and pass its unit tests in isolation.
-- `gameplay_module` is the **only** dynamic library in the system.
-- **Engine code never `#include`s gameplay headers.** CMake target visibility enforces this. Violations are CI failures.
-- Game behavior lives in `gameplay/` or `engine/world/` (for engine capabilities *Sacrilege* consumes via public API). The distinction: `engine/world/` implements capabilities; `gameplay/` implements *Sacrilege*-specific policy.
+- `greywater_core` has **no dependency on gameplay code**. It builds and tests in isolation.
+- `gameplay/` is the **only** dynamic library. All *Sacrilege* game logic lives here.
+- Engine code never `#include`s gameplay headers. CMake target visibility enforces this.
+- `engine/world/` implements arena generation **capabilities** (terrain, streaming, SDR). `gameplay/` implements *Sacrilege*-specific **behavior** (what spawns, when, at what difficulty).
 
 ---
 
-## §8. Phase Build Status (as of 2026-04-21)
+## §8. Build Status (as of 2026-04-22)
 
 | Phase | Name | Status | Tests |
 |-------|------|--------|-------|
-| 1–4 | Scaffolding, Platform, Math/ECS/Jobs, Vulkan HAL | ✅ Complete | — |
-| 5 | Frame Graph & Reference Renderer | ✅ Complete | — |
-| 6 | Asset Pipeline & Content Cook | ✅ Complete | — |
-| 7 | Editor Foundation | ✅ Complete (demo pending) | — |
-| 8 | Scene Serialization & Visual Scripting | ✅ Complete | — |
-| 9 | BLD (Brewed Logic Directive, Rust) | ✅ Complete | — |
-| 10 | Runtime I — Audio & Input | ✅ Complete | — |
-| 11 | Runtime II — UI, Events, Config, Console | ✅ Complete | 271/271 |
-| 12 | Physics | ✅ Complete | — |
-| 13 | Animation & Game AI Framework | ✅ Complete | 347/347 |
-| 14 | Networking & Multiplayer | ✅ Complete | 394/394 |
-| 15 | Persistence & Telemetry | ✅ Complete | 473/473 |
-| 16 | Platform Services, i18n & a11y | ✅ Complete | 586/586 |
-| 17 | Shader Pipeline, Materials & VFX | ✅ Complete | 711/711 |
-| 18 | Cinematics & Mods | 🔜 Planned | — |
-| 19–23 | Blacklake + *Sacrilege* world stack | 🔜 Planned | — |
+| 1–17 | Engine foundation through shader pipeline | ✅ Complete | 711/711 |
+| 18 | Cinematics & Mods | ✅ Complete | sandbox_studio OK |
+| 19 | Blacklake Core & Deterministic Genesis | ✅ Complete | 26 universe_tests |
+| 20 | Arena Topology, GPTM & Sacrilege LOD | 🔜 Active | — |
+| 21 | Sacrilege Frame — Rendering, Atmosphere, Audio | 🔜 Planned | — |
+| 22 | Martyrdom Combat & Player Stack | 🔜 Planned | — |
+| 23 | Damned Host, Circles Pipeline & Boss | 🔜 Planned | — |
 | 24 | Hardening & Release | 🔜 Planned | — |
-| 25 | LTS Sustenance | 🔜 Ongoing | — |
 
 ---
 
 ## §9. Session Handoff Protocol
 
-Every coding session begins with this checklist. No exceptions.
+Every session begins with this checklist. No exceptions.
 
 ### Cold-Start (10 minutes)
 
-1. **Read today's daily log** — what yesterday finished, what was blocked, what Tomorrow's Intention said.
-2. **`git log --oneline -10` + `git status`** — confirm working tree state.
-3. **Re-read `CLAUDE.md`** at project root and skim `docs/README.md`.
-4. **Check Kanban** in `02_ROADMAP_AND_OPERATIONS.md` — WIP limit is 2. Know your card.
-5. **Read the relevant doc** for the current phase (see §9.1 below).
-6. **Copy the day's card** into the daily log under *🎯 Today's Focus*. Commit.
+1. `git log --oneline -10` + `git status` — know what landed last.
+2. Re-read `CLAUDE.md` at project root.
+3. Check active phase in `02_ROADMAP_AND_OPERATIONS.md`. Know your card.
+4. Read the relevant doc for the current phase (see §9.1).
 
 ### Doc by Phase
 
-| Phase | Read first |
-|-------|-----------|
-| Foundation (1–3) | `01_CONSTITUTION_AND_PROGRAM.md` |
-| Rendering (4–5, 17) | `05_RESEARCH_BUILD_AND_STANDARDS.md` — Vulkan guide |
-| C++ / Rust patterns | `05_RESEARCH_BUILD_AND_STANDARDS.md` — language guide |
-| Systems questions | `04_SYSTEMS_INVENTORY.md` |
-| Architectural ambiguity | `06_ARCHITECTURE.md` |
-| BLD questions | `06_ARCHITECTURE.md §3.7` + `08_BLACKLAKE_AND_RIPPLE.md` |
-| *Sacrilege* / Blacklake | `07_SACRILEGE.md` + `08_BLACKLAKE_AND_RIPPLE.md` |
+| Phase | Read |
+|-------|------|
+| 20–23 (Blacklake + Sacrilege game systems) | `07_SACRILEGE.md` + `08_BLACKLAKE.md` |
+| Rendering work | `05_RESEARCH_BUILD_AND_STANDARDS.md` |
+| C++23 patterns | `05_RESEARCH_BUILD_AND_STANDARDS.md` |
+| Architecture questions | `06_ARCHITECTURE.md` |
+| Gameplay systems | `07_SACRILEGE.md §III` |
 
 ### CMake Presets
 
 ```bash
-# Configure + build + test — Linux
-cmake --preset dev-linux
-cmake --build --preset dev-linux
-ctest --preset dev-linux
-
-# Windows
-cmake --preset dev-win
-cmake --build --preset dev-win
-ctest --preset dev-win
+cmake --preset dev-linux && cmake --build --preset dev-linux && ctest --preset dev-linux
+cmake --preset dev-win   && cmake --build --preset dev-win   && ctest --preset dev-win
 ```
 
 | Preset | Config | OS | Purpose |
 |--------|--------|----|---------|
-| `dev-linux` | Debug | Linux | Default developer workflow |
-| `dev-win` | Debug | Windows | Default developer workflow |
-| `release-linux` | Release | Linux | Release build |
-| `release-win` | Release | Windows | Release build |
-| `linux-asan` | Debug + ASan | Linux | AddressSanitizer (nightly) |
-| `linux-ubsan` | Debug + UBSan | Linux | UndefinedBehaviorSanitizer (nightly) |
-| `linux-tsan` | Debug + TSan | Linux | ThreadSanitizer (nightly) |
-| `studio-win/linux` | Phase 17 full stack | both | Shader/post/VFX perf gates |
+| `dev-linux` | Debug | Linux | Default workflow |
+| `dev-win` | Debug | Windows | Default workflow |
+| `release-linux` / `release-win` | Release | both | Release builds |
+| `linux-asan` / `linux-ubsan` / `linux-tsan` | Debug+san | Linux | Nightly sanitizers |
+| `studio-win` / `studio-linux` | Phase 17 | both | Full shader/post perf gates |
 
 ### End-of-Session (5 minutes)
 
-1. Update daily log: completed tasks, blockers, Tomorrow's Intention.
-2. Move Kanban card: Done → Review, still going → In Progress (≤ 2!), blocked → Blocked with reason.
-3. Commit: small commits, one logical change, Conventional Commits format.
-4. If Sunday: 30-minute retro — no coding. Read 7 daily logs. Assess real vs. planned pace.
-
-### Hot Commands
-
-```bash
-# Full build
-cmake --preset dev-linux && cmake --build --preset dev-linux
-
-# BLD iteration only (Rust-only changes)
-cd bld && cargo build --release
-
-# Executables
-./build/dev-linux/sandbox/gw_sandbox
-./build/dev-linux/editor/gw_editor
-
-# Regenerate MCP tool schemas after #[bld_tool] additions
-cd bld && cargo build -p bld-tools
-
-# Regenerate C header after bld-ffi changes
-cd bld && cargo build -p bld-bridge
-
-# BLD lint + UB check
-cargo clippy --workspace -- -D warnings
-cargo +nightly miri test -p bld-ffi
-```
+1. Update daily log: done, blocked, tomorrow.
+2. Move Kanban card appropriately (WIP ≤ 2).
+3. Commit: small commits, Conventional Commits format, CI must stay green.
 
 ---
 
 ## §10. If You Get Stuck
 
-1. Re-read `03_PHILOSOPHY_AND_ENGINEERING.md`. Half of all "what do I do" moments dissolve once you remember the Brew Doctrine.
-2. Re-read the Engineering Principles in `03_PHILOSOPHY_AND_ENGINEERING.md §B`. Your blocker is probably listed.
-3. Write an ADR. If the problem is architectural ambiguity, draft `10_APPENDIX_ADRS_AND_REFERENCES.md` (ADR section) and make the trade-off explicit. Commit the ADR before committing code.
-4. Open BLD. Ask the agent for context. `docs.search_engine_docs` is built for this.
-5. If it is Friday evening — stop. Tomorrow is a rest day for a reason.
+1. Re-read `03_PHILOSOPHY_AND_ENGINEERING.md` — the Brew Doctrine dissolves most ambiguity.
+2. Re-read the review playbook in `03_PHILOSOPHY_AND_ENGINEERING.md §B` — your blocker is likely listed.
+3. Write an ADR. Architectural ambiguity → draft the decision explicitly, commit ADR before code.
+4. Open BLD. Ask it. That's what it's for.
+5. Friday evening — stop. Rest days are load-bearing.
 
 ---
 
-*The constitution is the engine's immune system. Every violation is an infection. Honor it.*
+*The constitution is the engine's immune system. Honor it.*

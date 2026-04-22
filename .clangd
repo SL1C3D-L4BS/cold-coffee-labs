@@ -16,6 +16,8 @@ Diagnostics:
 If:
   PathMatch: .*
 CompileFlags:
+  # Mirrored by CMake from build/<preset>/compile_commands.json (see root CMakeLists.txt).
+  CompilationDatabase: .
   Add:
     - -std=c++23
     - -I.
@@ -28,13 +30,22 @@ CompileFlags:
     - -Ibuild/dev-linux/_deps/doctest-src
     - -Ibuild/dev-win/_deps/volk-src
     - -Ibuild/dev-linux/_deps/volk-src
+    # `${workspaceFolder}` helps clangd when the CWD for relative `-Ibuild/...` is not the repo root.
+    - -I${workspaceFolder}/build/dev-win/_deps/volk-src
+    - -I${workspaceFolder}/build/dev-linux/_deps/volk-src
     - -Ibuild/dev-win/_deps/vulkan-headers-src/include
     - -Ibuild/dev-linux/_deps/vulkan-headers-src/include
+    - -I${workspaceFolder}/build/dev-win/_deps/vulkan-headers-src/include
+    - -I${workspaceFolder}/build/dev-linux/_deps/vulkan-headers-src/include
     - -Ibuild/dev-win/_deps/vulkanmemoryallocator-src/include
     - -Ibuild/dev-linux/_deps/vulkanmemoryallocator-src/include
+    - -I${workspaceFolder}/build/dev-win/_deps/vulkanmemoryallocator-src/include
+    - -I${workspaceFolder}/build/dev-linux/_deps/vulkanmemoryallocator-src/include
     # Generated engine headers (version.generated.hpp) — same layout as preset binaryDir.
     - -Ibuild/dev-win/engine/gen
     - -Ibuild/dev-linux/engine/gen
+    - -I${workspaceFolder}/build/dev-win/engine/gen
+    - -I${workspaceFolder}/build/dev-linux/engine/gen
 
 ---
 # `sandbox_studio` compile definitions normally come from CMake; mirror them for TU-only analysis.

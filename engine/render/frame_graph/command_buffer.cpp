@@ -71,6 +71,15 @@ void CommandBuffer::draw_indexed(uint32_t index_count, uint32_t instance_count,
     }
 }
 
+void CommandBuffer::draw_indexed_indirect(VkBuffer       buffer,
+                                          VkDeviceSize   offset,
+                                          uint32_t       draw_count,
+                                          uint32_t       stride) {
+    if (cmd_) {
+        vkCmdDrawIndexedIndirect(cmd_, buffer, offset, draw_count, stride);
+    }
+}
+
 void CommandBuffer::dispatch(uint32_t gx, uint32_t gy, uint32_t gz) {
     if (cmd_) vkCmdDispatch(cmd_, gx, gy, gz);
 }
