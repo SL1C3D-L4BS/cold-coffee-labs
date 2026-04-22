@@ -13,6 +13,14 @@ cmake_minimum_required(VERSION 3.28)
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING
     "Policy floor for third-party CMakeLists with sub-3.5 minimums")
 
+# CMake 4.x emits deprecation diagnostics when processing third-party CMakeLists that
+# still call cmake_minimum_required(VERSION ...) below 3.10. Greywater pins those
+# sources via CPM; refreshing upstream CMake is a separate upgrade. Default OFF keeps
+# configure logs and IDE CMake Problems clean — pass -DCMAKE_WARN_DEPRECATED=ON to audit.
+set(CMAKE_WARN_DEPRECATED OFF CACHE BOOL
+    "Suppress CMake deprecation warnings from vendored cmake_minimum_required (CMake 4.x)."
+    FORCE)
+
 project(greywater
     VERSION 0.0.1
     DESCRIPTION "Greywater_Engine by Cold Coffee Labs"
