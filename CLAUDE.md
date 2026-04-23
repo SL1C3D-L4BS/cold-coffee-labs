@@ -110,6 +110,30 @@ The **Greywater Editor** is a native C++ application built into the engine runti
    - **Rendering:** `docs/05_RESEARCH_BUILD_AND_STANDARDS.md`
    - **Architecture:** `docs/06_ARCHITECTURE.md`
 
+## ECC 12-entry workflow menu (ADR-0119)
+
+Slash commands in `.cursor/commands/` (and `~/.claude/commands/` after
+global ECC install) form the default operator loop. **Use in rough order
+as the task needs — not all twelve every session:**
+
+1. `/plan` — break work into steps and risks.  
+2. `/tdd` — red/green/refactor with coverage discipline.  
+3. `/code-review` — self-review or hand-off to review agents.  
+4. `/build-fix` — unstick compiles, link errors, and presets.  
+5. `/e2e` — Playwright or harness journeys for user-visible flows.  
+6. `/refactor-clean` — remove dead code and consolidate.  
+7. `/orchestrate` — multi-step / multi-harness fan-out.  
+8. `/learn` — extract durable patterns (skills, hooks, notes).  
+9. `/verify` — repo verification loop (lint, tests, policy).  
+10. `/multi-plan` — ECC cross-model planning (`ccg-workflow`).  
+11. `/multi-execute` — ECC cross-model implementation pass.  
+12. `/security-scan` — run AgentShield policy + security skill stack.
+
+`tools/ai/install_ecc.ps1` (or `install_ecc.sh`) replays graphify + ECC +
+`ccg-workflow` if this machine is missing pieces. `AGENTS.md` lists all 38
+ECC subagent slugs. See `tools/ai/README.md` for env var and disable
+knobs.
+
 ---
 
 ## Where to Start (First Time on the Project)
