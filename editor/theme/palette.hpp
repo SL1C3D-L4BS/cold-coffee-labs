@@ -22,6 +22,7 @@ struct Palette {
     Color32 text;             // default text
     Color32 text_muted;       // disabled / hint
     Color32 accent;           // primary interactive
+    Color32 accent_secondary; // cool blurple — secondary emphasis / links
     Color32 accent_strong;    // hover / active
     Color32 destructive;      // delete / kill actions
     Color32 positive;         // save / commit / success / “live” indicators
@@ -60,6 +61,7 @@ constexpr Palette CORRUPTED_RELIC{
     /*text         */ {0xE8, 0xDC, 0xD0},
     /*text_muted   */ {0x78, 0x6C, 0x62},
     /*accent       */ {0xC4, 0x2A, 0x2A},   // blood red
+    /*accent_secondary*/ {0x72, 0x58, 0x9E}, // blurple (cool secondary)
     /*accent_strong*/ {0xF0, 0x50, 0x50},   // ember
     /*destructive  */ {0x6E, 0x0A, 0x0A},   // dried gules
     /*positive     */ {0x4F, 0x9D, 0x4A},   // sick green
@@ -89,6 +91,7 @@ constexpr Palette BREWED_SLATE{
     /*text         */ {0xDC, 0xE1, 0xE6},
     /*text_muted   */ {0x8A, 0x94, 0x9E},
     /*accent       */ {0x6F, 0xA8, 0xDC},
+    /*accent_secondary*/ {0x7A, 0x62, 0xC4}, // deeper blurple
     /*accent_strong*/ {0x90, 0xBE, 0xE8},
     /*destructive  */ {0xC7, 0x54, 0x3E},
     /*positive     */ {0x85, 0xB3, 0x58},
@@ -118,6 +121,7 @@ constexpr Palette FIELD_TEST_HC{
     /*text         */ {0xFF, 0xFF, 0xFF},
     /*text_muted   */ {0xB0, 0xB0, 0xB0},
     /*accent       */ {0xFF, 0xB0, 0x00},   // Wong yellow
+    /*accent_secondary*/ {0x56, 0x4C, 0xB0}, // Wong blue
     /*accent_strong*/ {0xFF, 0xD0, 0x40},
     /*destructive  */ {0xD5, 0x5E, 0x00},   // Wong vermillion
     /*positive     */ {0x00, 0x9E, 0x73},   // Wong green

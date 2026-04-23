@@ -5,6 +5,7 @@ add_library(gw_assets STATIC)
 
 target_sources(gw_assets
     PRIVATE
+        image_decode_rgba8.cpp
         asset_db.cpp
         asset_loader.cpp
         mesh_asset.cpp

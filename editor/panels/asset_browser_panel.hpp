@@ -23,7 +23,7 @@ public:
 
 private:
     void draw_directory_tree();
-    void draw_content_grid();
+    void draw_content_grid(EditorContext& ctx);
     void navigate_to(const std::filesystem::path& dir);
 
     enum class ViewMode { Grid, List };

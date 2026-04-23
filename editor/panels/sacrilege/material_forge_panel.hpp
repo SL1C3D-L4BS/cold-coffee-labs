@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace gw::editor::panels::sacrilege {
@@ -17,9 +18,15 @@ public:
 
 private:
     void try_load_index(const std::filesystem::path* project_root);
-    void draw_library_grid();
+    void draw_library_grid(gw::editor::EditorContext& ctx);
+    void draw_material_cell(gw::editor::EditorContext& ctx, const std::string& id,
+                            const std::string& reldir, int& uploads_this_frame);
+    [[nodiscard]] std::optional<std::filesystem::path> cached_albedo_path(
+        const std::string& id, const std::string& reldir,
+        const std::filesystem::path* project_root);
 
     std::vector<std::pair<std::string, std::string>> entries_;  // id, relative_dir
+    std::unordered_map<std::string, std::optional<std::filesystem::path>> albedo_cache_;
     bool         index_loaded_ = false;
     bool         index_tried_  = false;
     char         filter_[128]{};

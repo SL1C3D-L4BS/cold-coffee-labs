@@ -14,6 +14,7 @@
 #include "editor/render/render_settings.hpp"
 #include "editor/selection/selection_context.hpp"
 #include "editor/pie/gameplay_host.hpp"
+#include "editor/render/imgui_texture_cache.hpp"
 #include "editor/shell/recent_projects.hpp"
 #include "editor/theme/corruption_pulse.hpp"
 #include "editor/undo/command_stack.hpp"
@@ -27,6 +28,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <vector>
 
 struct GLFWwindow;
@@ -88,6 +90,8 @@ private:
     void apply_theme();
     void update_clear_colors_from_theme();
     void build_launcher_ui();
+    /// Set project root, chdir for relative content/ paths, recent list, main editor.
+    void open_project(const std::filesystem::path& root);
 
     // -----------------------------------------------------------------------
     // Callbacks (GLFW)
@@ -96,6 +100,7 @@ private:
                                  int action, int mods);
     static void on_scroll_callback(GLFWwindow* w, double dx, double dy);
     static void on_framebuffer_resize(GLFWwindow* w, int width, int height);
+    static void on_drop_paths(GLFWwindow* w, int count, const char** paths);
 
     // -----------------------------------------------------------------------
     // State
@@ -135,6 +140,7 @@ private:
 
     // Layout built flag — persisted via ImGui ini.
     bool layout_built_ = false;
+    bool layout_pending_reset_ = false;
 
     // Swapchain resize deferred flag.
     bool swapchain_resize_pending_ = false;
@@ -151,6 +157,9 @@ private:
     char shell_path_manual_[1024]{};
     std::vector<gw::editor::shell::RecentProject> recent_projects_;
     std::filesystem::path project_root_;
+    std::optional<std::filesystem::path> pending_folder_drop_;
+    std::unique_ptr<gw::editor::render::ImGuiTextureCache> imgui_tex_cache_;
+    float last_dt_sec_ = 1.f / 60.f;
 };
 
 }  // namespace gw::editor

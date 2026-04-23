@@ -39,6 +39,9 @@ compile_commands.json
 /content/
 !/content/.gitkeep
 
+# Franchise game content/ mirrors the same rule: local pulls (e.g. AmbientCG) live under content/textures/.
+franchises/**/content/textures/
+
 # Ephemeral.
 *.log
 .env

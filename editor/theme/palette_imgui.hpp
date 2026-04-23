@@ -37,4 +37,8 @@ namespace gw::editor::theme {
     return imgui_vec4(ThemeRegistry::instance().active().palette.accent);
 }
 
+[[nodiscard]] inline ImVec4 active_accent_secondary_imgui() noexcept {
+    return imgui_vec4(ThemeRegistry::instance().active().palette.accent_secondary);
+}
+
 } // namespace gw::editor::theme

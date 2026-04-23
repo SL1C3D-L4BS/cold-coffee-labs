@@ -6,6 +6,10 @@
 #include <filesystem>
 
 // Forward declarations to keep this header lightweight.
+namespace gw::editor::render {
+class ImGuiTextureCache;
+}
+
 namespace gw::editor {
     struct EditorContext;
     class  SelectionContext;
@@ -38,6 +42,8 @@ struct EditorContext {
     void*                             scene_color_descriptor = nullptr;
     /// Opened project root (content/, assets/ live under here). nullptr in tests / launcher.
     const std::filesystem::path*      project_root         = nullptr;
+    /// RGBA8 thumbnails via Vulkan → ImGui (optional).
+    gw::editor::render::ImGuiTextureCache* imgui_textures = nullptr;
 };
 
 // ---------------------------------------------------------------------------

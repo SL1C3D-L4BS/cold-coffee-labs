@@ -55,6 +55,7 @@ void apply_palette_to_imgui_style(const Palette& palette, ImGuiStyle& style,
     const ImVec4 bg            = C(palette.background);
     const ImVec4 panel         = C(palette.panel);
     const ImVec4 accent        = C(palette.accent);
+    const ImVec4 accent_alt    = C(palette.accent_secondary);
     const ImVec4 accent_hi     = C(palette.accent_strong);
     const ImVec4 bad           = C(palette.destructive);
     const ImVec4 good          = C(palette.positive);
@@ -104,10 +105,12 @@ void apply_palette_to_imgui_style(const Palette& palette, ImGuiStyle& style,
     col[ImGuiCol_SeparatorHovered]      = mul_alpha(accent, 0.55f);
     col[ImGuiCol_SeparatorActive]      = accent_hi;
     col[ImGuiCol_ResizeGrip]            = mul_alpha(accent, 0.22f);
-    col[ImGuiCol_ResizeGripHovered]     = mul_alpha(accent, 0.55f);
+    col[ImGuiCol_ResizeGripHovered]     = lerp(mul_alpha(accent, 0.55f),
+                                               mul_alpha(accent_alt, 0.5f), 0.4f);
     col[ImGuiCol_ResizeGripActive]      = mul_alpha(accent_hi, 0.85f);
     col[ImGuiCol_Tab]                   = lerp(bg, panel, 0.65f);
-    col[ImGuiCol_TabHovered]            = mul_alpha(accent, 0.55f);
+    col[ImGuiCol_TabHovered]            = lerp(mul_alpha(accent, 0.55f),
+                                               mul_alpha(accent_alt, 0.45f), 0.35f);
     col[ImGuiCol_TabActive]             = lerp(panel, accent, 0.22f);
     col[ImGuiCol_TabUnfocused]          = lerp(bg, panel, 0.5f);
     col[ImGuiCol_TabUnfocusedActive]    = lerp(panel, accent, 0.12f);
@@ -124,7 +127,8 @@ void apply_palette_to_imgui_style(const Palette& palette, ImGuiStyle& style,
     col[ImGuiCol_TableRowBgAlt]        = ImVec4{1, 1, 1, 0.03f};
     col[ImGuiCol_TextSelectedBg]        = sel;
     col[ImGuiCol_DragDropTarget]      = mul_alpha(warn, 0.85f);
-    col[ImGuiCol_NavHighlight]         = mul_alpha(accent, 0.75f);
+    col[ImGuiCol_NavHighlight]         = lerp(mul_alpha(accent, 0.75f),
+                                              mul_alpha(accent_alt, 0.65f), 0.3f);
     col[ImGuiCol_NavWindowingHighlight] = mul_alpha(warn, 0.85f);
     col[ImGuiCol_NavWindowingDimBg]    = ImVec4{0, 0, 0, 0.45f};
     col[ImGuiCol_ModalWindowDimBg]      = ImVec4{0, 0, 0, 0.55f};

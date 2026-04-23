@@ -80,6 +80,7 @@ endif()
 add_executable(gw_editor
     main.cpp
     app/editor_app.cpp
+    render/imgui_texture_cache.cpp
     panels/panel_registry.cpp
     panels/outliner_panel.cpp
     panels/inspector_panel.cpp
@@ -141,6 +142,8 @@ add_executable(gw_editor
     shell/sha256.cpp
     shell/private_gate.cpp
     shell/recent_projects.cpp
+    shell/layout_state.cpp
+    shell/franchise_roots.cpp
     shell/file_dialog.cpp
     # Part C §23 — Audit panels (docs/05 deep research).
     panels/audit/shader_hotreload_panel.cpp
@@ -161,6 +164,7 @@ target_include_directories(gw_editor PRIVATE
 target_link_libraries(gw_editor PRIVATE
     greywater::core
     greywater::assets
+    greywater::material
     engine_render
     greywater::world
     greywater::audio

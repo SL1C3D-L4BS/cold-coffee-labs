@@ -47,6 +47,8 @@ add_executable(gw_tests
     integration/cook_pipeline_test.cpp
     # Phase 7 — Editor Foundation
     unit/editor/reflect_macro_test.cpp
+    unit/editor/franchise_roots_test.cpp
+    "${CMAKE_SOURCE_DIR}/editor/shell/franchise_roots.cpp"
     unit/editor/selection_test.cpp
     # Editor implementation units needed by tests (not part of gw_editor binary).
     "${CMAKE_SOURCE_DIR}/editor/selection/selection_context.cpp"

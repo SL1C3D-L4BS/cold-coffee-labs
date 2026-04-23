@@ -64,6 +64,8 @@
 #include "editor/config/editor_config.hpp"
 #include "editor/modules/modules_builtin.hpp"
 #include "editor/shell/file_dialog.hpp"
+#include "editor/shell/franchise_roots.hpp"
+#include "editor/shell/layout_state.hpp"
 #include "editor/shell/private_gate.hpp"
 #include "editor/shell/recent_projects.hpp"
 #include "editor/theme/editor_fonts.hpp"
@@ -375,7 +377,17 @@ void EditorApplication::run() {
 
         const double now = glfwGetTime();
         const float  dt  = static_cast<float>(now - last_time);
-        last_time = now;
+        last_time        = now;
+        last_dt_sec_     = (dt > 1e-6f) ? dt : last_dt_sec_;
+
+        if (pending_folder_drop_) {
+            namespace fs = std::filesystem;
+            if (shell_phase_ == EditorShellPhase::ChooseProject &&
+                gw::editor::shell::is_likely_project_root(*pending_folder_drop_)) {
+                open_project(*pending_folder_drop_);
+            }
+            pending_folder_drop_.reset();
+        }
 
         if (swapchain_resize_pending_) {
             recreate_swapchain();
@@ -445,6 +457,7 @@ void EditorApplication::run() {
             .project_root = (shell_phase_ == EditorShellPhase::MainEditor)
                 ? &project_root_
                 : nullptr,
+            .imgui_textures = imgui_tex_cache_.get(),
         };
 
         build_ui();
@@ -478,6 +491,7 @@ void EditorApplication::init_window() {
     glfwSetKeyCallback(window_, on_key_callback);
     glfwSetScrollCallback(window_, on_scroll_callback);
     glfwSetFramebufferSizeCallback(window_, on_framebuffer_resize);
+    glfwSetDropCallback(window_, on_drop_paths);
 }
 
 // ---------------------------------------------------------------------------
@@ -868,30 +882,21 @@ void EditorApplication::init_imgui() {
     // Disable auto-save — we manage ini explicitly.
     io.IniFilename = nullptr;
 
-    // Load saved layout.
+    // Load saved layout when schema matches and required docking/windows exist.
     namespace fs = std::filesystem;
-    fs::path ini_path;
-#ifdef _WIN32
-    if (const char* appdata = std::getenv("APPDATA"); appdata)
-        ini_path = fs::path{appdata} / "GreywaterEditor" / "layout.ini";
-    else
-        ini_path = "layout.ini";
-#else
-    if (const char* home = std::getenv("HOME"); home)
-        ini_path = fs::path{home} / ".config" / "greywater_editor" / "layout.ini";
-    else
-        ini_path = "layout.ini";
-#endif
-
-    if (fs::exists(ini_path)) {
+    const fs::path ini_path   = gw::editor::shell::layout_ini_path();
+    const int      disk_schema = gw::editor::shell::read_layout_schema_version();
+    if (disk_schema == gw::editor::shell::kLayoutSchemaVersion && fs::exists(ini_path)) {
         std::ifstream f{ini_path, std::ios::binary | std::ios::ate};
         if (f.good()) {
             const auto sz = f.tellg();
             f.seekg(0);
             std::string buf(static_cast<size_t>(sz), '\0');
             f.read(buf.data(), sz);
-            ImGui::LoadIniSettingsFromMemory(buf.c_str(), buf.size());
-            layout_built_ = true;
+            if (gw::editor::shell::layout_ini_has_critical_windows(buf)) {
+                ImGui::LoadIniSettingsFromMemory(buf.c_str(), buf.size());
+                layout_built_ = true;
+            }
         }
     }
 
@@ -940,6 +945,10 @@ void EditorApplication::init_imgui() {
         gw_fatal("ImGui_ImplVulkan_Init failed");
 
     vk_->imgui_initialised = true;
+
+    imgui_tex_cache_ = std::make_unique<gw::editor::render::ImGuiTextureCache>(
+        vk_->device, vk_->physical_device, vk_->graphics_queue, vk_->graphics_family,
+        vk_->cmd_pool, vk_->allocator);
 }
 
 // ---------------------------------------------------------------------------
@@ -950,29 +959,20 @@ void EditorApplication::shutdown_imgui() {
 
     vkDeviceWaitIdle(vk_->device);
 
+    imgui_tex_cache_.reset();
+
     // Save layout before tearing down.
     namespace fs = std::filesystem;
-    fs::path ini_dir;
-#ifdef _WIN32
-    if (const char* appdata = std::getenv("APPDATA"); appdata)
-        ini_dir = fs::path{appdata} / "GreywaterEditor";
-    else
-        ini_dir = ".";
-#else
-    if (const char* home = std::getenv("HOME"); home)
-        ini_dir = fs::path{home} / ".config" / "greywater_editor";
-    else
-        ini_dir = ".";
-#endif
-
+    const fs::path ini_path = gw::editor::shell::layout_ini_path();
     std::error_code ec;
-    fs::create_directories(ini_dir, ec);
-    std::ofstream f{ini_dir / "layout.ini", std::ios::binary};
+    fs::create_directories(ini_path.parent_path(), ec);
+    std::ofstream f{ini_path, std::ios::binary};
     if (f.good()) {
         size_t sz = 0;
         const char* data = ImGui::SaveIniSettingsToMemory(&sz);
         f.write(data, static_cast<std::streamsize>(sz));
     }
+    gw::editor::shell::write_layout_schema_version(gw::editor::shell::kLayoutSchemaVersion);
 
     // Scene RT bindings reference the ImGui Vulkan backend; drop them first.
     destroy_scene_rt();
@@ -1202,48 +1202,140 @@ void EditorApplication::build_launcher_ui() {
             ImGui::TextColored(gw::editor::theme::active_accent_imgui(), "%s",
                                shell_gate_err_);
     } else if (shell_phase_ == EditorShellPhase::ChooseProject) {
-        ImGui::TextUnformatted("Open project");
+        ImGui::TextUnformatted("Sacrilege franchise");
         ImGui::TextDisabled(
-            "Pick a project root (folder with content/ or your Greywater tree).");
+            "Pick a title workspace, browse, drop a folder here, or open a recent project.");
         ImGui::Spacing();
-        if (ImGui::Button("Browse…", ImVec2{160.f, 0.f})) {
-            if (auto picked = gw::editor::shell::pick_folder()) {
-                project_root_ = *picked;
-                gw::editor::shell::touch_recent_project(recent_projects_,
-                                                        project_root_);
-                shell_phase_ = EditorShellPhase::MainEditor;
+
+        ImGui::PushStyleColor(ImGuiCol_ChildBg,
+                              gw::editor::theme::imgui_vec4(
+                                  gw::editor::theme::ThemeRegistry::instance().active()
+                                      .palette.panel,
+                                  0.92f));
+        ImGui::BeginChild("##drop_zone", {0.f, 72.f}, true, ImGuiWindowFlags_NoScrollbar);
+        ImGui::TextDisabled("Drop a project folder");
+        ImGui::TextUnformatted("Release over this panel while Choose Project is open.");
+        if (ImGui::BeginDragDropTarget()) {
+            if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload(nullptr)) {
+                if (pl->Data && pl->DataSize > 0) {
+                    const char* data = static_cast<const char*>(pl->Data);
+                    const int len    = pl->DataSize - 1;
+                    if (len > 0 && data[len] == '\0') {
+                        namespace fs = std::filesystem;
+                        std::error_code ec;
+                        fs::path p{std::string_view{data, static_cast<std::size_t>(len)}};
+                        p = fs::weakly_canonical(p, ec);
+                        if (gw::editor::shell::is_likely_project_root(p)) open_project(p);
+                    }
+                }
             }
+            ImGui::EndDragDropTarget();
+        }
+        ImGui::EndChild();
+        ImGui::PopStyleColor();
+        ImGui::Spacing();
+
+        const auto repo = gw::editor::shell::find_greywater_repo_root();
+        if (repo) {
+            const auto franchise_games =
+                gw::editor::shell::list_sacrilege_franchise_games(*repo);
+            if (franchise_games.empty()) {
+                ImGui::TextColored(gw::editor::theme::active_warning_imgui(),
+                    "No franchise games listed — add entries to franchises/sacrilege/games.manifest.");
+            } else {
+                ImGui::TextDisabled("Franchise titles");
+                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {10.f, 10.f});
+                const float card_w =
+                    std::clamp(ImGui::GetContentRegionAvail().x * 0.92f, 240.f, 560.f);
+                for (std::size_t i = 0; i < franchise_games.size(); ++i) {
+                    const auto& g = franchise_games[i];
+                    ImGui::PushID(static_cast<int>(i));
+                    ImGui::BeginChild("##fcard", {card_w, 86.f}, true,
+                                       ImGuiWindowFlags_NoScrollbar);
+                    ImGui::TextUnformatted(g.display_name.c_str());
+                    ImGui::TextDisabled("%s", g.slug.c_str());
+                    if (ImGui::Button("Open", {120.f, 0.f})) open_project(g.root);
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("Copy path"))
+                        ImGui::SetClipboardText(g.root.string().c_str());
+                    ImGui::EndChild();
+                    ImGui::PopID();
+                }
+                ImGui::PopStyleVar();
+            }
+        } else {
+            ImGui::TextColored(gw::editor::theme::active_warning_imgui(),
+                "Greywater repo root not found from cwd or executable path.");
+            ImGui::TextDisabled(
+                "Run from the engine tree or use Browse / typed path below.");
+        }
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+        ImGui::TextDisabled("Other");
+        if (ImGui::Button("Browse folder…", ImVec2{200.f, 0.f})) {
+            if (auto picked = gw::editor::shell::pick_folder()) open_project(*picked);
         }
         ImGui::Spacing();
-        ImGui::TextDisabled("Recent");
-        for (std::size_t i = 0; i < recent_projects_.size(); ++i) {
-            const auto& r = recent_projects_[i];
-            const std::string row =
-                r.display_name + "###recent_proj_" + std::to_string(i);
-            if (ImGui::Selectable(row.c_str())) {
-                project_root_ = r.root;
-                gw::editor::shell::touch_recent_project(recent_projects_,
-                                                        project_root_);
-                shell_phase_ = EditorShellPhase::MainEditor;
+        ImGui::TextDisabled("Recent projects");
+        if (recent_projects_.empty()) {
+            ImGui::TextDisabled("Nothing here yet — open a folder once and it will be remembered.");
+        } else {
+            gw::editor::shell::sort_recents_for_display(recent_projects_);
+            const float rc_w =
+                std::clamp(ImGui::GetContentRegionAvail().x * 0.48f, 260.f, 520.f);
+            for (std::size_t i = 0; i < recent_projects_.size(); ++i) {
+                const auto& r = recent_projects_[i];
+                ImGui::PushID(static_cast<int>(i + 9000));
+                const bool valid = gw::editor::shell::is_likely_project_root(r.root);
+                ImGui::BeginChild("##rcard", {rc_w, 92.f}, true,
+                                   ImGuiWindowFlags_NoScrollbar);
+                if (r.pinned)
+                    ImGui::TextColored(gw::editor::theme::active_accent_secondary_imgui(),
+                                       "Pinned");
+                else
+                    ImGui::TextDisabled("Recent");
+                ImGui::TextUnformatted(r.display_name.c_str());
+                if (!valid)
+                    ImGui::TextColored(gw::editor::theme::active_warning_imgui(),
+                                       "Path may be invalid (missing content/assets).");
+                ImGui::TextDisabled("%s", r.root.string().c_str());
+                if (ImGui::Button("Open", {88.f, 0.f}) && valid) open_project(r.root);
+                ImGui::SameLine();
+                const char* pin_lbl = r.pinned ? "Unpin" : "Pin";
+                if (ImGui::SmallButton(pin_lbl))
+                    gw::editor::shell::set_recent_pinned(recent_projects_, r.root, !r.pinned);
+                ImGui::SameLine();
+                if (ImGui::SmallButton("Remove"))
+                    gw::editor::shell::remove_recent_project(recent_projects_, r.root);
+                ImGui::SameLine();
+                if (ImGui::SmallButton("Copy path"))
+                    ImGui::SetClipboardText(r.root.string().c_str());
+                ImGui::EndChild();
+                ImGui::PopID();
             }
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
-                ImGui::SetTooltip("%s", r.root.string().c_str());
         }
         ImGui::Spacing();
         ImGui::InputText("Path", shell_path_manual_, sizeof(shell_path_manual_));
-        if (ImGui::Button("Open typed path", ImVec2{160.f, 0.f})) {
+        if (ImGui::Button("Open typed path", ImVec2{200.f, 0.f})) {
             namespace fs = std::filesystem;
-            project_root_ = fs::path{shell_path_manual_};
+            const fs::path typed{shell_path_manual_};
             std::error_code ec;
-            if (fs::exists(project_root_, ec)) {
-                gw::editor::shell::touch_recent_project(recent_projects_,
-                                                        project_root_);
-                shell_phase_ = EditorShellPhase::MainEditor;
-            }
+            if (fs::exists(typed, ec)) open_project(fs::absolute(typed, ec));
         }
     }
 
     ImGui::End();
+}
+
+void EditorApplication::open_project(const std::filesystem::path& root) {
+    namespace fs = std::filesystem;
+    project_root_ = root;
+    std::error_code ec;
+    fs::current_path(project_root_, ec);
+    gw::editor::shell::touch_recent_project(recent_projects_, project_root_);
+    shell_phase_ = EditorShellPhase::MainEditor;
 }
 
 void EditorApplication::build_ui() {
@@ -1336,11 +1428,34 @@ void EditorApplication::build_ui() {
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Window")) {
-            for (auto& p : panels_.panels()) {
-                bool vis = p->visible();
-                if (ImGui::MenuItem(p->name(), nullptr, vis))
-                    p->set_visible(!vis);
-            }
+            auto toggle_group = [this](const char* title,
+                                       std::initializer_list<const char*> names) {
+                if (ImGui::BeginMenu(title)) {
+                    for (const char* n : names) {
+                        if (IPanel* p = panels_.find(n)) {
+                            bool v = p->visible();
+                            if (ImGui::MenuItem(n, nullptr, v)) p->set_visible(!v);
+                        }
+                    }
+                    ImGui::EndMenu();
+                }
+            };
+            toggle_group("Cockpit",
+                         {"Viewport", "Scene", "Outliner", "Lighting", "Inspector",
+                          "Render Settings"});
+            toggle_group("Assets & targets",
+                         {"Asset Browser", "Material Forge", "Render Targets"});
+            toggle_group("Scripting & agents", {"VScript", "BLD Copilot", "Sequencer"});
+            toggle_group("Sacrilege",
+                         {"Act / Phase", "AI Director Sandbox", "Circle Editor", "Dialogue Graph",
+                          "Editor Copilot", "Encounter Editor", "PCG Node Graph", "Shader Forge",
+                          "Sin-Signature"});
+            toggle_group("Audit",
+                         {"Asset Dependencies", "Bake", "Heatmap", "Localization", "Profiler",
+                          "Shader Hot-Reload", "Shader Permutations"});
+            toggle_group("Output", {"Console"});
+            ImGui::Separator();
+            if (ImGui::MenuItem("Reset docking layout")) layout_pending_reset_ = true;
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Help")) {
@@ -1356,13 +1471,44 @@ void EditorApplication::build_ui() {
         ImGui::EndMenuBar();
     }
 
-    const ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
-    ImGui::DockSpace(dockspace_id, {0.f, 0.f}, ImGuiDockNodeFlags_None);
+    constexpr float kStatusH = 24.f;
+    const ImVec2  dock_region = ImGui::GetContentRegionAvail();
+    const float   dock_h      = std::max(64.f, dock_region.y - kStatusH);
+    ImGui::BeginChild("##dock_body", {0.f, dock_h}, false,
+                      ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar);
 
-    if (!layout_built_ && ImGui::DockBuilderGetNode(dockspace_id) == nullptr) {
+    const ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
+    if (layout_pending_reset_) {
+        ImGui::DockBuilderRemoveNode(dockspace_id);
+        build_docking_layout();
+        layout_pending_reset_ = false;
+        layout_built_         = true;
+    } else if (!layout_built_ && ImGui::DockBuilderGetNode(dockspace_id) == nullptr) {
         build_docking_layout();
         layout_built_ = true;
     }
+    ImGui::DockSpace(dockspace_id, {0.f, 0.f}, ImGuiDockNodeFlags_None);
+    ImGui::EndChild();
+
+    ImGui::PushStyleColor(ImGuiCol_ChildBg,
+                          ImGui::GetStyleColorVec4(ImGuiCol_MenuBarBg));
+    ImGui::BeginChild("##status_bar", {0.f, kStatusH}, true,
+                       ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    {
+        const float fps = (last_dt_sec_ > 1e-6f) ? (1.f / last_dt_sec_) : 0.f;
+        ImGui::TextUnformatted(project_root_.empty() ? "No project"
+                                                     : project_root_.string().c_str());
+        ImGui::SameLine();
+        ImGui::TextDisabled("|");
+        ImGui::SameLine();
+        ImGui::Text("fps %.0f", static_cast<double>(fps));
+        ImGui::SameLine();
+        ImGui::TextDisabled("|");
+        ImGui::SameLine();
+        ImGui::TextDisabled("layout schema v%d", gw::editor::shell::kLayoutSchemaVersion);
+    }
+    ImGui::EndChild();
+    ImGui::PopStyleColor();
 
     ImGui::End();
 
@@ -1406,54 +1552,12 @@ void EditorApplication::build_ui() {
 }
 
 void EditorApplication::build_docking_layout() {
-    // Cockpit layout (Phase 7 gate-E). The mock-up calls for a left column of
-    // stacked cards (Scene stats → Outliner → Lighting), a right column of
-    // Inspector + Render Settings, a bottom ribbon for the Render Targets
-    // strip and tabbed Asset Browser / Console, and the Viewport fills the
-    // centre.
+    // Fullscreen dockspace only — panels start floating (FirstUseEver positions
+    // in PanelRegistry); user docks into this empty host as they prefer.
     const ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
     ImGui::DockBuilderRemoveNode(dockspace_id);
     ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
     ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->WorkSize);
-
-    ImGuiID centre = dockspace_id;
-    ImGuiID left = 0, right = 0, bottom = 0;
-    ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Right, 0.24f, &right,  &centre);
-    ImGui::DockBuilderSplitNode(centre,       ImGuiDir_Left,  0.22f, &left,   &centre);
-    ImGui::DockBuilderSplitNode(centre,       ImGuiDir_Down,  0.32f, &bottom, &centre);
-
-    // Split the left column into Scene (stats, top) / Outliner (mid) /
-    // Lighting (bottom).
-    ImGuiID left_top = 0, left_mid = left;
-    ImGui::DockBuilderSplitNode(left_mid,  ImGuiDir_Up,   0.28f, &left_top, &left_mid);
-    ImGuiID left_bot = 0;
-    ImGui::DockBuilderSplitNode(left_mid,  ImGuiDir_Down, 0.40f, &left_bot, &left_mid);
-
-    // Split the right column into Inspector (top) / Render Settings (bottom).
-    ImGuiID right_top = right, right_bot = 0;
-    ImGui::DockBuilderSplitNode(right_top, ImGuiDir_Down, 0.55f, &right_bot, &right_top);
-
-    // Bottom ribbon: Render Targets on top, Console/Asset Browser as tabs.
-    ImGuiID bottom_top = 0, bottom_main = bottom;
-    ImGui::DockBuilderSplitNode(bottom_main, ImGuiDir_Up, 0.50f, &bottom_top, &bottom_main);
-
-    ImGui::DockBuilderDockWindow("Scene",           left_top);
-    ImGui::DockBuilderDockWindow("Outliner",        left_mid);
-    ImGui::DockBuilderDockWindow("Lighting",        left_bot);
-    ImGui::DockBuilderDockWindow("Viewport",        centre);
-    ImGui::DockBuilderDockWindow("Inspector",       right_top);
-    ImGui::DockBuilderDockWindow("Render Settings", right_bot);
-    ImGui::DockBuilderDockWindow("Render Targets",  bottom_top);
-    ImGui::DockBuilderDockWindow("Asset Browser",   bottom_main);
-    ImGui::DockBuilderDockWindow("Console",         bottom_main);
-    ImGui::DockBuilderDockWindow("Material Forge",  bottom_main);
-    // VScript docks as a tab over the viewport so users can toggle between
-    // authoring the graph and seeing the scene without losing side panels.
-    ImGui::DockBuilderDockWindow("VScript",         centre);
-    // BLD Copilot docks as a tab next to the Inspector so users can keep
-    // the agent visible alongside selection state.
-    ImGui::DockBuilderDockWindow("BLD Copilot",     right_top);
-
     ImGui::DockBuilderFinish(dockspace_id);
 }
 
@@ -1676,6 +1780,17 @@ void EditorApplication::on_framebuffer_resize(GLFWwindow* w,
                                                int /*width*/, int /*height*/) {
     auto* app = static_cast<EditorApplication*>(glfwGetWindowUserPointer(w));
     if (app) app->swapchain_resize_pending_ = true;
+}
+
+void EditorApplication::on_drop_paths(GLFWwindow* w, int count, const char** paths) {
+    auto* app = static_cast<EditorApplication*>(glfwGetWindowUserPointer(w));
+    if (!app || count < 1 || !paths || !paths[0]) return;
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    fs::path p = fs::path{paths[0]};
+    p          = fs::weakly_canonical(p, ec);
+    if (!fs::is_directory(p, ec)) return;
+    app->pending_folder_drop_ = std::move(p);
 }
 
 }  // namespace gw::editor

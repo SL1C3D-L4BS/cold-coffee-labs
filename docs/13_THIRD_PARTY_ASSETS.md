@@ -6,51 +6,79 @@ This document describes how **AmbientCG** ([ambientcg.com](https://ambientcg.com
 
 ## Policy
 
-- **Default quality:** 2K JPEG material archives (`*_2K-JPG.zip`) to balance disk and fidelity.
-- **Do not commit** the full downloaded library to git. Keep zips under `content/_download_cache/ambient_cg/` (gitignored) and optionally commit only a small curated subset if needed.
-- After sync, run the **content cook** (`gw_cook` / `tools/cook`) from your build so authored sources become `assets/…/*.gwtex` where applicable.
+- **Default quality:** 2K JPEG (`*_2K-JPG`) to balance disk and fidelity; match `resolution` / `file_type` in the downloader’s `config.yaml`.
+- **Do not commit** the full downloaded library to git. Keep the bulk library on disk locally (gitignored under `content/textures/ambient_cg/` as needed).
+- After import, run the **content cook** (`gw_cook` / `tools/cook`) from your build so authored sources become `assets/…/*.gwtex` where applicable.
 
-## Primary pipeline: `tools/ambientcg_sync/sync.py`
+## One-shot automated pull (this repo)
 
-From the repository root (or pass `--content-root`):
+A clone lives under **`content/_download_cache/ambientcg_downloader/`** (gitignored with the rest of `/content/`). **`tools/ambientcg_sync/run_downloader_then_import.ps1`** copies Greywater’s fixed **`main.py`** (correct CSV tier matching — upstream used substring checks and accidentally pulled **12K/16K** when set to **2K**), runs **`main.py`**, then **`import_from_downloader.py --link-franchises`**. Progress: **`content/_download_cache/ambientcg_downloader/pull.log`**. Expect **hours** and **tens of GB** at 2K JPEG. Configure that folder’s **`config.yaml`** before the first run.
+
+To watch output in a **separate window** (and keep it open when finished), run **`tools/ambientcg_sync/start_ambientcg_pull_visible.cmd`** or start PowerShell with **`-NoExit -File …/run_downloader_then_import.ps1`**. Avoid running two copies at once (duplicate downloads).
+
+**Verify without trust:** run **`python tools/ambientcg_sync/ambientcg_pull_status.py`** (or **`tools/ambientcg_sync/ambientcg_pull_status.cmd`**). It re-fetches the public CSV, counts rows matching your `config.yaml`, compares to `downloads/*.zip` and `unzipped/*`, prints **`pull.log`** age and last lines, and **`tasklist`** rows for `python.exe`. Downloader logs lines like **`[2026-…Z] [142/2603] saved … (bytes)`** after you restart with the updated `ambientcg_downloader_main.py`.
+
+## Primary pipeline: [ambientcg-downloader](https://github.com/alvarognnzz/ambientcg-downloader) + import
+
+The maintained approach is the community **ambientcg-downloader** (CSV API, bulk unzip). Greywater maps its per-zip folders (`Rock064_2K-JPG`, etc.) into `content/textures/ambient_cg/<AssetId>/`.
+
+1. Clone the repo on your machine (for example under Desktop), install deps, edit **`config.yaml`** (`resolution`, `file_type`, `unzip.folder`, `keep_files`).
+2. Run `main.py` (or `poetry run python main.py`) until downloads and unzip finish. The library is large (on the order of **10GB+** at 1K; more at 2K/4K).
+3. From the **Greywater repository root**, import into `content/textures/ambient_cg/` and refresh the index:
 
 ```text
-python tools/ambientcg_sync/sync.py
+python tools/ambientcg_sync/import_from_downloader.py --source "PATH/TO/ambientcg-downloader/unzipped" --link-franchises
 ```
 
-The script:
+**Windows:** set `AMBIENTCG_UNZIPPED` to that `unzipped` folder, then run **`tools/ambientcg_sync/sync_ambientcg.cmd`** (forwards extra args to the importer). If Git Bash has no `python` on PATH, use `py.exe -3` or the full `Python312\python.exe` path.
 
-1. Pages the API `https://ambientcg.com/api/v3/assets?type=material&include=downloads`.
-2. For each asset, downloads the **2K-JPG** zip into `content/_download_cache/ambient_cg/`.
-3. Extracts to `content/textures/ambient_cg/<AssetId>/`.
-4. Writes resume state to `content/manifests/ambient_cg_sync_manifest.json`.
-5. Emits `content/manifests/ambient_cg_index.tsv` (id + relative directory) for the **Material Forge** panel.
+Optional **`--copy`**: copy instead of move (duplicates disk; leaves the downloader tree intact).
 
-Options: `--max-assets N` (smoke tests), `--sleep` (seconds between HTTP calls).
+Optional cleanup of the **cloned downloader** after a successful import (only when you intend to remove that directory):
 
-## Fallback: community downloader
+```text
+python tools/ambientcg_sync/import_from_downloader.py --source "...\unzipped" --link-franchises ^
+  --delete-repo-root "...\ambientcg-downloader" --yes
+```
 
-If the API path fails (network, API changes), clone or download [ambientcg-downloader](https://github.com/alvarognnzz/ambientcg-downloader), set `config.yaml` to `resolution: "2K"`, `file_type: "JPG"`, then place or link extracted trees under `content/textures/ambient_cg/<AssetId>/` and run:
+The importer writes **`content/manifests/ambient_cg_index.tsv`** and **`assets/manifests/ambient_cg_index.tsv`**. With **`--link-franchises`**, it also creates Windows junctions (or POSIX symlinks) from `franchises/sacrilege/<game>/content/textures/ambient_cg` to the shared repo tree and copies the index into each game’s `assets/manifests/`.
+
+## Rebuild index only
+
+If folders are already under `content/textures/ambient_cg/<AssetId>/`:
 
 ```text
 python tools/ambientcg_sync/build_index.py
 ```
 
-That rebuilds `ambient_cg_index.tsv` from folders on disk. Pin a git commit of the third-party tool when you rely on it for reproducibility.
+By default this updates **`content/manifests/ambient_cg_index.tsv`** only (the bundled sample under **`assets/manifests/`** stays small in git). After a full import, both trees match; to rewrite **`assets/manifests`** too (for example before **`--link-franchises`** without re-importing), add **`--mirror-assets-manifest`**.
 
 ## Editor
 
 **Material Forge** (bottom dock, tab with **Asset Browser** / **Console**) resolves the index in this order:
 
-1. `<project_root>/content/manifests/ambient_cg_index.tsv` (output of `sync.py` after a full download).
-2. `<project_root>/assets/manifests/ambient_cg_index.tsv` (small **bundled** sample list in git so the panel is never empty before your first sync).
+1. `<project_root>/content/manifests/ambient_cg_index.tsv` (output of `import_from_downloader.py` / `build_index.py`).
+2. `<project_root>/assets/manifests/ambient_cg_index.tsv` (small **bundled** sample list in git so the panel is never empty before your first import).
 3. Walk upward from the process **current working directory** (same file names) so launching from `build/.../bin` still finds the repo.
 
 `project_root` is the folder you open in the project picker; use the **repository root** so `assets/` resolves correctly.
 
+## Verification checklist (disk + index)
+
+After **`import_from_downloader.py`** or a manual unzip into `content/textures/ambient_cg/<AssetId>/`:
+
+1. **Folders:** `content/textures/ambient_cg/` should contain one directory per indexed asset (names match the downloader folders, e.g. `Rock064_2K-JPG`).
+2. **Index:** `content/manifests/ambient_cg_index.tsv` exists, non-empty, tab-separated `id<TAB>relative_path` rows (see **`python tools/ambientcg_sync/build_index.py`** to regenerate).
+3. **Pull health:** **`python tools/ambientcg_sync/ambientcg_pull_status.py`** — CSV vs zip/unzipped counts, `pull.log` tail, running `python.exe` tasks.
+4. **Editor:** Open the **repo root** as the project; **Material Forge** should resolve the index and show **OK** / **NO ALB** badges once albedo files are on disk under each material folder.
+
+## Cook (textures → runtime)
+
+Authoring sources under `content/` are not sampled by the renderer until cooked. From your build tree, run the **content cook** target you use in CI (e.g. **`gw_cook`** / `tools/cook`) so eligible images become packaged **`*.gwtex`** (and related) under `assets/` as defined by your cook manifests. Re-run cook after adding or changing AmbientCG folders.
+
 ## Disk expectations
 
-Roughly **tens to hundreds of GB** for the full ~2K material set. Use `--max-assets` for CI and developer smoke syncs.
+A full mirror is **large** (tens of GB depending on resolution). Plan disk space before running the downloader.
 
 ## Viewport note
 

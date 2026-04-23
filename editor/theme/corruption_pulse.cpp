@@ -36,13 +36,17 @@ void draw_pulse_overlay(const CorruptionPulseState& s) noexcept {
     ImDrawList*    dl = ImGui::GetForegroundDrawList();
     if (!dl) return;
 
-    const int edge_alpha =
-        static_cast<int>(200.f * std::clamp(s.amplitude + s.sin_signature * 0.15f, 0.f, 1.f));
-    const int mid_alpha = static_cast<int>(edge_alpha * 0.25f);
+    const auto& pal = ThemeRegistry::instance().active().palette;
+    const float mix   = std::clamp(s.amplitude + s.sin_signature * 0.15f, 0.f, 1.f);
+    const int mid_alpha = static_cast<int>(50.f * mix);
+    const int alt_edge  = static_cast<int>(110.f * mix);
 
     dl->AddRectFilledMultiColor(
-        a, b, IM_COL32(0, 0, 0, edge_alpha), IM_COL32(0, 0, 0, mid_alpha),
-        IM_COL32(0, 0, 0, mid_alpha), IM_COL32(0, 0, 0, edge_alpha));
+        a, b,
+        IM_COL32(pal.accent_secondary.r, pal.accent_secondary.g, pal.accent_secondary.b, alt_edge),
+        IM_COL32(0, 0, 0, mid_alpha),
+        IM_COL32(0, 0, 0, mid_alpha),
+        IM_COL32(pal.accent_secondary.r, pal.accent_secondary.g, pal.accent_secondary.b, alt_edge));
 }
 
 } // namespace gw::editor::theme
