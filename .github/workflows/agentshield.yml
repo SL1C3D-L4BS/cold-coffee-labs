@@ -1,19 +1,22 @@
 # .github/workflows/agentshield.yml
-# ADR-0119: AgentShield CI gate for Greywater / Sacrilege.
+# ADR-0119 + ADR-0120: AgentShield CI gate for Greywater / Sacrilege.
 #
 # Blocks PRs that:
 #   1. Modify paths under `blocked_paths` in `.cursor/agentshield.json`
-#      without an accompanying ADR reference.
-#   2. Touch docs in `require_adr_reference_for` without a `docs/10`
-#      ADR update in the same PR.
+#      without an accompanying ADR-dddd reference in the commit range
+#      (or a `Waiver: <planning-doc>` trailer).
+#   2. Touch docs in `require_adr_reference_for` without an ADR-dddd
+#      reference in the commit range.
 #   3. Exceed per-PR volume caps (`max_files_per_session`,
 #      `max_lines_per_session`).
-#   4. Lack the `Agent-Session: <id>` commit trailer when the PR is
-#      authored by an AI-assisted commit.
+#   4. Lack the `Agent-Session: <id>` commit trailer on any commit in
+#      the range (`enforce_commit_trailer: true`).
 #
-# The real AgentShield binary ships with ECC and is installed by
-# `node install.js --scope project` (see `tools/ai/README.md`). This
-# workflow is the CI-side counterpart that runs it on every PR.
+# The policy runtime lives in `tools/ai/agentshield_cli.js`. It is a
+# self-contained Node implementation because ECC v1.10.0 upstream does
+# not yet ship an `agentshield` package (verified 2026-04-23); when
+# upstream adds one we point this workflow at
+# `third_party/everything-claude-code/packages/agentshield/bin/cli.js`.
 
 name: AgentShield
 
@@ -27,7 +30,7 @@ permissions:
 
 jobs:
   agentshield:
-    name: AgentShield policy gate
+    name: AgentShield policy gate (hard-fail)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,29 +42,26 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Verify config present
+      - name: Verify AgentShield config present
         run: |
           test -f .cursor/agentshield.json || {
-            echo "AgentShield config missing — ADR-0119 install incomplete." >&2
+            echo "::error title=AgentShield::Missing .cursor/agentshield.json (ADR-0120)."
             exit 1
           }
           cat .cursor/agentshield.json
 
-      - name: Run AgentShield (when vendored)
+      - name: Run AgentShield (hard-fail)
         run: |
-          AGENTSHIELD_BIN=third_party/everything-claude-code/packages/agentshield/bin/cli.js
-          if [ -f "$AGENTSHIELD_BIN" ]; then
-            node "$AGENTSHIELD_BIN" \
-              --config .cursor/agentshield.json \
-              --base "origin/${{ github.base_ref }}" \
-              --head "HEAD"
+          CLI_UPSTREAM=third_party/everything-claude-code/packages/agentshield/bin/cli.js
+          if [ -f "$CLI_UPSTREAM" ]; then
+            echo "Using upstream ECC AgentShield CLI."
+            CLI="$CLI_UPSTREAM"
           else
-            echo "::warning title=AgentShield::ECC not vendored yet; running advisory-only fallback."
-            echo "Follow tools/ai/README.md §ECC to vendor third_party/everything-claude-code."
-            # Fallback: basic path-block check via shell.
-            BLOCKED=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD | grep -E '^(assets/ai/.*\.bin|bld/bld-governance/policy/|engine/core/crypto/)' || true)
-            if [ -n "$BLOCKED" ]; then
-              echo "::error title=AgentShield::Blocked paths modified without ECC vendoring: $BLOCKED"
-              exit 1
-            fi
+            echo "Upstream ECC v1.10.0 does not ship agentshield; using tools/ai/agentshield_cli.js."
+            CLI=tools/ai/agentshield_cli.js
           fi
+          node "$CLI" \
+            --config .cursor/agentshield.json \
+            --base "origin/${{ github.base_ref }}" \
+            --head "HEAD" \
+            --fail-on critical
