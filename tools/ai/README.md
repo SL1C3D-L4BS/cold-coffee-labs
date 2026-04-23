@@ -63,18 +63,88 @@ Copy-Item tools/ai/hooks/post-checkout .git/hooks/post-checkout -Force
 
 ### everything-claude-code (ECC)
 
+ECC v1.10.0 is vendored under `third_party/everything-claude-code/` at
+pinned SHA `846ffb75da9a5f4e677d927af1ad4a1951652267` (ADR-0119). The
+installer uses upstream's actual `--target` flag, not the older
+`--scope` flag documented in some drafts:
+
 ```powershell
-# Vendor into the repo (read-only).
-git clone --depth 1 https://github.com/affaan-m/everything-claude-code third_party/everything-claude-code
-# Globally install the ECC toolkit (user-scoped).
-node third_party/everything-claude-code/install.js --scope user
-# Project-scoped adapters + rules.
-node third_party/everything-claude-code/install.js --scope project --root .
+# One-time Node dep fetch (~200 packages, ~55 MB).
+Push-Location third_party/everything-claude-code
+npm install --no-audit --no-fund --loglevel=error
+Pop-Location
+
+# User-global install (~/.claude/{agents,skills,commands,rules,hooks,...}).
+node third_party/everything-claude-code/scripts/install-apply.js `
+  --target claude --profile full
+
+# Project install (.cursor/{agents,skills,commands,rules,hooks,...}).
+node third_party/everything-claude-code/scripts/install-apply.js `
+  --target cursor --profile full
 ```
 
-The project-scoped step writes `.cursor/hooks/`, ECC rule packs into
-`.cursor/rules/`, and the AgentShield CI workflow under
-`.github/workflows/agentshield.yml`.
+Both runs write an `install-state.json` (user-global at
+`~/.claude/ecc/install-state.json`, project at
+`.cursor/ecc-install-state.json`) recording the exact modules applied
+so reinstalls are idempotent and uninstalls are reversible.
+
+Harness adapter dirs (`.codex/`, `.opencode/`, `.gemini/`, `.kiro/`,
+`.trae/`, `.agents/`) at the repo root are populated verbatim from the
+vendor tree so Codex / OpenCode / Gemini CLI / Kiro / Trae sessions
+pick up the same rule pack.
+
+### multi-* slash commands
+
+Installed to both `~/.claude/commands/` and `.cursor/commands/` by the
+ECC `--profile full` run:
+
+| Command | Purpose |
+|---------|---------|
+| `/multi-plan` | Fan a plan out to Claude + Codex + Gemini for cross-model review. |
+| `/multi-execute` | Dispatch the same implementation prompt to all three and diff outputs. |
+| `/multi-backend` | Backend-tuned multi-model pipeline. |
+| `/multi-frontend` | Frontend-tuned multi-model pipeline. |
+| `/multi-workflow` | Full `plan -> execute -> verify` loop across harnesses. |
+
+The runtime wrapper ships as `ccg` (npm package `ccg-workflow`).
+Initialize interactively with `npx ccg-workflow init --lang en`; for
+CI / headless use, it reads `~/.claude/.ccg/config.json`.
+
+### MCP servers (`.cursor/mcp.json`)
+
+Merged from `third_party/everything-claude-code/mcp-configs/mcp-servers.json`.
+Seven servers are wired to env vars instead of inline secrets:
+
+| Server | Env var(s) | Notes |
+|--------|------------|-------|
+| `github` | `GITHUB_PERSONAL_ACCESS_TOKEN` | PRs, issues, repos. |
+| `context7` | — | Live docs lookup; no auth. |
+| `exa` | `EXA_API_KEY` | Web research; disable via `ECC_DISABLED_MCPS=exa`. |
+| `memory` | — | Local sqlite at `.cursor/memory.sqlite`. |
+| `playwright` | — | Browser automation / e2e. |
+| `sequential-thinking` | — | Chain-of-thought; no auth. |
+| `supabase` | `SUPABASE_URL`, `SUPABASE_ANON_KEY` | Optional; disable via `ECC_DISABLED_MCPS=supabase`. |
+
+Set env vars at the OS or shell level; `.cursor/mcp.json` resolves
+`${env:VAR}` at session start. The `ECC_DISABLED_MCPS` comma list
+strips servers at startup (see `.cursor/hooks/session-start.js`).
+
+### Environment variable map (full)
+
+| Var | Required by | Default |
+|-----|-------------|---------|
+| `ANTHROPIC_API_KEY` | `graphify add <url>`, `/graphify --update`, `ccg` fan-out | — |
+| `OPENAI_API_KEY` | `ccg` Codex leg (optional) | — |
+| `GEMINI_API_KEY` | `ccg` Gemini leg (optional) | — |
+| `GITHUB_PERSONAL_ACCESS_TOKEN` | `github` MCP, `gh` PR commands | — |
+| `EXA_API_KEY` | `exa` MCP (optional) | — |
+| `SUPABASE_URL` + `SUPABASE_ANON_KEY` | `supabase` MCP (optional) | — |
+| `ECC_HOOK_PROFILE` | `.cursor/hooks/adapter.js` — pick event budget profile | `minimal` |
+| `ECC_DISABLED_HOOKS` | Comma list of hook files to skip (e.g. `before-shell-execution`) | — |
+| `ECC_DISABLED_MCPS` | Comma list of MCP servers to strip at session start | — |
+| `ANTHROPIC_BASE_URL` | Route Claude / `ccg` calls to a proxy / relay | Anthropic cloud |
+| `GRAPHIFY_GRAPH_PATH` | Override graph location for MCP / CI | `graphify-out/graph.json` |
+| `AGENTSHIELD_CONFIG` | Override AgentShield policy path | `.cursor/agentshield.json` |
 
 ## Penpax (waitlist)
 
