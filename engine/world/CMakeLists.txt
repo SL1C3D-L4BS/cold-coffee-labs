@@ -8,11 +8,11 @@ add_library(gw_world STATIC
     origin/floating_origin.cpp
     resources/resource_distributor.cpp
     universe/determinism_validator.cpp
-    planet/gptm_mesh_builder.cpp
-    planet/gptm_mesh_builder_upload.cpp
-    planet/gptm_layout_check.cpp
-    planet/gptm_lod_selector.cpp
-    planet/gptm_tile_renderer.cpp
+    gptm/gptm_mesh_builder.cpp
+    gptm/gptm_mesh_builder_upload.cpp
+    gptm/gptm_layout_check.cpp
+    gptm/gptm_lod_selector.cpp
+    gptm/gptm_tile_renderer.cpp
 )
 add_library(greywater::world ALIAS gw_world)
 

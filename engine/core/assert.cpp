@@ -12,5 +12,11 @@ namespace core {
     std::abort();
 }
 
+[[noreturn]] void unimplemented_fail(const char* tag, const char* file, int line, std::string_view message) {
+    std::cerr << "GW_UNIMPLEMENTED[" << tag << "] at " << file << ":" << line
+              << " message=" << message << "\n";
+    std::abort();
+}
+
 }  // namespace core
 }  // namespace gw

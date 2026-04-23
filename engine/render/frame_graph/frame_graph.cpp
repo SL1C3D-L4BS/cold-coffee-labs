@@ -1,5 +1,5 @@
 #include "frame_graph.hpp"
-#include "../hal/vulkan_device.hpp"
+#include "engine/core/assert.hpp"
 #include <algorithm>
 #include <expected>
 #include <functional>
@@ -107,7 +107,11 @@ Result<std::monostate> FrameGraph::compile() {
     }
     
     if (has_transient) {
-        // TODO: Get VMA allocator from render context
+        // P20-FRAMEGRAPH-ALIASING: Transient aliasing requires a VMA allocator
+        // plumbed from the render context. Until that lands, aborting is better
+        // than silently leaking GPU memory.
+        GW_UNIMPLEMENTED("P20-FRAMEGRAPH-ALIASING",
+                         "transient resource aliasing requires VMA allocator wiring");
         // aliasing_ = std::make_unique<TransientAliasing>(vma_allocator);
         // auto aliasing_result = aliasing_->compute_aliasing(resources_, execution_order_);
         // if (!aliasing_result) {

@@ -1,0 +1,10 @@
+id: wfc_rl_scorer
+adr: ADR-0095
+seed: 0xBEEFFEED
+dataset_manifest: null
+runtime_consumer: engine/world/wfc/wfc_scorer.hpp
+output_dir: assets/ai/wfc_rl_scorer/
+notes: >
+  RL-scored WFC tile-weight table per Circle profile. Runtime WFC remains
+  deterministic; this pipeline only produces the scoring table consumed
+  at cook time.

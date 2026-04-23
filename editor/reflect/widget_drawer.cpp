@@ -161,7 +161,7 @@ void WidgetDrawer::sort_and_freeze() {
 void WidgetDrawer::register_type(uint32_t type_id, DrawFn fn) {
     // Silently no-op after freeze — registration is editor startup-only and
     // any late caller is a programming error, but the editor must not take
-    // the sandbox `assert-on-error` path (see docs/12 §B2 — assertions are
+    // the sandbox `assert-on-error` path (see docs/03_PHILOSOPHY_AND_ENGINEERING.md §B2 — assertions are
     // sandbox-only). The misuse is visible via the developer console
     // (we log once) instead.
     if (frozen_) {

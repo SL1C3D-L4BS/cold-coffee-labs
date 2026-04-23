@@ -98,7 +98,7 @@ bool GameplayHost::restore_snapshot(gw::ecs::World& world) {
 bool GameplayHost::enter_play(GameplayContext& ctx) {
     // Guard: transition is only valid from Editor → Playing. Returns false
     // (recoverable) rather than asserting — editor code must not take the
-    // sandbox `assert-on-error` path (see docs/12 §B2: assertions are
+    // sandbox `assert-on-error` path (see docs/03_PHILOSOPHY_AND_ENGINEERING.md §B2: assertions are
     // sandbox-only). The UI disables Play while already in PIE, so reaching
     // this branch is a programming error the caller can handle.
     if (state_ != PIEState::Editor) return false;

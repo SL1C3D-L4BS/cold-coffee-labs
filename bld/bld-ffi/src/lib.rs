@@ -19,7 +19,7 @@
 //!   `editor/bld_api/editor_bld_api.cpp` is the implementation.
 //!
 //! Miri runs nightly on this crate to catch UB at the boundary.
-//! See docs/00 §2.5, docs/04 §3.3 / §3.7, ADR-0007, ADR-0011, ADR-0015,
+//! See docs/01_CONSTITUTION_AND_PROGRAM.md §2.5, docs/04_SYSTEMS_INVENTORY.md §3.3 / §3.7, ADR-0007, ADR-0011, ADR-0015,
 //! CLAUDE.md non-negotiable #15.
 
 #![deny(unsafe_op_in_unsafe_fn)]

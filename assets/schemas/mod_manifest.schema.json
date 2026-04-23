@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://greywater.coldcoffeelabs.dev/schemas/mod_manifest.schema.json",
+  "title": "Greywater Mod Manifest",
+  "description": "Manifest schema for mods loaded under Greywater's modding sandbox (ADR-0115b).",
+  "type": "object",
+  "required": ["mod_id", "display_name", "version", "api_level", "entry_points"],
+  "properties": {
+    "mod_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{2,63}$",
+      "description": "Lowercase snake-case mod identifier."
+    },
+    "display_name":       { "type": "string", "minLength": 1, "maxLength": 80 },
+    "description":        { "type": "string", "maxLength": 512 },
+    "author":             { "type": "string", "maxLength": 80 },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[A-Za-z0-9.-]+)?$"
+    },
+    "engine_min_version": { "type": "string" },
+    "engine_max_version": { "type": "string" },
+    "api_level":          { "type": "integer", "minimum": 1 },
+    "sandbox": {
+      "type": "object",
+      "properties": {
+        "filesystem_jail":   { "type": "string" },
+        "allow_network":     { "type": "boolean" },
+        "allow_steam_api":   { "type": "boolean" },
+        "bld_tool_surface":  {
+          "type": "string",
+          "enum": ["none", "read_only", "mutate_with_hitl"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "entry_points": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "path"],
+        "properties": {
+          "kind":       { "type": "string", "enum": ["dll", "wasm", "data_only"] },
+          "path":       { "type": "string" },
+          "linux_path": { "type": "string" }
+        }
+      },
+      "minItems": 1
+    },
+    "content": {
+      "type": "object",
+      "properties": {
+        "materials":  { "type": "array", "items": { "type": "string" } },
+        "encounters": { "type": "array", "items": { "type": "string" } },
+        "dialogue":   { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    "signing": {
+      "type": "object",
+      "properties": {
+        "required_in_release": { "type": "boolean" },
+        "ed25519_public_key":  { "type": ["string", "null"] },
+        "ed25519_signature":   { "type": ["string", "null"] }
+      }
+    }
+  },
+  "additionalProperties": false
+}

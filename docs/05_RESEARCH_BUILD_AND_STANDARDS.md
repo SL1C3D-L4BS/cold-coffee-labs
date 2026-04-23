@@ -164,6 +164,7 @@ Callers gate on the booleans. No runtime `if (mesh_shaders) ...` strewn through 
 
 - **Authoring:** HLSL primary (Microsoft's shading language, now open, with excellent tooling and SPIR-V emission through DXC). GLSL supported for ports and for legacy samples.
 - **Compiler:** **DXC** (DirectX Shader Compiler) emits SPIR-V. Invoked from `tools/cook/` at content-cook time and from the editor for hot-reload.
+  - **PATH expectation:** `dxc` must be resolvable as a bare executable (`which dxc` / `where dxc`). It ships with the LunarG Vulkan SDK under `<VULKAN_SDK>/Bin` (Linux) and `%VULKAN_SDK%\Bin` (Windows); installing the SDK per `docs/05 §Build toolchain` puts it on `PATH`. CI asserts this via the `Verify DXC on PATH` step in `.github/workflows/ci.yml`; a missing or mis-versioned `dxc` fails the build before any shader is cooked.
 - **Permutations:** generated at cook time from feature-flag matrices declared per material. No runtime shader compilation in shipped builds.
 - **Include paths:** `shaders/common/` for shared, `shaders/<subsystem>/` for specific.
 - **Reflection:** `spirv-cross` or `spirv-reflect` for shader introspection at cook time.
@@ -290,7 +291,7 @@ Beyond the general renderer patterns, Greywater uses Vulkan for game-specific wo
 
 ---
 
-# 04_LANGUAGE_RESEARCH_GUIDE — Greywater_Engine
+## Language Research Guide (merged from former `04_LANGUAGE_RESEARCH_GUIDE.md`)
 
 **Status:** Reference
 **Scope:** The C++23 discipline used across the engine **and** the Rust patterns used inside BLD. Greywater is a dual-language codebase with a narrow FFI seam — the disciplines differ and both must be understood.
@@ -623,7 +624,7 @@ Greywater does not maintain an external curriculum of C++ or Rust books here. En
 
 ---
 
-# BUILDING — Greywater_Engine
+## Building Greywater Engine (merged from former `BUILDING.md`)
 
 **Audience:** anyone who has just cloned the repo and wants a working build.
 **Status:** Operational · Phase 1 minimum. Phase 2+ adds per-subsystem detail.
@@ -642,7 +643,7 @@ Greywater does not maintain an external curriculum of C++ or Rust books here. En
 | Vulkan SDK | **1.4.341.1** (CI-pinned; engine targets 1.2 core + opportunistic 1.3) | https://vulkan.lunarg.com/sdk/home |
 | Git | any | |
 
-On Windows we use **clang-cl** (LLVM's MSVC-compatible driver). MSVC and GCC are not supported (`docs/00` §2.2).
+On Windows we use **clang-cl** (LLVM's MSVC-compatible driver). MSVC and GCC are not supported (`docs/01_CONSTITUTION_AND_PROGRAM.md` §2.2).
 
 Optional: `sccache` — pass `-DGW_USE_SCCACHE=ON` at configure time to wire it as the compiler launcher.
 
@@ -738,7 +739,7 @@ Everything beyond the Phase 1 smoke. Run `git log` for landed work. The phase-ga
 
 ---
 
-# CODING_STANDARDS — Greywater
+## Coding Standards (merged from former `CODING_STANDARDS.md`)
 
 **Status:** Operational
 **Derived from:** `docs/01_CONSTITUTION_AND_PROGRAM.md` §3 + `docs/05_RESEARCH_BUILD_AND_STANDARDS.md` + `docs/03_PHILOSOPHY_AND_ENGINEERING.md`
@@ -873,8 +874,70 @@ Full specification: `docs/06_ARCHITECTURE.md` Chapter 13, `docs/06_ARCHITECTURE.
 | `clang-tidy` | `.clang-tidy` | CI (Phase 2+ once it's wired into the per-TU build) |
 | `rustfmt` | `rustfmt.toml` | `cargo fmt --check` in CI |
 | `clippy` | — | `cargo clippy -- -D warnings` in CI |
+| `tools/lint/check_git_pins.py` | — | CI gate for Rust git SHA pins (ADR-0091) |
+| `tools/lint/check_cpm_sha_pins.py` | — | CI gate for CPM C++ deps (ADR-0110) — rejects branch-floating `GIT_TAG` values |
+| `tools/lint/check_single_shader_root.py` | — | CI gate — shaders live under `shaders/` only, not duplicated under `engine/render/` |
+| `tools/lint/check_shader_registration.py` | — | CI gate for shader permutation declarations + Slang/DXC parity |
+| `tools/lint/check_no_exceptions.py` | — | CI gate for exception use (ADR-0086 burn-down) |
+| `tools/lint/check_no_iostream.py` | — | CI gate for `<iostream>` in shipped code paths |
+| `tools/lint/check_no_raw_threads.py` | — | CI gate for `std::thread` / `std::async` outside `engine/jobs/` |
 
 Non-conforming PRs are blocked on CI. See `12` §J for the exhaustive review rubric.
+
+---
+
+## 13. Runtime AI research — libraries under evaluation (Phase 26)
+
+The `01` §2.2.2 carve-out permits on-device ML inference. The following libraries are under evaluation for the `engine/ai_runtime/` inference runtime; ADR-0095 ratchets the choice to **ggml / llama.cpp C++ headers** for *Sacrilege* v1. Research notes live here for future revisits.
+
+| Library | Status | CPU determinism | GPU determinism | Notes |
+|---------|--------|-----------------|-----------------|-------|
+| **ggml / llama.cpp C++** | **selected (ADR-0095)** | Deterministic by default | Vulkan backend is non-deterministic as of Apr 2026 (llama.cpp PR #16016); CUDA determinism is opt-in and costs throughput. We ship CPU for any rollback-participating model. | Primary. |
+| **ONNX Runtime C++** | evaluated, rejected for v1 | Deterministic under `RunOptions::enable_deterministic_compute` | Deterministic EPs only | Heavier binary; ggml wins on ceremony-per-bit. Revisit if we need ONNX-authored model zoo. |
+| **TensorFlow Lite C++** | rejected | Partial | No | Poor determinism guarantees; designed for mobile non-gaming workloads. |
+| **PyTorch Mobile / ExecuTorch** | rejected | N/A | N/A | Python-first; C++ surface is narrow. Against `01` §2.2.1 spirit. |
+| **MLC-LLM** | out of scope | N/A | N/A | LLM-specific; we don't ship on-device LLMs per `01` §2.2.2 rule 4. |
+
+**Constraint reminder:** anything that reaches into the network, loads weights over HTTP, or depends on Python at runtime is rejected outright.
+
+---
+
+## 14. Deterministic ML coding standard (§2.2.2 enforcement)
+
+Every runtime ML system in `engine/ai_runtime/` **must** satisfy the following rules. These are enforced by code review and perf / determinism CI gates.
+
+1. **Fixed graph topology.** No `if`-branches on input tensor values that alter the shape or quantization path. Control flow that changes the graph is disallowed; precompute and branch in C++ around the model instead.
+2. **Fixed precision.** All tensors are `f32` or `i8` per the model card. No mixed-precision accumulation that could flip rounding on different hardware. Use ggml's deterministic-friendly ops (see ggml-cpu op list).
+3. **Seeded RNG.** Any sampling step reads from the shared per-frame seed channel (`gw::world::SeedManager`) — never `std::random_device`, never `time()`, never a private PRNG.
+4. **Rollback safety.** Models whose output feeds authoritative state (e.g. Director `next_spawn`) must be **pure functions of (state, seed)**; no hidden recurrent state across rollback boundaries. Recurrent models must snapshot + restore their hidden state through the persistence layer.
+5. **Presentation-only tagged.** Models whose output is purely visual/aural (symbolic music mix, material eval) carry a `GW_AI_PRESENTATION_ONLY` marker and are excluded from replay hash.
+6. **Weights as assets.** Use the model registry (`engine/ai_runtime/model_registry.hpp`) to load; never `fopen` a bare weight file. The registry verifies BLAKE3 + Ed25519 before handing the inference runtime a pointer.
+7. **Budget-annotated.** Every model has a `constexpr float budget_ms` declared in its header. A matching `gw_perf_gate_*` asserts the ceiling on RX 580.
+8. **Determinism test required.** Every model ships with a doctest that runs two parallel inferences with the same seed on the same weights and asserts byte-identical outputs.
+9. **No internet, no telemetry.** `engine/ai_runtime/` may not `#include` anything from `engine/net/` or `engine/telemetry/`. Enforced at CMake link time.
+10. **HITL for cook-time-adjacent flows.** Cook-time training output (weights) can only be promoted to `assets/ai/` after an HITL approval through `bld-governance`.
+
+### Example: director_policy.hpp budget annotation
+
+```cpp
+// engine/ai_runtime/director_policy.hpp
+#pragma once
+#include "engine/ai_runtime/inference_runtime.hpp"
+
+namespace gw::ai_runtime {
+
+constexpr float DIRECTOR_BUDGET_MS = 0.1f;  // RX 580 Tier A (ADR-0097)
+static_assert(DIRECTOR_BUDGET_MS <= 0.74f);
+
+struct DirectorPolicyInput  { /* ECS snapshot: player state, arena metrics */ };
+struct DirectorPolicyOutput { /* spawn table, item drops, intensity level  */ };
+
+// Pure function of (state, seed). Rollback-safe.
+DirectorPolicyOutput evaluate_director(const DirectorPolicyInput& in,
+                                       u64 seed) noexcept;
+
+}  // namespace gw::ai_runtime
+```
 
 ---
 
@@ -893,7 +956,7 @@ mkdir -p engine/{platform,memory,core/{command,events,config},math,jobs,ecs,rend
 ---
 
 ```cpp
-// snippets/ecs_system_example.cpp — Greywater_Engine
+// snippets/ecs_system_example.cpp — Greywater Engine
 //
 // The canonical ECS system shape. Systems are plain functions with declared
 // read/write component sets; the scheduler runs non-conflicting systems in
@@ -953,7 +1016,7 @@ inline void register_gameplay_systems(ecs::World& world)
 ---
 
 ```rust
-// snippets/bld_tool_example.rs — Greywater_Engine · BLD crate
+// snippets/bld_tool_example.rs — Greywater Engine · BLD crate
 //
 // The canonical BLD tool shape. `#[bld_tool]` generates the MCP schema,
 // JSON decoder, dispatch handler, and registry entry at compile time —

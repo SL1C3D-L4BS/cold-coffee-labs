@@ -1,0 +1,12 @@
+id: music_symbolic_train
+adr: ADR-0098
+seed: 0xA11EC0DE
+dataset_manifest: null
+runtime_consumer: engine/ai_runtime/music_symbolic.hpp
+output_dir: assets/ai/music_symbolic/
+params_budget: 1_000_000
+budget_ms_rx580: 0.20
+notes: >
+  Tiny RoPE symbolic transformer (≤ 1M params). Trained on offline-composed
+  stems + combat intensity traces. Output is a pinned weight blob consumed
+  by the runtime on ggml CPU (ADR-0098, docs/09 §"Phase 26 perf budgets").

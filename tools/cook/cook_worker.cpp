@@ -51,7 +51,7 @@ CookStats CookWorker::execute(CookGraph&                            graph,
     std::mutex manifest_mutex;
 
     // Fork N reserved workers; NN #10 routes all raw std::thread ownership
-    // through engine/jobs/. See docs/AUDIT_MAP_2026-04-20.md (P2-2).
+    // through engine/jobs/. See audit-2026-04-20 (P2-2).
     const uint32_t n_threads = std::min(cfg_.thread_count, total);
     std::vector<gw::jobs::ReservedWorker> threads;
     threads.reserve(n_threads);

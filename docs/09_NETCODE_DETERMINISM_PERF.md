@@ -31,6 +31,32 @@ ECS replication, interest management, and snapshot encoding are specified in **`
 
 *Sacrilege* prioritizes **responsive combat** (rollback-style prediction where enabled) and **deterministic** Blacklake sampling for seeds and arenas. Gameplay code lives in `gameplay_module`; engine provides facades and transport — see **`docs/01_CONSTITUTION_AND_PROGRAM.md`** §7.
 
+## Runtime AI determinism contract (`docs/01` §2.2.2, Phase 26)
+
+Runtime ML inference under the `engine/ai_runtime/` carve-out obeys the same purity rules as every other rollback-visible system, with three additions specific to ML:
+
+1. **Authoritative-state models are CPU-only.** Any model whose output mutates replicated ECS state (Director spawn tables, encounter intensity, enemy DNA selection) runs on ggml's CPU backend. Vulkan backends are not yet bit-deterministic across drivers (llama.cpp Apr 2026 state) and are therefore forbidden for authoritative paths.
+2. **Presentation-only models are explicitly tagged and hash-excluded.** Symbolic music mixing and neural material evaluation carry a `GW_AI_PRESENTATION_ONLY` marker; their outputs are excluded from the replay hash and the golden-hash determinism gate.
+3. **Pinned weights are part of the content SHA.** The model registry (`engine/ai_runtime/model_registry.hpp`) verifies BLAKE3 + Ed25519 on every weight file at load. A weight-file change is a `GoldenHashes` bump exactly like any asset-format change.
+
+See `docs/05` §14 for the full deterministic-ML coding standard (10 rules, all enforced by CI or review).
+
+## Phase 26 perf budgets — Runtime AI stack
+
+**Reference hardware:** RX 580 8 GB (Tier A ceiling). Aggregate ceiling for `engine/ai_runtime/` is **0.74 ms/frame** — the existing frame-budget headroom row from `docs/07` §16. No net budget is added; the runtime AI stack consumes the previously unallocated headroom and must stay within it.
+
+| Gate target | Budget | Enforced by |
+|-------------|--------|-------------|
+| `gw_perf_gate_ai_director` | ≤ 0.10 ms/frame (policy eval) | CI PR gate |
+| `gw_perf_gate_ai_music` | ≤ 0.20 ms/frame (stem-mix decision) | CI PR gate |
+| `gw_perf_gate_ai_material` | ≤ 0.40 ms/frame (neural material eval) | CI PR gate |
+| `gw_perf_gate_ai_registry` | ≤ 0.04 ms/frame (registry + overhead) | CI PR gate |
+| **Aggregate gate** `gw_perf_gate_ai_runtime_total` | ≤ 0.74 ms/frame on RX 580 at 1080p | CI PR gate — blocks merge |
+
+A violation of the aggregate gate is never fixed by stealing from another subsystem; it is fixed by model quantization, prune, or kill.
+
+**Standalone AI Director Sandbox** (`apps/sandbox_director`) runs its own perf gate `gw_perf_gate_director` in headless mode — the same 0.10 ms ceiling applied to batches of scenario evaluations, proving the policy would ship at gameplay speed before it ever reaches the runtime.
+
 ---
 
 *Pure in the rewind window. Deterministic in the lockstep path.*
@@ -39,7 +65,7 @@ ECS replication, interest management, and snapshot encoding are specified in **`
 
 ---
 
-# Phase 12 — Performance budgets
+## Phase 12 — Performance budgets
 
 **Status:** operational · gate-enforced via `gw_perf_gate` + per-suite asserts
 **Reference hardware:** CI box (Ryzen-class 8C/16T, 32 GB DDR4, RX 580 8 GB)
@@ -105,7 +131,7 @@ Any row may be raised by up to 10% in a single ADR note; larger raises require a
 
 ---
 
-# Phase 13 — Performance gates
+## Phase 13 — Performance gates
 
 **Status:** Operational (CI-enforced)
 **Owner:** Simulation Lead
@@ -152,7 +178,7 @@ Any pin bump (Ozz / ACL / Recast) reruns **all 16 gates** as part of the PR. Tab
 
 ---
 
-# Phase 14 — Performance gates
+## Phase 14 — Performance gates
 
 **Status:** Operational (CI-enforced)
 **Owner:** Networking Lead
@@ -210,7 +236,7 @@ Any pin bump (GNS / Opus / Steam Audio) reruns **all 19 gates** as part of the P
 
 ---
 
-# Phase 15 performance budgets
+## Phase 15 performance budgets
 
 CI enforcement target: label `phase15` (see ADR-0064). Measurements use `gw_perf_gate` / wall-clock micro-benchmarks on RX-580-class dev PCs.
 
@@ -240,7 +266,7 @@ CI enforcement target: label `phase15` (see ADR-0064). Measurements use `gw_perf
 
 ---
 
-# Phase 16 — perf budgets
+## Phase 16 — perf budgets
 
 Enforced by `tests/perf/phase16_perf_gate.cpp` (CTest label `phase16;perf`).
 
@@ -265,7 +291,7 @@ apply a 4× slack to stay green on sanitizer presets.
 
 ---
 
-# Phase 17 performance budgets — Studio Renderer
+## Phase 17 performance budgets — Studio Renderer
 
 Source of truth: **ADR-0081**.
 
@@ -317,7 +343,7 @@ True GPU timings come from the nightly `studio-*` matrix.
 
 ---
 
-# Phase 12 — Replay protocol
+## Phase 12 — Replay protocol
 
 **Status:** operational
 **Binding on:** engine/physics, runtime, CI
@@ -442,7 +468,7 @@ build/dev-win/bin/sandbox_physics.exe --replay=out.gwreplay --enforce-hash
 
 ---
 
-# Phase 13 — `.gwreplay` extension for animation + BT + navmesh
+## Phase 13 — `.gwreplay` extension for animation + BT + navmesh
 
 **Status:** Operational
 **Companion:** ADR-0037, ADR-0045
@@ -553,7 +579,7 @@ Both commands ship in Phase-13 Wave 13F.
 
 ---
 
-# Accessibility Self-Check — Phase 10
+## Accessibility Self-Check — Phase 10
 
 **Status:** open — signed off at Phase-10 exit gate
 **Owner:** Cold Coffee Labs engine group
@@ -614,7 +640,7 @@ Signed — _(founder signature at Phase-10 close)_
 
 ---
 
-# Accessibility Self-Check — Phase 11
+## Accessibility Self-Check — Phase 11
 
 **Status:** open — signed off at Phase-11 exit gate
 **Owner:** Cold Coffee Labs engine group
@@ -688,7 +714,7 @@ Signed — _(founder signature at Phase-11 close)_
 
 ---
 
-# Accessibility Self-Check — Phase 12
+## Accessibility Self-Check — Phase 12
 
 **Status:** open — signed off at Phase-12 exit gate
 **Owner:** Cold Coffee Labs engine group
@@ -750,7 +776,7 @@ Signed — _(founder signature at Phase-12 close)_
 
 ---
 
-# docs/a11y_phase13_selfcheck.md — Phase 13 accessibility self-check
+## docs/a11y_phase13_selfcheck.md — Phase 13 accessibility self-check
 
 **Status:** Operational
 **Scope:** Debug draw, editor BT/anim graph authoring, sandbox_living_scene HUD.
@@ -796,7 +822,7 @@ Checklist reviewed at start of each Phase-13 wave (13A..13F) and at the end of P
 
 ---
 
-# docs/a11y_phase14_selfcheck.md — Phase 14 accessibility self-check
+## docs/a11y_phase14_selfcheck.md — Phase 14 accessibility self-check
 
 **Status:** Operational
 **Scope:** Voice chat, session discovery UI, net debug overlays, `sandbox_netplay` HUD.
@@ -856,7 +882,7 @@ Checklist reviewed at start of each Phase-14 wave (14A..14L) and at the end of P
 
 ---
 
-# Phase 15 accessibility self-check — privacy & persistence UI
+## Phase 15 accessibility self-check — privacy & persistence UI
 
 Use before merging RmlUi changes under `ui/privacy/`.
 
@@ -873,7 +899,7 @@ Use before merging RmlUi changes under `ui/privacy/`.
 
 ---
 
-# Phase 16 — WCAG 2.2 AA self-check
+## Phase 16 — WCAG 2.2 AA self-check
 
 Exit-gate checklist consumed by `apps/sandbox_platform_services`
 (prints `a11y_selfcheck=green` when every AA box below is Pass).

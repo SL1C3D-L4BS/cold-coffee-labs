@@ -194,10 +194,21 @@ set_target_properties(gw_tests PROPERTIES
 add_dependencies(gw_tests example_mod)
 
 # doctest CMake integration auto-registers each TEST_CASE with CTest.
+#
+# P3.9 (audit 2026-04-20): gw_tests is a monolith that spans every phase
+# subsystem. Rather than forcing a splintering rewrite, we attach a rich
+# LABELS list so `ctest -L <subsystem>` runs the whole monolith binary (still
+# <1s per TEST_CASE via doctest filter under the hood), and developers who
+# want per-test-case selection use `ctest -R <regex>` (doctest's TEST_CASE
+# names are preserved as CTest test names).
+#
+# Future split plan — see audit-2026-04-20 P3.9 burn-down: introduce
+# gw_tests_<phase> executables as we retire Phase-scope code, starting with
+# `gw_tests_physics` and `gw_tests_net` (already natural boundaries).
 include("${doctest_SOURCE_DIR}/scripts/cmake/doctest.cmake")
 doctest_discover_tests(gw_tests
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
-    PROPERTIES LABELS smoke;assets
+    PROPERTIES LABELS "smoke;assets;core;math;memory;ecs;scene;vscript;audio;input;events;config;console;ui;physics;anim;gameai;net;persist;telemetry;platform_services;i18n;a11y;render;vfx;runtime;mod"
 )
 
 # Phase 18-A — `.gwseq` codec + sequencer unit tests.
@@ -243,3 +254,6 @@ doctest_discover_tests(universe_tests
 
 # Week 032 — Foundation Renderer milestone perf gate.
 add_subdirectory(perf)
+
+# Part C §25 — LibFuzzer harnesses (ADR-0117). Conditional on GW_FUZZ=ON.
+add_subdirectory(fuzz)

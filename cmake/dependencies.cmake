@@ -61,8 +61,9 @@ CPMAddPackage(
 )
 
 # --- Vulkan headers / loader (system-provided via VULKAN_SDK) -----------------
-# docs/01_CONSTITUTION_AND_PROGRAM.md §2.2: Vulkan 1.2 baseline; 1.3 features opportunistic.
-find_package(Vulkan 1.2 REQUIRED)
+# docs/01_CONSTITUTION_AND_PROGRAM.md §2.1: Vulkan 1.3 baseline (ADR-0111).
+# Mesh shaders / ray tracing / work graphs stay Tier G (opt-in, feature-gated).
+find_package(Vulkan 1.3 REQUIRED)
 
 # --- Phase 6 — Asset Pipeline & Content Cook ---------------------------------
 
@@ -95,7 +96,8 @@ CPMAddPackage(
 CPMAddPackage(
     NAME mikktspace
     GITHUB_REPOSITORY mmikk/MikkTSpace
-    GIT_TAG master
+    # ADR-0110: pinned to the SHA captured by the 2026-04-22 green build.
+    GIT_TAG 3e895b49d05ea07e4c2133156cfa94369e19e409
     DOWNLOAD_ONLY YES
 )
 if(mikktspace_ADDED)
@@ -110,7 +112,8 @@ endif()
 CPMAddPackage(
     NAME stb
     GITHUB_REPOSITORY nothings/stb
-    GIT_TAG master
+    # ADR-0110: pinned to the SHA captured by the 2026-04-22 green build.
+    GIT_TAG 31c1ad37456438565541f4919958214b6e762fb4
     DOWNLOAD_ONLY YES
 )
 if(stb_ADDED)
@@ -219,7 +222,9 @@ CPMAddPackage(
 CPMAddPackage(
     NAME imgui
     GITHUB_REPOSITORY ocornut/imgui
-    GIT_TAG          docking  # Dear ImGui docking branch — DockSpace, multi-viewport
+    # ADR-0110: pinned to a docking-branch SHA (2026-04-22 green build).
+    # Bump via ADR — do not return to a floating branch ref.
+    GIT_TAG          6b61e60e221817a5084c4576cc5bc42919142c5e
     DOWNLOAD_ONLY    YES
 )
 
@@ -228,7 +233,8 @@ CPMAddPackage(
 CPMAddPackage(
     NAME ImGuizmo
     GITHUB_REPOSITORY CedricGuillemet/ImGuizmo
-    GIT_TAG          master
+    # ADR-0110: pinned (2026-04-22 green build, "LightRig Editor" commit).
+    GIT_TAG          a15acd87a3f3241a29ea1363ceafc680dca3a96b
     DOWNLOAD_ONLY    YES
 )
 
@@ -237,7 +243,8 @@ CPMAddPackage(
 CPMAddPackage(
     NAME imnodes
     GITHUB_REPOSITORY Nelarius/imnodes
-    GIT_TAG          master
+    # ADR-0110: pinned (2026-04-22 green build, imgui 1.92.0 migration commit).
+    GIT_TAG          b2ec254ce576ac3d42dfb7aef61deadbff8e7211
     DOWNLOAD_ONLY    YES
 )
 

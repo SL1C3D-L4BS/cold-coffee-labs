@@ -25,3 +25,9 @@ add_subdirectory(sandbox_studio)
 
 # Phase 19-C — Infinite Seed (Hell Seed Murmur3 / resource gate).
 add_subdirectory(sandbox_infinite_seed)
+
+# Phase 26 / Part B §12.7 — Standalone AI Director Sandbox (ADR-0107).
+add_subdirectory(sandbox_director)
+
+# Phase 22 / Part C §22 — Steam Deck Tier A smoke probe (ADR-0113).
+add_subdirectory(sandbox_deck_probe)

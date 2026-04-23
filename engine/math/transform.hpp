@@ -55,7 +55,11 @@ private:
     Vec3<T> scale_;
 };
 
-using Transform3f = Transform<float>;
+// World-space transforms MUST be `Transform3d` (f64) per
+// docs/01_CONSTITUTION_AND_PROGRAM.md §2.6 and CLAUDE.md NN #17.
+// `Transform<float>` is intentionally NOT aliased here: local-to-chunk math
+// and GPU-bound data should use explicit `Vec3f` / `glm::vec3` at the call
+// site so the precision demotion is visible in code review.
 using Transform3d = Transform<double>;
 
 }  // namespace math

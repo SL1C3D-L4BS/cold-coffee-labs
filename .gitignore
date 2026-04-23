@@ -49,6 +49,16 @@ compile_commands.json
 .DS_Store
 Thumbs.db
 
+# Machine-side diagnostics (audit-2026-04-20 P4.1): dxdiag dumps and the
+# accidental 0.txt land that leaked a machine GUID before. Never commit.
+0.txt
+DxDiag*.txt
+dxdiag*.txt
+
+# Repo-root `bin/` is a scratch directory for local smoke runs. CI/release
+# artifacts live under build/<preset>/bin/ and are already covered by /build/.
+/bin/
+
 # Phase 15 — local saves / telemetry / cloud (never commit).
 *.gwsave
 **/sentry-db/

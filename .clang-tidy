@@ -5,9 +5,15 @@
 # Disabled checks have an explicit reason:
 #   - readability-magic-numbers / cppcoreguidelines-avoid-magic-numbers:
 #     rendering / math code is dense with legitimate literals.
+#
+# Opt-ins outside the big prefix buckets:
+#   - google-readability-casting: enforces the "no C-style casts" policy from
+#     docs/03 §A1 (casts must be static_cast / reinterpret_cast / const_cast /
+#     bit_cast / dynamic_cast).  Enabled alone; the rest of google-* is style
+#     enforcement we do not share with upstream Google.  Audit-2026-04-20 P5.
 #   - modernize-use-trailing-return-type: house style is classic C++ return
-#     syntax unless necessary; see docs/00 §3.
-#   - llvm-header-guard: we use #pragma once per docs/00 §3.
+#     syntax unless necessary; see docs/01_CONSTITUTION_AND_PROGRAM.md §3.
+#   - llvm-header-guard: we use #pragma once per docs/01_CONSTITUTION_AND_PROGRAM.md §3.
 #   - fuchsia-*: unrelated coding-style enforcement.
 #   - altera-*: FPGA-specific.
 
@@ -17,6 +23,7 @@ Checks: >
   clang-analyzer-*,
   concurrency-*,
   cppcoreguidelines-*,
+  google-readability-casting,
   misc-*,
   modernize-*,
   performance-*,

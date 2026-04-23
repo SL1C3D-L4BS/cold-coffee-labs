@@ -1,4 +1,5 @@
 // Phase 19-C — *Infinite Seed* exit gate: Hell Seed, chunk lattice, resource determinism.
+#include "engine/jobs/reserved_worker.hpp"
 #include "engine/jobs/scheduler.hpp"
 #include "engine/memory/arena_allocator.hpp"
 #include "engine/world/resources/resource_distributor.hpp"
@@ -13,7 +14,6 @@
 #include <array>
 #include <cstdio>
 #include <set>
-#include <thread>
 #include <vector>
 
 using gw::jobs::Scheduler;
@@ -114,14 +114,15 @@ int main() {
         }
     }
 
-    // Two threads: two independent re-synth passes @ (0,0,0) must match
+    // Two threads: two independent re-synth passes @ (0,0,0) must match.
+    // NN #10 / ADR-0088: OS-thread ownership routes through engine/jobs.
     const ChunkCoord probe{0, 0, 0};
     std::uint64_t    a = 0;
     std::uint64_t    b = 0;
     {
-        std::thread t0([&] { a = hash_synthetic_chunk(world, probe.x, probe.y, probe.z); });
+        gw::jobs::ReservedWorker w0{[&] { a = hash_synthetic_chunk(world, probe.x, probe.y, probe.z); }};
         b = hash_synthetic_chunk(world, probe.x, probe.y, probe.z);
-        t0.join();
+        w0.join();
     }
     if (a != b) {
         return 4;

@@ -4,7 +4,6 @@ target_sources(greywater_core
     PRIVATE
         crypto/sha256.cpp
         crypto/sha3.cpp
-        crypto/tiny_sha3.c
         type_registry.cpp
         field_reflection.cpp
         serialization.cpp
@@ -20,7 +19,6 @@ target_sources(greywater_core
         FILES
             crypto/sha256.hpp
             crypto/sha3.hpp
-            crypto/tiny_sha3.h
             type_registry.hpp
             field_reflection.hpp
             serialization.hpp

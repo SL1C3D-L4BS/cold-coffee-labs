@@ -30,14 +30,21 @@ You descend through **Nine Inverted Circles of Hell**. Every circle is a differe
 
 ## Table of Contents
 
+**Part 0 — Cosmology & Cast (Story Bible entry point)**
+0.1 The Primordial Schism
+0.2 The Protagonist — Malakor / Father Niccolò
+0.3 The Factions — CORE, LEGION, UNWRITTEN
+0.4 The Locations — Rome, Vatican, Heaven, Hell, Silentium
+0.5 The Three Acts
+
 **Part I — The Game**
 1. Core Loop
-2. Martyrdom Engine — Sin, Mantra, Blasphemies, Rapture & Ruin
+2. Martyrdom Engine — Sin, Mantra, Blasphemies, Rapture & Ruin (+ God Mode, Grace Meter)
 3. Movement — Speed Demon Doctrine
 4. Arsenal — Profane and Sacred Weapons
 5. The Damned Host — Enemy Roster
-6. Nine Inverted Circles — Level Design
-7. The God Machine — Final Boss
+6. Nine Inverted Circles — Level Design (with Location Skins)
+7. The God Machine / Logos — Final Boss
 
 **Part II — Systems (C++23 Implementation)**
 8. ECS Architecture for Sacrilege
@@ -47,16 +54,75 @@ You descend through **Nine Inverted Circles of Hell**. Every circle is a differe
 12. Gore & Dismemberment System
 13. Diegetic HUD
 
-**Part III — Art Direction**
+**Part III — Art Direction & Narrative Reactivity**
 14. Visual Style — Crunchy Low-Poly Horror
 15. Sound Design — Metal & Mayhem
+15b. Narrative Reactivity — Sin-Signature, Voice Director, Grace Finale
 
 **Part IV — Performance & Technical Targets**
 16. Frame Budget
 17. Sacrilege-Specific Engine Extensions
 
 **Part V — Novel Contributions (Patent Posture)**
-18. Claims
+18. Claims (1–8)
+
+---
+
+## Part 0 — Cosmology & Cast
+
+> **Authority note.** The canonical narrative Bible lives in `docs/11_NARRATIVE_BIBLE.md`. This Part 0 is the shipping-relevant summary that the mechanics below assume. When lore and mechanics collide, `docs/11` wins on *lore*; this document (`docs/07`) wins on *mechanics and budgets*.
+
+### 0.1 The Primordial Schism
+
+Before creation there was **the Absolute** — pure undifferentiated unity. It fractured into three aspects:
+
+- **The One** — the God of mercy, justice, and stewardship. Authored Heaven. Retired in silence.
+- **The Other** — the adversary. Jealous shadow of the One. Authored Hell and the Factory that recycles damned souls into weapons.
+- **The Witness** — the neutral observer. Authored the *Silentium*, a mirror dimension, and walks between. Player encounters the Witness in Act III.
+
+The One's silence is the starting condition. Humanity prays to a God who does not answer. The Church (**CORE**) manufactures a false response for political control. The player's work is to cross the silence.
+
+### 0.2 The Protagonist — Malakor / Father Niccolò
+
+**Father Niccolò Bianchi** is a Vatican exorcist who commits the ritual forbidden by the One: he fuses his soul with **Malakor**, a fallen angel of the *Unwritten* (angels who defected from the One's silence). The fusion is the gameplay. The player is both.
+
+- **Malakor** is the combat voice. Aggressive, hungry, amoral. Speaks during Rapture, Blasphemy casts, kills, and *God Mode*.
+- **Niccolò** is the moral voice. Measured, regretful, devotional. Speaks during exploration, post-combat downtime, and the Grace finale.
+
+Voice selection is runtime, driven by the Sin-signature (§15b) and current combat state. Never both at once. The duality is diegetic — the player never sees Niccolò's face; they see their own hands, their own weapons, and hear the argument in their head.
+
+### 0.3 The Factions
+
+| Faction | Role | Play pattern |
+|---------|------|--------------|
+| **The CORE** (Church of the Recycled Eden) | Institutional antagonist; manufactures the false God response; staffed by fanatical clerics and cyber-cherubim | Sacred-weapon encounters; the most politically charged kills; Mantra-rich |
+| **The LEGION** | Hell's extraction infrastructure; recyclers of damned souls into weapons, monsters, and the Factory Floor itself | Profane-weapon encounters; Sin-rich; bodies are literally raw material |
+| **The UNWRITTEN** | Fallen angels who defected from the One's silence; Malakor's people; mostly allies (rare, silent NPCs you rescue, never fight) | Grace-eligible; harming one is a Grace penalty |
+
+### 0.4 The Locations
+
+Shipping locations skin the Nine Circles (§6) without changing their mechanical identity:
+
+| Location | Skin of | Notes |
+|----------|---------|-------|
+| **Rome (streets)** | Circle I — Limbo | Act I opening; tutorial vertical movement across collapsed basilicas |
+| **Vatican Necropolis** | Circle II — Lust | Layered catacombs; frozen shear |
+| **Colosseum of Echoes** | Circle VII — Violence | Gladiatorial pit for the Act II crescendo |
+| **Palazzo of the Unspoken** | Circle VI — Heresy | Non-Euclidean CORE administrative heart |
+| **Sewer of Grace** | Circle VIII — Fraud | False corridors; the Unwritten are hiding here |
+| **Heaven's Back Door** | Circle V — Wrath | The One's abandoned throne room |
+| **Hell's Factory Floor** | Circle IV — Greed | The LEGION's recycler |
+| **The Silentium** | Circle IX — Treachery (profile variant) | Mirror dimension; zero-gravity void; **not an open world** — a special procedural profile layered on Circle IX per `docs/01` §2.6 |
+
+The lore-to-mechanics mapping is therefore **total**: every Circle has a narrative skin, every skin has a deterministic profile, every profile is Blacklake-generated from the Hell Seed.
+
+### 0.5 The Three Acts
+
+| Act | Title | Structural beat | Gameplay focus |
+|-----|-------|-----------------|----------------|
+| **I** | *The Rite of Unspeaking* | Niccolò performs the forbidden fusion; the player learns Sin/Mantra/movement across Rome and the Vatican | Circles I–III; learn Blasphemies; first **God Mode** trigger at end |
+| **II** | *The Blasphemy Circuit* | The player carves through the CORE and into the LEGION; encounters the Witness | Circles IV–VII; full Blasphemy economy; Sin-signature begins driving dialogue divergence |
+| **III** | *The Unmaking* | The player confronts the Logos (silent God); chooses annihilation or the **Grace Meter** finale | Circles VIII–IX + Silentium; Logos fight (§7); `forgive` Blasphemy unlocks |
 
 ---
 
@@ -175,6 +241,54 @@ Systems:
 
 All systems are pure functions over component spans. Deterministic at fixed dt. Rollback-safe.
 
+#### 2.6 God Mode — the Blasphemy State (narrative skin over Rapture)
+
+**God Mode** is the narrative name the player and dialogue use for the state that the Martyrdom Engine already implements as *Rapture*. It is not a new mechanical state — the existing `RaptureState` component is the authority. God Mode layers the following **presentation and scripting hooks** on top:
+
+- **Malakor speaker lock.** While `RaptureState.active == true`, the narrative voice director (`engine/narrative/voice_director.hpp`) locks to Malakor regardless of Sin-signature. Niccolò cannot speak during God Mode.
+- **Reality-warp hooks (opt-in, Tier A).** The render frame graph reads a `GodModePresentation` component and applies a per-pass distortion (chromatic aberration pulse, colour grade shift, post stack intensity +1 tier). Pure visual — zero replay-hash impact.
+- **Grace Meter coupling.** Each Act I God Mode trigger increments a `GraceCost` counter. The player *can* reach the Grace finale without ever triggering God Mode (Max Sin category is precisely that run), but Grace unlock prices scale with God Mode count.
+- **Act I first-trigger scripting.** The first time Rapture auto-triggers in Act I, a deterministic dialogue hook fires (Niccolò crying, Malakor laughing). This is scripted per seed — not randomized — so speedrun splits reproduce.
+
+**Rule:** God Mode never changes the Rapture/Ruin 6s/12s ratio (§2.4). It never adds damage, speed, or invulnerability beyond what Rapture already provides. The narrative layer is a pure skin over the mechanical spine. See `docs/01` §0.1 for the governing principle.
+
+#### 2.7 Grace Meter — the forgiveness ending
+
+**Grace** is a third Martyrdom-adjacent resource introduced in Act III. It is a Blasphemy-payment currency that enables exactly one terminal Blasphemy: **`forgive`**.
+
+**Accrual rules (deterministic, ECS-resident):**
+
+| Source | Grace | Notes |
+|--------|-------|-------|
+| Choosing not to kill an Unwritten NPC | +15 | Per-encounter, deduplicated by entity id |
+| Completing a Circle without entering Rapture | +25 | Tracked by `RaptureTriggerCounter` |
+| Glory-killing only hostile (CORE/LEGION) targets for a full Circle | +10 | Sin-signature driven |
+| Parrying the Logos' first phase without damage | +50 | Act III §7 Phase 1 hook |
+| Using a Blasphemy to save an NPC life | +5 | Per-entity-id, one-shot |
+
+**Expenditure:**
+- `forgive` Blasphemy (Sin cost: 100, Grace cost: 100) is available **only** during the Logos fight Phase 4 window (see §7). It ends the game in the Grace path and triggers the Witness epilogue.
+- The player cannot spend Grace on anything else. It is not a combat resource.
+
+**ECS representation:**
+
+```cpp
+// gameplay/martyrdom/grace_meter.hpp
+struct GraceComponent {
+    float value = 0.f;
+    float max   = 100.f;
+};
+
+struct GraceTransactionEvent {
+    u32   actor_id;
+    float delta;
+    u16   source;    // enum: UnwrittenSaved, CircleNoRapture, ParryLogos, ...
+    u64   seed;      // per-transaction seed for determinism
+};
+```
+
+All Grace accrual is seed-stamped so replays reproduce identical Grace curves. The `forgive` Blasphemy is the only Blasphemy whose cost gate includes a Grace check.
+
 ---
 
 ### 3. Movement — Speed Demon Doctrine
@@ -254,17 +368,19 @@ Each Circle is a procedurally generated 3D arena generated by the Blacklake Fram
 
 **Design intent per Circle:**
 
-| Circle | Blacklake Profile | Environment | Signature Encounter | New Mechanic |
-|--------|------------------|-------------|---------------------|--------------|
-| **I — Limbo (Inverted)** | Vertical displacement, floating islands | Dark sky, platforms over void, perpetual twilight | Cherubim swarm introduction | Wall Kick, Slide |
-| **II — Lust (Frozen)** | Directional shear, ice formations | Ice caverns, slippery floors, low visibility | Deacon pack — parry training | Blood Surf |
-| **III — Gluttony (Gut)** | Sinuous organic forms, flesh geometry | Flesh tunnels, acid pools, pulsating walls | Leviathan introduction | Cathedral staking |
-| **IV — Greed (Forge)** | Rectilinear industrial, crushers | Foundry, molten metal hazards, conveyor geometry | Warden + Cherubim combo | Grapple Hook |
-| **V — Wrath (Battlefield)** | Cratered, disrupted terrain | Open trenches, raining projectiles, Martyr clusters | Martyr chain management | Dogma dual-wield |
-| **VI — Heresy (Library)** | Non-Euclidean angular displacement, impossible geometry | Shifting walls, impossible angles, mirror traps | Hell Knight + Painweaver combo | Parry |
-| **VII — Violence (Arena)** | Clean amphitheatre topology, tiered seating | Gladiatorial pit, spectator enemies, terrain traps | Full enemy roster encounter | Sacrilege Mode (naked run) |
-| **VIII — Fraud (Maze)** | High-frequency false floors, mirror geometry | False walls, mirror rooms, deceptive perspective | Abyssal fleet in maze | Heretic's Lament health-as-ammo |
-| **IX — Treachery (Abyss)** | Zero-gravity void debris field | Black void, frozen lake below, no atmosphere | Full gauntlet all enemy types | All mechanics final exam |
+| Circle | Location Skin | Blacklake Profile | Environment | Signature Encounter | New Mechanic |
+|--------|---------------|------------------|-------------|---------------------|--------------|
+| **I — Limbo (Inverted)** | Rome (streets) | Vertical displacement, floating islands | Collapsed basilicas over void, perpetual twilight | Cherubim swarm introduction | Wall Kick, Slide |
+| **II — Lust (Frozen)** | Vatican Necropolis | Directional shear, ice formations | Layered catacombs, slippery floors, low visibility | Deacon pack — parry training | Blood Surf |
+| **III — Gluttony (Gut)** | Sewer of Grace (entry) | Sinuous organic forms, flesh geometry | Flesh tunnels, acid pools, pulsating walls | Leviathan introduction | Cathedral staking |
+| **IV — Greed (Forge)** | Hell's Factory Floor | Rectilinear industrial, crushers | LEGION recycler foundry, molten metal, conveyor geometry | Warden + Cherubim combo | Grapple Hook |
+| **V — Wrath (Battlefield)** | Heaven's Back Door | Cratered, disrupted terrain | The One's abandoned throne room (shattered) | Martyr chain management | Dogma dual-wield |
+| **VI — Heresy (Library)** | Palazzo of the Unspoken | Non-Euclidean angular displacement, impossible geometry | CORE administrative heart; shifting walls, mirror traps | Hell Knight + Painweaver combo | Parry |
+| **VII — Violence (Arena)** | Colosseum of Echoes | Clean amphitheatre topology, tiered seating | Gladiatorial pit, spectator enemies, terrain traps | Full enemy roster encounter | Sacrilege Mode (naked run) |
+| **VIII — Fraud (Maze)** | Sewer of Grace (deep) | High-frequency false floors, mirror geometry | False walls, mirror rooms — Unwritten hide here | Abyssal fleet in maze | Heretic's Lament health-as-ammo |
+| **IX — Treachery (Abyss)** | The Silentium (mirror profile) | Zero-gravity void debris field | Black void, frozen lake below, no atmosphere | Full gauntlet all enemy types | All mechanics final exam |
+
+**Silentium note.** The Silentium is not an open world; it is a **special procedural profile** layered on Circle IX (Treachery), per `docs/01` §2.6. Same Blacklake pipeline, same Hell Seed, mirrored geometry + voided atmosphere + Witness encounters. The editor's `circle_editor` panel exposes the Silentium profile as a checkbox on Circle IX.
 
 **Procedural generation rules:**
 - Each Circle has a constexpr `CircleProfile` — SDR parameters, enemy density tables, resource density tables
@@ -274,7 +390,7 @@ Each Circle is a procedurally generated 3D arena generated by the Blacklake Fram
 
 ---
 
-### 7. The God Machine — Final Boss
+### 7. The God Machine / Logos — Final Boss
 
 A colossal clockwork angel, arena-filling, with four rotating faces. The final encounter tests mastery of every mechanic.
 
@@ -288,6 +404,19 @@ A colossal clockwork angel, arena-filling, with four rotating faces. The final e
 | **4 — Revelation** | All four faces | Full arena collapse; forced Rapture/Ruin cycling; final window | Manage Sin to enter Rapture at optimal moment; finish during Rapture window |
 
 **Design:** The God Machine is designed so that the Martyrdom Engine is not just useful — it is *required*. A player who reaches Phase 4 with no Blasphemy economy will die. The fight is a skill evaluation, not a DPS check.
+
+#### 7b. Logos Alternate Phase 4 — the Grace Path
+
+Phase 4 has **two entry conditions** that produce **two different endings**:
+
+| Entry condition | Phase-4 behaviour | Ending |
+|-----------------|-------------------|--------|
+| `GraceComponent.value < 100` on entering Phase 4 | As written above — Revelation, full arena collapse, forced Rapture/Ruin cycling, boss dies to damage | **Annihilation ending** — Malakor wins, Niccolò is silent, the One remains silent |
+| `GraceComponent.value == 100` on entering Phase 4 | Arena collapse halts; all minion spawns cease; the four faces become a single **Logos** face (silent, weeping); a 12-second window opens where `forgive` Blasphemy is spendable | **Grace ending** — player spends 100 Sin + 100 Grace to end the game; Witness epilogue unlocks |
+
+The Grace path is **not** easier. It requires the player to have played largely restraint-focused runs across Acts I–II to accumulate 100 Grace (§2.7 accrual table), while still having earned enough Sin to be at 100 at the Phase-4 window. The Max-Sin speedrun category explicitly forbids the Grace path; the Grace category explicitly requires it.
+
+**Implementation note:** Phase 4 entry is data-driven by `gameplay/boss/logos/phase4_selector.cpp`, which reads `GraceComponent` from the player ECS entity. The boss behaviour tree has two root branches; the selector picks one deterministically at Phase-4 entry and commits. No rollback across the selection.
 
 ---
 
@@ -476,6 +605,55 @@ No minimap. No objective markers. No floating damage numbers. No kill feed. The 
 - The Apostate (player character) delivers impact one-liners on kill chains ("Repent." / "Too slow." / "Your god isn't listening.")
 - Environmental audio responds to Circle — flesh tunnels squelch, ice caverns echo, forge pounds
 
+Music layer mixing and BPM-sync layer selection are driven by the **symbolic adaptive music** transformer in `engine/ai_runtime/music_symbolic.hpp` — a ≤ 1M-parameter RoPE model running on ggml CPU with a 0.2 ms budget per frame. Stems are authored offline and pinned; the model selects which stem weights rise and fall frame-to-frame based on combat intensity. See `docs/06` §3.32.
+
+---
+
+### 15b. Narrative Reactivity — Sin-Signature, Voice Director, Grace Finale
+
+Narrative reactivity is not dialogue randomization. It is a **deterministic function** of player play-style over a bounded recent window. The authoritative module is `engine/narrative/`.
+
+#### 15b.1 Sin-Signature (rolling fingerprint)
+
+A five-channel ECS component updated every gameplay tick:
+
+| Channel | Bounds | Driven by |
+|---------|--------|-----------|
+| `god_mode_uptime_ratio` | `[0.0, 1.0]` | Rapture time ÷ Circle time |
+| `precision_ratio` | `[0.0, 1.0]` | Headshot / parry kills ÷ total kills |
+| `cruelty_ratio` | `[0.0, 1.0]` | Glory kills + dismemberment chain bonuses ÷ total kills |
+| `hitless_streak` | `u16` kill count | Kills since last damage taken |
+| `deaths_per_area_avg` | `[0.0, 10.0]` | Rolling avg over last 3 Circles |
+
+The Sin-signature is part of the replicated ECS snapshot and is rollback-safe. It is the **input channel** to the voice director, the AI Director spawn table selector, and the Grace-unlock priority queue.
+
+#### 15b.2 Voice Director
+
+`engine/narrative/voice_director.hpp` picks Malakor vs Niccolò per line given:
+
+1. Current combat state (`RaptureState.active`, `RuinState.active`, `CombatInCombat` flag).
+2. Sin-signature snapshot.
+3. Dialogue-graph line pool for the current Act + Circle + encounter.
+
+**Rules (authoritative):**
+
+- During God Mode (§2.6): Malakor-only.
+- During Ruin: Niccolò-only (remorse lines).
+- Otherwise: weighted roll from line pool biased by Sin-signature (high `cruelty_ratio` → Malakor-heavy; high `precision_ratio` with low `cruelty_ratio` → Niccolò-heavy).
+- Weighted roll is seeded — same play-style produces same lines on replay.
+
+Lines are authored in the editor's `dialogue_graph` panel and cooked to `.gwdlg`. The BLD `voice-line-generate` tool can *draft* lines offline; all production lines are HITL-approved through `bld-governance`.
+
+#### 15b.3 Grace Finale Reactivity
+
+The Logos Phase-4 selector (§7b) reads `GraceComponent.value`. The Witness epilogue cutscene's line choice reads Sin-signature at game-end time:
+
+- High cruelty / low precision → Witness narrates "you forgave because you were tired, not because you were merciful."
+- High precision / low cruelty → Witness narrates "you forgave because you understood the silence."
+- Balanced → Witness narrates "you forgave. The word is enough."
+
+These are three deterministic branches; no runtime LLM; all assets pinned.
+
 ---
 
 ## Part IV — Performance & Technical Targets
@@ -519,6 +697,12 @@ Max active entities per Circle: 512 enemies + 128 projectiles + 64 limb entities
 **Claim 4 — The Martyrdom Engine.** A dual-resource risk/reward system: Sin accrual via Profane weapon use; Mantra accrual via Sacred weapon skill; expenditure of Sin for temporary powers (Blasphemies); automatic triggering of an involuntary enhanced-power state (Rapture) followed by a mandatory vulnerability state (Ruin) upon Sin reaching maximum — with no player opt-out.
 
 **Claim 5 — Persistent Gameplay-Affecting Dismemberment.** Severed limbs persist as physics entities with navigation obstacle classification; limbs affect enemy pathfinding and can be used by the player as thrown weapons.
+
+**Claim 6 — Grace Meter Finale Gate.** A dual-counter system in which accumulation of a *restraint*-based currency (Grace) across the run **gates a non-combat ending branch** on the final boss, where the terminal ability is spending both the violence currency (Sin) and the restraint currency (Grace) simultaneously. The restraint currency is accumulated by deliberately *not* exercising the game's power mechanics (no-Rapture-Circle bonus, Unwritten-spared bonus), such that the ending requires *both* mastery and restraint — neither alone suffices.
+
+**Claim 7 — Sin-Signature Narrative Reactivity.** A deterministic five-channel play-style fingerprint (God-Mode uptime, precision, cruelty, hitless streak, deaths per area) replicated through the ECS snapshot, used as a **seeded input** to a voice-director runtime that selects between two in-head speaker voices (combat persona vs. moral persona) without any runtime text generation. Same seed + same play pattern → same dialogue line on replay. Rollback-safe; replay-stable; speedrun-comparable.
+
+**Claim 8 — Bounded Deterministic Runtime AI in a Rollback-Networked First-Person Shooter.** A runtime inference architecture (`engine/ai_runtime/`) in which (a) authoritative-state models are pure functions of `(ECS state, per-frame seed)` with fixed topology and fixed precision, (b) presentation-only models are explicitly tagged and excluded from the replay hash, and (c) all model weights are content-addressed and signature-verified at load. The combination permits on-device neural systems (hybrid AI Director, symbolic adaptive music, neural material evaluator) inside a lockstep rollback net architecture without breaking determinism.
 
 ---
 

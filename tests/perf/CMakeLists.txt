@@ -80,3 +80,25 @@ set_tests_properties(phase17_budgets_perf PROPERTIES
     TIMEOUT    60
     RUN_SERIAL TRUE
 )
+
+# Part C §25 — Runtime AI perf gate (ADR-0117).
+# AI Director + symbolic music + neural-material budgets.
+add_executable(gw_perf_gate_director
+    director_budgets_perf_test.cpp
+)
+target_link_libraries(gw_perf_gate_director
+    PRIVATE
+        greywater::core
+)
+set_target_properties(gw_perf_gate_director PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
+add_test(NAME director_budgets_perf
+    COMMAND gw_perf_gate_director
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+)
+set_tests_properties(director_budgets_perf PROPERTIES
+    LABELS     "ai;perf"
+    TIMEOUT    60
+    RUN_SERIAL TRUE
+)

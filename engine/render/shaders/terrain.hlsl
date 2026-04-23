@@ -1,6 +1,6 @@
 // engine/render/shaders/terrain.hlsl — GPTM terrain shared declarations (included by shaders/world/terrain.*.hlsl).
 //
-// Vertex layout must match `gw::world::planet::GptmVertex` (32-byte interleaved). Until the Vulkan
+// Vertex layout must match `gw::world::gptm::GptmVertex` (32-byte interleaved). Until the Vulkan
 // vertex input state is generated from reflection, the entry-point shaders use a layout-equivalent
 // field pack: float3 + uint2 oct + float2 uv + uint biome + uint pad.
 

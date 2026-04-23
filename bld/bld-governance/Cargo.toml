@@ -21,4 +21,4 @@ ulid = { workspace = true }
 [dev-dependencies]
 tempfile = "3"
 
-# No unwrap / expect allowed in this crate (docs/00 §3 Rust style, ADR-0015).
+# No unwrap / expect allowed in this crate (docs/01_CONSTITUTION_AND_PROGRAM.md §3 Rust style, ADR-0015).

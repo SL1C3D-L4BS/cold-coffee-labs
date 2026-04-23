@@ -1,7 +1,7 @@
 # editor/CMakeLists.txt — Phase 7: Editor Foundation
 # Spec ref: docs/05 Phase 7 (weeks 037-042), Phase 7 full specification §16.
 
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.28)
 
 # ---------------------------------------------------------------------------
 # gw_imgui — Dear ImGui static lib with docking + Vulkan + GLFW backends.
@@ -104,6 +104,43 @@ add_executable(gw_editor
     seq/seq_gwseq_rebuild.cpp
     seq_panel/seq_panel.cpp
     undo/command_stack.cpp
+
+    # Part B §12.1 — Theme registry (ADR-0104).
+    theme/theme_registry.cpp
+    theme/distressed_draw.cpp
+    theme/corruption_pulse.cpp
+    theme/default_layout.cpp
+    # Part B §12.2 — Declarative module system (ADR-0105).
+    modules/module_manifest.cpp
+    modules/modules_builtin.cpp
+    # Part B §12.3 — Corrupted Relic custom widgets.
+    widgets/spline_editor.cpp
+    widgets/distressed_widgets.cpp
+    # Part B §12.4 — Sacrilege-specific panels (Phases 21–28).
+    panels/sacrilege/circle_editor_panel.cpp
+    panels/sacrilege/encounter_editor_panel.cpp
+    panels/sacrilege/dialogue_graph_panel.cpp
+    panels/sacrilege/sin_signature_panel.cpp
+    panels/sacrilege/act_state_panel.cpp
+    panels/sacrilege/ai_director_sandbox_panel.cpp
+    panels/sacrilege/material_forge_panel.cpp
+    panels/sacrilege/pcg_node_graph_panel.cpp
+    panels/sacrilege/shader_forge_panel.cpp
+    panels/sacrilege/editor_copilot_panel.cpp
+    # Part B §12.5 — PIE upgrades (ADR-0106).
+    pie/pie_debug_hud.cpp
+    pie/rollback_inspector.cpp
+    pie/pie_perf_guard.cpp
+    # Part B §14 — Editor a11y toggles (ADR-0108).
+    a11y/editor_a11y.cpp
+    # Part C §23 — Audit panels (docs/05 deep research).
+    panels/audit/shader_hotreload_panel.cpp
+    panels/audit/profiler_panel.cpp
+    panels/audit/asset_deps_panel.cpp
+    panels/audit/localization_panel.cpp
+    panels/audit/heatmap_panel.cpp
+    panels/audit/bake_panel.cpp
+    panels/audit/shader_permutations_panel.cpp
 )
 
 target_include_directories(gw_editor PRIVATE

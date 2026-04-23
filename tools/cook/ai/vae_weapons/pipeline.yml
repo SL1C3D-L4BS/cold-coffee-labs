@@ -1,0 +1,10 @@
+id: vae_weapons
+adr: ADR-0095
+seed: 0xC0FFEE
+dataset_manifest: null      # filled in by `tools/cook/ai/_common/freeze_dataset.py`
+runtime_consumer: gameplay/weapons/variants
+output_dir: assets/ai/vae_weapons/
+notes: >
+  Variational autoencoder over the weapon-archetype schema. Output is a
+  frozen pack of sampled weapon variants, NOT a runtime model — the runtime
+  loads static assets.

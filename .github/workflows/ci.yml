@@ -47,9 +47,12 @@ jobs:
       - name: Setup Ninja
         uses: seanmiddleditch/gha-setup-ninja@v5
 
-      - name: Setup Rust (stable)
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust (pinned via rust-toolchain.toml)
+        # The toolchain version is read from rust-toolchain.toml at the repo root.
+        # Bumping it is an ADR-worthy change per docs/01 §2.2.
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: "1.85.0"
           components: rustfmt, clippy
 
       - name: Setup sccache
@@ -84,6 +87,18 @@ jobs:
         with:
           version: 1.4.341.1
           cache: true
+
+      - name: Verify DXC on PATH (docs/05 §Shader authoring & toolchain)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          # DXC ships with the Vulkan SDK under <VULKAN_SDK>/Bin (Linux) and
+          # <VULKAN_SDK>\Bin (Windows). humbletim/install-vulkan-sdk@v1.2
+          # already appends both to PATH. This step is a tripwire — if the SDK
+          # layout changes or the PATH export regresses, we fail loud and early
+          # instead of bleeding into a cryptic shader-cook error.
+          command -v dxc
+          dxc --version
 
       - name: Cache CPM source pulls
         uses: actions/cache@v4
@@ -120,10 +135,44 @@ jobs:
             cmake --build --preset ${{ matrix.preset_release }}
           fi
 
-      - name: CTest (Debug only — tests run in dev preset)
+      - name: clang-tidy (Linux Debug only — headline sweep)
+        if: runner.os == 'Linux' && matrix.config == 'Debug'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          BUILD_DIR="build/${{ matrix.preset_debug }}"
+          if [ ! -f "$BUILD_DIR/compile_commands.json" ]; then
+            echo "compile_commands.json missing — ensure CMAKE_EXPORT_COMPILE_COMMANDS=ON in preset"
+            exit 1
+          fi
+          # run-clang-tidy is shipped with clang-tidy-18.
+          # Scope to engine/ + editor/ to keep wall-clock reasonable; third_party is excluded by HeaderFilterRegex.
+          run-clang-tidy-18 -p "$BUILD_DIR" -quiet \
+            -header-filter='^(?!.*third_party).*(engine|editor)/.*\.hpp$' \
+            '^.*/(engine|editor)/.*\.cpp$' 2>&1 | tee clang-tidy.log
+          # Fail the job if any error/warning slipped through (WarningsAsErrors='*' in .clang-tidy
+          # should have caught them at the per-TU level; this is a second-line guard).
+          if grep -E '(error:|warning:)' clang-tidy.log >/dev/null; then
+            echo "clang-tidy reported findings — see clang-tidy.log above"
+            exit 1
+          fi
+
+      - name: CTest (Debug — dev preset)
         if: matrix.config == 'Debug'
         shell: bash
         run: ctest --preset ${{ matrix.preset_debug }} --output-on-failure
+
+      - name: CTest (Release — smoke run in release preset)
+        if: matrix.config == 'Release'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          # Release CTest smoke: catches tests that only fail under -O2/NDEBUG
+          # (UB, ODR, asserts compiled out, constexpr divergence). Keeps the full
+          # test matrix in Debug for speed; Release only re-runs the same cases
+          # against the Release binaries built above.
+          ctest --preset ${{ matrix.preset_release }} --output-on-failure
+        continue-on-error: false
 
       - name: CTest phase15 label (sandbox + parity + perf)
         if: matrix.config == 'Debug'
@@ -175,6 +224,85 @@ jobs:
           cd bld
           cargo fmt --all -- --check
 
+  studio_ship:
+    # P3.6: studio-* and ship-* presets bring up the full Phase 16/17 dep
+    # graph. Keep these on their own job so a flaky external dep (Steamworks,
+    # Slang, SPIRV-Reflect) doesn't gate the core {Debug,Release} matrix.
+    name: studio/ship (${{ matrix.os }} ${{ matrix.preset }})
+    runs-on: ${{ matrix.os }}
+    needs: [build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            preset: ship-linux
+          - os: ubuntu-latest
+            preset: studio-linux
+          - os: windows-latest
+            preset: ship-win
+          - os: windows-latest
+            preset: studio-win
+    env:
+      CPM_SOURCE_CACHE: ${{ github.workspace }}/.cpm-cache
+      SCCACHE_GHA_ENABLED: "true"
+      CMAKE_C_COMPILER_LAUNCHER: sccache
+      CMAKE_CXX_COMPILER_LAUNCHER: sccache
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v5
+
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.7
+
+      - name: Install Clang/LLVM 18+ (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euxo pipefail
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
+            | sudo gpg --dearmor -o /usr/share/keyrings/llvm-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-18 main" \
+            | sudo tee /etc/apt/sources.list.d/llvm.list
+          sudo apt-get update
+          sudo apt-get install -y clang-18 lld-18 \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libwayland-dev libxkbcommon-dev
+          sudo update-alternatives --install /usr/bin/clang   clang   /usr/bin/clang-18 100
+          sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-18 100
+          sudo update-alternatives --install /usr/bin/ld.lld  ld.lld  /usr/bin/ld.lld-18 100
+
+      - name: Install LLVM (Windows, clang-cl)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          clang-cl --version
+          ninja --version
+
+      - name: Install Vulkan SDK
+        uses: humbletim/install-vulkan-sdk@v1.2
+        with:
+          version: 1.4.341.1
+          cache: true
+
+      - name: Cache CPM source pulls
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CPM_SOURCE_CACHE }}
+          key: cpm-${{ runner.os }}-${{ hashFiles('cmake/dependencies.cmake') }}
+
+      - name: Configure + build + test (${{ matrix.preset }})
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cmake --preset ${{ matrix.preset }}
+          cmake --build --preset ${{ matrix.preset }}
+          ctest --preset ${{ matrix.preset }} --output-on-failure
+
   lint:
     name: lint (format + C++)
     runs-on: ubuntu-latest
@@ -206,3 +334,31 @@ jobs:
           set -euxo pipefail
           python3 tools/lint/check_no_os_headers.py --repo-root .
           python3 tools/lint/check_no_os_headers.py --repo-root . --self-test
+
+      - name: Exception-policy ratchet (ADR-0086)
+        run: |
+          set -euxo pipefail
+          python3 tools/lint/check_no_exceptions.py --repo-root . --self-test
+          python3 tools/lint/check_no_exceptions.py --repo-root .
+
+      - name: OS-thread ownership policy (ADR-0088)
+        run: |
+          set -euxo pipefail
+          python3 tools/lint/check_no_raw_threads.py --repo-root . --self-test
+          python3 tools/lint/check_no_raw_threads.py --repo-root .
+
+      - name: Dependency SHA-pin ratchet (ADR-0091)
+        run: |
+          set -euxo pipefail
+          python3 tools/lint/check_git_pins.py
+
+      - name: Shader registration (P3.2)
+        run: |
+          set -euxo pipefail
+          python3 tools/lint/check_shader_registration.py
+
+      - name: No <iostream> outside logger (audit-2026-04-20 P4.6)
+        run: |
+          set -euxo pipefail
+          python3 tools/lint/check_no_iostream.py --self-test
+          python3 tools/lint/check_no_iostream.py --repo-root .

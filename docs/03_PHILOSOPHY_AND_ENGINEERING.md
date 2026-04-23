@@ -16,7 +16,7 @@ This document is the values statement of **Greywater Engine** — the platform *
 
 ## 1. What we build and what we don't
 
-We do not build Greywater_Engine to compete with the large commercial engines. Those products have ten-thousand-engineer head starts and they're not going anywhere. Racing them on their own terms is a losing proposition we have no interest in.
+We do not build Greywater Engine to compete with the large commercial engines. Those products have ten-thousand-engineer head starts and they're not going anywhere. Racing them on their own terms is a losing proposition we have no interest in.
 
 We build Greywater Engine because the combination we want to ship — **a data-oriented native C++ runtime, a Rust-native AI copilot with authoritative tool-use over the public API, a text-IR-native visual scripting system that AI and humans coauthor, a Clang-only reproducible build across Windows and Linux, a Vulkan 1.2-baseline renderer designed for mid-range hardware (including the RX 580), and deterministic procedural depth (Blacklake) in service of *Sacrilege* and future titles** — is not available anywhere. Nobody is going to build it for us.
 
@@ -88,7 +88,47 @@ Gameplay-critical systems — physics under lockstep, visual-script IR execution
 
 ### 2.11 The flagship defines the player fantasy
 
-Every system exists to serve ***Sacrilege*** first — speed, violence, Martyrdom loop, Nine Inverted Circles, the tone in **GW-SAC-001** (`docs/07_SACRILEGE.md`). If a subsystem does not make *Sacrilege* better, it does not get priority.
+Every system exists to serve ***Sacrilege*** first — speed, violence, Martyrdom loop, Nine Inverted Circles, the tone in **GW-SAC-001** (`docs/07_SACRILEGE.md`) and the Story Bible (`docs/11_NARRATIVE_BIBLE.md`). If a subsystem does not make *Sacrilege* better, it does not get priority.
+
+### 2.12 Horror-Studio Posture
+
+Cold Coffee Labs is a **horror studio** first. The Brew Doctrine (`§1`, `§2.1`–`§2.11`) remains intact; horror-studio posture is an additive set of values that shapes how every subsystem serves the genre.
+
+- **Dread pacing over spectacle.** The AI Director's job is to let silence land before a crescendo, not to maximize engagement. Build-Up → Sustained Peak → Peak Fade → Relax is a rhythm, not a loot table.
+- **Diegetic horror.** Every overlay that breaks diegesis (floating icons, numeric damage text, boss names in mid-screen banners) defaults **off**. The diegetic HUD (blood vial, runic Sin ring, Grace halo) is the contract.
+- **Readable gore.** Dismemberment, decals, ragdoll limbs communicate game-state (enemies hit, attack directionality, area hazards). Gore that confuses is a bug. A gore-level slider (§2.15) lets players opt down without losing signal.
+- **Player-signature narrative.** The Sin-signature fingerprint (Cruelty / Precision / Hitless / God-Mode-uptime / Deaths-per-area) drives Malakor / Niccolò dialogue and Director parameter clamps. The game remembers how the player plays; the story reacts.
+- **Silence is content.** The audio weave supports minutes of near-silence without losing tension. Layer masks, low-amplitude drones, and foley bed are authored for *absence* as much as presence.
+- **The ending is an act of forgiveness.** The terminal Blasphemy (`forgive`) is not an unlock — it is a choice to *not* damage the final boss. The Grace meter is the Story-Bible contract on how the game ends (`docs/11_NARRATIVE_BIBLE.md` §Grace Finale).
+
+### 2.13 Content Engine — Seven IP-Agnostic Services
+
+Greywater is not a one-game engine. It is factored as a **content platform** with seven named services (see `docs/06_ARCHITECTURE.md §3.12`). Sacrilege is the v1 consumer; *Apostasy* / *Silentium* / *The Witness* prove the platform (Phase 29).
+
+**Principles for content-engine hygiene:**
+
+1. **Stable data schemas.** Each service exposes POD schema headers under `engine/services/<svc>/schema/`. Schemas do not depend on Sacrilege types. A future IP adds new data; it never patches the schema.
+2. **One consumer today, N tomorrow.** No Sacrilege-specific strings, enums, or hardcoded Circle IDs leak into `engine/services/`. Sacrilege-specific types live in `gameplay/` or `engine/world/biome/circle_profiles`.
+3. **Service boundaries are also test boundaries.** Each service has its own doctest harness and an "imaginary second IP" integration test (a trivial prototype that links only the service contract) that must stay green.
+4. **BLD commits through services.** AI-authored edits use service schemas, not raw engine internals. This lets *Apostasy* authors reuse every BLD tool without re-mapping internals.
+5. **Determinism carries across services.** The Director, music weave, and material forge all follow `§2.2.2` (C++, seed-fed, pinned weights, no internet) so multi-IP replay stays bit-identical.
+
+### 2.14 Bounded Runtime AI Is a Design Tool, Not a Magic Wand
+
+The §2.2.2 carve-out permits on-device ML. That permission carries a discipline:
+
+- **If a rule-based system can hit the pitch, ship the rule-based system.** The AI Director is a rule state machine first; RL parameter tuning is bounded and clamp-checked.
+- **Never use ML where a seed would do.** Weapon permutations, layout variety, stem selection — these belong to cook-time (VAE, WFC+RL) or deterministic seed math, not runtime inference.
+- **Every runtime model has a perf gate and a determinism test.** If a model cannot meet its budget on RX 580, it ships at cook-time or it does not ship.
+- **Assets, not magic.** ML weights are versioned cooked assets, signed (Ed25519), loaded through the normal asset pipeline. Loader rejects mismatches at runtime.
+
+### 2.15 Accessibility Is a First-Class Consumer
+
+Horror is exclusionary by genre default; the engine defaults the other way (WCAG 2.2 AA as the published bar).
+
+- **Gameplay a11y toggles** (colour-blind palettes, chromatic / shake / motion-blur sliders to zero, subtitles + speaker labels, gore-level slider, photosensitivity pre-warning, audio mono-mix + per-channel sliders, one-hand input preset) ship in `engine/a11y/` and the first-run flow.
+- **Editor a11y** parity (Field Test HC theme, corruption-off toggle, force-mono font) lives in `editor/a11y/`.
+- **Every horror effect has a disable.** Vignette, glitch hover, screen shake, chromatic aberration, pixel jitter — each is independently toggleable in Preferences ▸ Accessibility.
 
 ---
 
@@ -180,10 +220,10 @@ Choose brewed.
 
 ---
 
-# 12_ENGINEERING_PRINCIPLES — Code-Review Playbook
+## Code-Review Playbook (merged from former `12_ENGINEERING_PRINCIPLES.md`)
 
 **Status:** Canonical · Binding at review
-**Audience:** Anyone writing C++ or Rust code for Greywater_Engine · Anyone reviewing a PR
+**Audience:** Anyone writing C++ or Rust code for Greywater Engine · Anyone reviewing a PR
 **Enforcement:** Every item below is a gate at Review. A violation without a written justification blocks the merge.
 
 ---

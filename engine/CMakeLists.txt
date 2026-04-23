@@ -30,6 +30,10 @@ target_link_libraries(greywater_core
         # duplicate vkXXX symbol errors in any target that also uses volk.
         volk
         VulkanMemoryAllocator
+        # Vendored C reference implementation — backs engine/core/crypto/sha3.cpp.
+        # Moved out of engine/core/crypto/ into third_party/tiny_sha3/ by
+        # audit-2026-04-20 P3.11 to keep third-party code physically quarantined.
+        greywater::tiny_sha3
 )
 
 # Add render HAL
@@ -92,6 +96,16 @@ add_subdirectory(scripting)
 
 # Phase 19-A — Blacklake universe / HEC + SDR (engine/world/).
 add_subdirectory(world)
+
+# Phase 26 — Runtime AI stack (ADR-0095..0098, docs/01 §2.2.2 carve-out).
+# Bounded on-device C++ inference — appended to greywater_core (monolithic pattern).
+add_subdirectory(ai_runtime)
+
+# Phase 21/22 — Narrative subsystem: Story-Bible runtime (ADR-0099..0101).
+add_subdirectory(narrative)
+
+# Phase 27 — Franchise services: seven IP-agnostic services (ADR-0102).
+add_subdirectory(services)
 
 # Project version plumbed through a generated header so release binaries
 # and diagnostics report the exact build (git SHA landed in Phase 1 CI).

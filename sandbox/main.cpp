@@ -7,7 +7,7 @@
 // Clang + Ninja + CPM deps + Corrosion (via greywater_core's linkage graph)
 // + glslangValidator + runtime Vulkan.
 //
-// docs/05 week 004 · docs/10 §3 Week 02 · docs/00 §2.1–2.2.
+// docs/05_RESEARCH_BUILD_AND_STANDARDS.md week 004 · docs/10_APPENDIX_ADRS_AND_REFERENCES.md §3 Week 02 · docs/01_CONSTITUTION_AND_PROGRAM.md §2.1–2.2.
 // References:
 //   Vulkan 1.2 spec — https://registry.khronos.org/vulkan/specs/1.2-extensions/html/
 //   GLFW 3.4       — https://www.glfw.org/docs/latest/
@@ -26,7 +26,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
-#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -44,7 +43,7 @@ constexpr const char* kWindowTitle = "Greywater Sandbox — First Light";
 
 // -----------------------------------------------------------------------------
 // Error handling: Phase 1 uses assert-on-error at the entry point. Engine
-// subsystems (Phase 2+) move to gw::core::Result<T, E>. See docs/12 §A2.
+// subsystems (Phase 2+) move to gw::core::Result<T, E>. See docs/03_PHILOSOPHY_AND_ENGINEERING.md §A2.
 // -----------------------------------------------------------------------------
 
 [[noreturn]] void gw_fatal(const char* what) {

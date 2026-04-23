@@ -1,0 +1,12 @@
+id: director_train
+adr: ADR-0097
+seed: 0xD0D0D1
+dataset_manifest: null
+runtime_consumer: engine/ai_runtime/director_policy.hpp
+output_dir: assets/ai/director/
+budget_ms_rx580: 0.10
+notes: >
+  Offline RL training of BOUNDED PARAMETERS for the L4D-style rule-based
+  state machine in engine/ai_runtime/director_policy. Output is a pinned
+  checkpoint of thresholds, not a runtime policy network. No on-device
+  fine-tuning (ADR-0097).

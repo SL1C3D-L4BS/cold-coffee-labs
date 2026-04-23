@@ -30,12 +30,12 @@ Implementation progress and phase gates are **operational truth** in `docs/02_RO
 
 ---
 
-# Greywater — Architectural Blueprint & Phased Execution Plan
+## Architectural Blueprint & Phased Execution Plan (merged subdocument)
 
 | Field              | Value                                                   |
 | ------------------ | ------------------------------------------------------- |
 | **Project**        | Greywater Engine + *Sacrilege* (unified program)          |
-| **Engine**         | Greywater_Engine                                        |
+| **Engine**         | Greywater Engine                                        |
 | **Game**           | *Sacrilege* (debut title)                               |
 | **Hardware baseline** | AMD Radeon RX 580 8GB @ 1080p — *Sacrilege* Tier A: **144 FPS** (`docs/01_CONSTITUTION_AND_PROGRAM.md` §2.1); engine reference scenes: **≥ 60 FPS** where `docs/05_RESEARCH_BUILD_AND_STANDARDS.md` §1.4 applies |
 | **Art direction**  | *Sacrilege* — crunchy low-poly horror (GW-SAC-001)      |
@@ -101,7 +101,7 @@ This section states the architectural choices that shape every other section of 
 
 ### 3.1 Module Topology
 
-Grey Water is composed of four linkable artifacts. The boundary between them is load-bearing and enforced by the build system.
+Greywater Engine is composed of four linkable artifacts. The boundary between them is load-bearing and enforced by the build system.
 
 ```
                 +--------------------------+        +-----------------+
@@ -136,7 +136,7 @@ Grey Water is composed of four linkable artifacts. The boundary between them is 
 
 **Rules enforced at the CMake target level:**
 
-- `greywater_core` has **no dependency on any editor or game code**. It must build and pass its unit tests in isolation.
+- `greywater_core` has **no dependency on any editor or game code**. It must build and pass its unit tests in isolation. New subsystems `engine/ai_runtime/`, `engine/narrative/`, and `engine/services/*` follow the **monolithic alias-lib pattern** — they append their `FILE_SET HEADERS` to `greywater_core` rather than becoming separate top-level libs. This matches existing idiom and keeps link times manageable (see `docs/10` §18 audit finding).
 - `greywater_editor`, `sandbox`, and `game_runtime` **statically link** `greywater_core`. There is no engine DLL.
 - `gameplay_module` is the **only** dynamic library in the system. It links against `greywater_core` as an `INTERFACE` target (headers only — symbols resolve at load time).
 - Only `platform/` may `#include <windows.h>`, `<unistd.h>`, or any other OS header. Violations are a CI failure via clang-tidy check.
@@ -188,7 +188,7 @@ All allocators implement a common `IAllocator` vtable-free interface (CRTP or co
 
 The HAL exposes the vocabulary of modern GPUs — devices, queues, command buffers, pipelines, descriptors, synchronization primitives — without committing to a single API.
 
-- **Primary backend (Phase 3):** Vulkan 1.3 with dynamic rendering, timeline semaphores, and `VK_KHR_synchronization2`. No render passes; no subpasses.
+- **Primary backend (Phase 3):** Vulkan 1.2 baseline (`apiVersion = VK_API_VERSION_1_2`) with opportunistic 1.3 features (dynamic rendering, timeline semaphores, `VK_KHR_synchronization2`) gated via `RHICapabilities`. No render passes; no subpasses. See ADR-0003 (docs/10) for the tier-A / tier-B / tier-G capability table.
 - **Planned secondary backend:** WebGPU via Dawn, for browser and sandboxed targets. Same HAL contract.
 - **Not in scope:** DirectX 12, Metal. Reconsidered after Phase 4 based on platform commitments.
 
@@ -205,7 +205,7 @@ EnTT is a reference point, not a dependency. We implement the ECS in-house becau
 
 ### 3.7 Brewed Logic Directive (BLD) — Native AI Copilot Subsystem (Rust)
 
-BLD is the engine's native, agentic AI copilot and the primary differentiator of Greywater_Engine. It is implemented as a **standalone Rust crate** (`bld/`) built by Cargo via Corrosion, and linked as a static library into the editor. Rust is used **only for BLD** — the engine core, editor, sandbox, runtime, and gameplay module remain C++23.
+BLD is the engine's native, agentic AI copilot and the primary differentiator of Greywater Engine. It is implemented as a **standalone Rust crate** (`bld/`) built by Cargo via Corrosion, and linked as a static library into the editor. Rust is used **only for BLD** — the engine core, editor, sandbox, runtime, and gameplay module remain C++23.
 
 **Why Rust for this subsystem specifically:**
 
@@ -224,7 +224,7 @@ bld/
 ├── bld-mcp/               rmcp-based MCP server (JSON-RPC 2.0 + stdio + Streamable HTTP)
 ├── bld-tools/             proc-macro #[bld_tool], registry, dispatcher, tier/permission
 ├── bld-provider/          ILLMProvider trait + Claude cloud + alternate-cloud + candle/llama-cpp-rs backends
-├── bld-rag/               tree-sitter chunking, embeddings (candle/Nomic), sqlite-vss index, symbol graph + PageRank
+├── bld-rag/               tree-sitter chunking, embeddings (candle/Nomic), sqlite-vec index, symbol graph + PageRank
 ├── bld-agent/             plan/act/verify loop, sessions, memory, audit log, replay
 ├── bld-governance/        tier policy, HITL elicitation handlers, secret filter, code-author review
 ├── bld-bridge/            cbindgen-generated C header + cxx-facing exported API
@@ -279,7 +279,7 @@ project.*     list_scenes, current_selection, viewport_screenshot
 - **tree-sitter-rs** for AST-aware chunking (grammars: C++, GLSL, HLSL, JSON, the vscript IR, `.gwscene`).
 - **Symbol graph + PageRank** via `petgraph`.
 - **Embeddings:** `nomic-embed-code` model via `candle` by default (offline, no keys). Cloud embedding providers plug in as studio-configurable upgrades.
-- **Vector store:** SQLite + sqlite-vss via `rusqlite` + sqlite-vss bindings. No server process.
+- **Vector store:** SQLite + sqlite-vec via `rusqlite` + sqlite-vec bindings. No server process. (Superseded sqlite-vss per ADR-0013 — sqlite-vss is deprecated upstream.)
 - **Two indices:** engine docs/source (shipped pre-built) + user project (built incrementally on filesystem-watch events via `notify`).
 
 **Editor UX surface** (C++ side of the boundary, ImGui):
@@ -299,7 +299,7 @@ project.*     list_scenes, current_selection, viewport_screenshot
 
 ### 3.8 Visual Scripting — Text-IR Ground-Truth, Graph as Projection
 
-Visual scripting in Greywater_Engine is **text-first, AI-native, and graph-visualized** — not a Blueprint-style node-graph-as-ground-truth system.
+Visual scripting in Greywater Engine is **text-first, AI-native, and graph-visualized** — not a Blueprint-style node-graph-as-ground-truth system.
 
 **The architectural rule:** a typed text IR is the serialized source of truth. The node graph is a reversible projection with a sidecar layout file. BLD reads and writes the IR directly.
 
@@ -312,7 +312,7 @@ Visual scripting in Greywater_Engine is **text-first, AI-native, and graph-visua
 
 **IR design** (to be detailed in Phase 4):
 - Typed expressions, execution edges, stable-ID references to engine types and component members.
-- Serialized as a compact text form (JSON variant or custom DSL — TBD in Phase 4 kickoff).
+- **Serialized as a stable-ordered JSON variant** (`.gwvs` extension, UTF-8, LF line endings, 2-space indent, keys sorted lexicographically within each object, arrays ordered by stable execution index). Resolved during the audit-2026-04-20 sweep — a custom DSL was rejected because (a) BLD's RAG needs tree-sitter grammar coverage and `tree-sitter-json` is already in the Phase 9C grammar set, (b) `rapidjson`/`simdjson` are already transitive deps via `nlohmann_json` and the cook pipeline, (c) merge tooling (git, three-way) already understands JSON structurally well enough for BLD's `apply_patch` command. The stable-ordering constraint exists so that `git diff` on two authoring sessions over the same graph produces a meaningful hunk instead of a whole-file churn.
 - Executed by the `vscript/` runtime in both editor (interpreted for fast iteration) and runtime (JIT-compiled or AOT-cooked to bytecode on asset cook).
 - Node graph authored with **ImNodes**; layout persisted in a `.layout.json` sidecar. Node positions are never checked into the IR file — they are presentation.
 
@@ -595,6 +595,106 @@ A PR that regresses the default-workspace frame time by ≥ 5 % on the reference
 - All palette tokens meet WCAG 2.2 AA contrast thresholds against their use cases.
 - Panel registry test suite passes on Windows and Linux.
 
+### 3.32 Runtime AI Subsystem (`engine/ai_runtime/`) — Phase 26
+
+Bounded on-device C++ inference under the `docs/01` §2.2.2 carve-out. Target three consumers: hybrid AI Director, symbolic adaptive music, neural material evaluator.
+
+**Module shape:**
+
+```
+engine/ai_runtime/
+├── inference_runtime.{hpp,cpp}   ggml CPU backend wrapper (opt-in Vulkan behind GW_AI_VULKAN)
+├── model_registry.hpp            versioned pinned weight registry (BLAKE3 + Ed25519 verify)
+├── director_policy.hpp           L4D-style state machine + bounded RL params (ADR-0097)
+├── music_symbolic.hpp            ≤1M-param RoPE transformer picking BPM-sync layer mix (ADR-0098)
+├── material_eval.hpp             Neural PBR eval of cooked weights (Vulkan compute allowed)
+└── ai_cvars.hpp                  Budgets, toggles, perf counters
+```
+
+**Linkage:** alias lib `greywater::ai_runtime` appended to `greywater_core` via `FILE_SET HEADERS` (same monolithic pattern as other engine subsystems — see §18 audit findings for rationale).
+
+**Dependency contract:**
+- `engine/ai_runtime/` depends on `engine/core`, `engine/jobs`, `engine/ecs`, `engine/world/universe` (for `SeedManager`).
+- `engine/ai_runtime/` **may not** `#include` `engine/net/**` or `engine/telemetry/**` (enforced at CMake link time per `docs/05` §14 rule 9).
+- `engine/gameplay/` and `engine/services/director/` consume the public headers; they do not consume private implementation files.
+
+**Deterministic contract (ADR-0096):**
+- Model weights loaded verbatim through `model_registry`.
+- Fixed graph topology, fixed precision, seed-fed via `SeedManager`.
+- Models feeding authoritative state (Director) are pure functions of `(state, seed)`; CPU backend only.
+- Presentation-only models (symbolic music, material eval) tagged `GW_AI_PRESENTATION_ONLY` and excluded from replay hash.
+
+**Budget (aggregate ≤ 0.74 ms/frame on RX 580):**
+
+| Subsystem | Budget | Backend |
+|-----------|--------|---------|
+| Director policy | ≤ 0.1 ms | ggml CPU |
+| Symbolic music transformer | ≤ 0.2 ms | ggml CPU |
+| Neural material evaluator | ≤ 0.4 ms | ggml Vulkan (opt-in) |
+| Registry + overhead | ≤ 0.04 ms | CPU |
+
+CI perf gate: `gw_perf_gate_ai_runtime` fails the build on regression.
+
+### 3.33 Narrative Subsystem (`engine/narrative/`) — Phase 21/22
+
+Story-Bible runtime that skins the Martyrdom spine with Malakor / Niccolò, Acts I–III, and the Grace finale. Data-driven; all dialogue authored in `editor/panels/dialogue_graph/` and cooked to `.gwdlg`.
+
+**Module shape:**
+
+```
+engine/narrative/
+├── dialogue_graph.{hpp,cpp}   .gwdlg reader + line dispatcher
+├── act_state.{hpp,cpp}         Acts I/II/III state machine + phase gates (ADR-0099)
+├── sin_signature.{hpp,cpp}     Rolling fingerprint: God-Mode-uptime, Precision, Cruelty, Hitless, Deaths/area (ADR-0100)
+├── voice_director.{hpp,cpp}    Malakor vs Niccolò speaker selection + line picker
+└── grace_meter.{hpp,cpp}       Act III terminal `forgive` Blasphemy (ADR-0101)
+```
+
+**Linkage:** alias lib `greywater::narrative` appended to `greywater_core`.
+
+**Dependency contract:**
+- Depends on `engine/core`, `engine/ecs`, `engine/events`, `engine/audio`, `engine/ai_runtime` (Sin-signature can feed Director).
+- Never depends on `gameplay/`.
+- Data formats: `.gwdlg` (dialogue), `.gwact` (Act scripts) — binary, versioned, cooked by `gw_cook`.
+
+**Rollback-safe:** all narrative state is part of the replicated ECS snapshot. Grace meter is a `RuntimeComponent` with deterministic accumulation rules.
+
+### 3.34 Franchise Services (`engine/services/`) — Phase 27
+
+Seven IP-agnostic services defining the reusable content-engine surface. Each is a CMake `INTERFACE` schema header paired with a concrete `_impl` target.
+
+```
+engine/services/
+├── material_forge/    schema/material.hpp + impl
+├── level_architect/   schema/layout.hpp + impl
+├── combat_simulator/  schema/encounter.hpp + impl
+├── gore/              schema/gore.hpp + impl
+├── audio_weave/       schema/music.hpp + impl
+├── director/          schema/director.hpp + impl
+└── editor_copilot/    schema/copilot.hpp + impl
+```
+
+**Schema contract:**
+- Headers define POD types only — no Sacrilege-specific enums, strings, or identifiers.
+- Implementation shims wrap existing engine subsystems: `material_forge/impl` → `engine/render/material/`; `level_architect/impl` → `engine/world/`; `director/impl` → `engine/ai_runtime/director_policy`; `audio_weave/impl` → `engine/audio/` + `engine/ai_runtime/music_symbolic`; etc.
+- Each service ships a doctest + an "imaginary second IP" integration test.
+
+**Consumer pattern (Sacrilege today, Apostasy / Silentium / The Witness tomorrow):**
+
+```cpp
+// gameplay/acts/act_iii_unmaking.cpp (Sacrilege)
+#include "engine/services/director/schema/director.hpp"
+#include "engine/services/audio_weave/schema/music.hpp"
+
+void tick_act_iii(gw::services::DirectorHandle* director,
+                  gw::services::AudioWeaveHandle* music,
+                  const gw::narrative::SinSignature& sig) {
+    // ...pure schema access, IP-agnostic API...
+}
+```
+
+**Rule:** no `#include "gameplay/..."` inside `engine/services/`. No `#include "engine/services/<svc>/impl/..."` outside the service directory. CMake target visibility enforces both.
+
 ---
 
 ## 4. Toolchain & Build Path
@@ -641,7 +741,7 @@ Build infrastructure is **code**. It is versioned, reviewed, and CI-enforced wit
 - `rmcp` — official Rust Model Context Protocol SDK
 - `tree-sitter` + grammars (C++, GLSL, HLSL, JSON, vscript IR, `.gwscene`) — AST-aware chunking for RAG
 - `petgraph` — symbol graph + PageRank for RAG ranking
-- `rusqlite` + `sqlite-vss` bindings — local vector index (alt: `lancedb` embedded)
+- `rusqlite` + `sqlite-vec` bindings — local vector index (alt: `lancedb` embedded). See ADR-0013 for the sqlite-vss → sqlite-vec migration.
 - `candle` — pure-Rust ML runtime for local embeddings and inference (alt: `llama-cpp-rs`)
 - Per-provider HTTP client crates (pinned; one per alternate cloud LLM we support)
 - Claude-API Rust client (per-provider crates pinned; in-house wrapper where needed)
@@ -721,7 +821,7 @@ The operational week-by-week schedule lives in `docs/02_ROADMAP_AND_OPERATIONS.m
 
 **Deliverables**
 1. `engine/render/hal/` — device, queue, surface, swapchain interface; ~30 types in total.
-2. Vulkan 1.3 backend bootstrap — instance, physical-device selection, feature flagging, device creation, validation-layers-clean init.
+2. Vulkan 1.2-baseline backend bootstrap (1.3 features opportunistic) — instance, physical-device selection, feature flagging, device creation, validation-layers-clean init.
 3. HAL primitives — command buffers, fences, timeline semaphores.
 4. VMA (VulkanMemoryAllocator) integration; Buffer/Image HAL wrappers.
 5. Descriptor management — pools, sets, bindless via `VK_EXT_descriptor_indexing`.
@@ -784,7 +884,7 @@ BLD is the engine's primary competitive differentiator. Implemented as a Rust cr
 
 **Sub-phase 9B — Tool surface via proc macros (2w).** `#[bld_tool]` proc macro generating MCP schema + JSON decoder + dispatch + registry entry at compile time. `#[bld_component_tools]` macro generating `component.*` tools from the reflection registry. Mutating tools submit opcode+payload via C-ABI callback; editor enqueues as `ICommand`. MCP `elicitation` handler for diff-rendering approval dialogs.
 
-**Sub-phase 9C — RAG (2w).** `tree-sitter` with grammars for C++, GLSL, HLSL, JSON, vscript IR, `.gwscene`. Symbol graph via `petgraph` + PageRank. Nomic Embed Code via `candle` (offline). `rusqlite` + `sqlite-vss` index. Engine-docs index pre-built; user-project index built incrementally via `notify`. Hybrid retrieval (ripgrep lexical + tree-sitter symbol + vector).
+**Sub-phase 9C — RAG (2w).** `tree-sitter` with grammars for C++, GLSL, HLSL, JSON, vscript IR, `.gwscene`. Symbol graph via `petgraph` + PageRank. Nomic Embed Code via `candle` (offline). `rusqlite` + `sqlite-vec` index (per ADR-0013). Engine-docs index pre-built; user-project index built incrementally via `notify`. Hybrid retrieval (ripgrep lexical + tree-sitter symbol + vector).
 
 **Sub-phase 9D — Build, runtime & vscript tools (2w).** `build.*` wrapping CMake, parsing Clang JSON diagnostics. `runtime.*` exposing profiler snapshots. `code.*` for read/patch/symbol. `vscript.*` on the IR. Hot-reload pipeline end-to-end: agent writes gameplay code → build → reload → verify.
 
@@ -909,7 +1009,7 @@ Phases 19–23 build engine-side capabilities for **Blacklake** procedural genes
 
 **Exit Criteria (*Infinite Seed*)** — same Hell Seed + coordinate → byte-identical chunk content on Windows and Linux; determinism suite passes; streaming holds RX 580 frame budget under stress.
 
-### Phase 20 — Arena Topology, GPTM & Sacrilege LOD · 8 weeks · World Systems Lead
+### Phase 20 — GPTM, Nine Circles Geometry, Floating Origin · 8 weeks · World Systems Lead
 
 **Deliverables**
 1. **GPTM** slice — hybrid heightfield / sparse-volume modules for large inverted-circle arenas.
@@ -1045,7 +1145,7 @@ This blueprint is submitted for stakeholder sign-off. Approval authorizes the En
 
 ---
 
-# Greywater_Engine × Cold Coffee Labs — Core Architecture
+## Core Architecture — Narrative Walkthrough (merged subdocument)
 
 > *A narrative walkthrough of the engine we are building, who it is for, and the decisions behind it.*
 
@@ -1057,19 +1157,19 @@ This blueprint is submitted for stakeholder sign-off. Approval authorizes the En
 
 ## Chapter 1 — Intro
 
-Welcome to the Greywater_Engine project.
+Welcome to the Greywater Engine project.
 
 At Cold Coffee Labs, we are building a game engine from scratch. Not as a tutorial exercise, and not as a thin wrapper over someone else's runtime — as a real, production-intent technology stack that we own end to end. The purpose of this document is to lay out, plainly and in one place, what the engine is, how it is architected, and the engineering principles we will hold ourselves to while building it.
 
 If you are a gameplay programmer, a tools engineer, a renderer specialist, or a stakeholder trying to understand what the team is actually doing — this is the document to read first.
 
-The name is **Greywater_Engine**. It is the engine that powers Cold Coffee Labs titles. Nothing more clever than that.
+The name is **Greywater Engine**. It is the engine that powers Cold Coffee Labs titles. Nothing more clever than that.
 
 ---
 
 ## Chapter 2 — Series / Project Overview
 
-Greywater_Engine is a long-horizon project. It is not a six-month sprint to a demo. It is the foundation we expect to build and ship multiple games on over multiple years, and every early decision is weighed against that horizon.
+Greywater Engine is a long-horizon project. It is not a six-month sprint to a demo. It is the foundation we expect to build and ship multiple games on over multiple years, and every early decision is weighed against that horizon.
 
 What we are **not** doing:
 - We are not trying to out-feature the large commercial engines. If shipping a game quickly is the only goal, those exist.
@@ -1083,7 +1183,7 @@ What we **are** doing:
 - **Targeting the RX 580 (Polaris, 2016, 8 GB, Vulkan 1.2/1.3)** as the baseline. Every Tier A *Sacrilege* visual feature runs at **1080p / 144 FPS** on this card (L1). Engine-only reference scenes may use **≥ 60 FPS** harness rows (`05` §1.4). No ray tracing, no mesh shaders, no GPU work graphs as baseline — all are Tier G (hardware-gated, post-v1).
 - **Baking a first-class, native AI copilot — the Brewed Logic Directive (BLD) — into the engine as a Rust crate**, linked into the editor via a narrow C-ABI. Rust is used **only for BLD**; the rest of the engine is C++23.
 - **Visual scripting is text-first, AI-native, and graph-visualized.** A typed text IR is the ground-truth serialized form; the node graph is a reversible projection with a sidecar layout file. BLD reads and writes the IR directly.
-- **Purpose-built for *Sacrilege* first.** Greywater_Engine is designed around the debut title’s needs (Martyrdom loop, Blacklake hellscapes, BLD-authored content) — with a clean engine/game code boundary so the engine remains reusable for future Cold Coffee Labs titles.
+- **Purpose-built for *Sacrilege* first.** Greywater Engine is designed around the debut title’s needs (Martyrdom loop, Blacklake hellscapes, BLD-authored content) — with a clean engine/game code boundary so the engine remains reusable for future Cold Coffee Labs titles.
 - **Flagship art direction (*Sacrilege*).** Crunchy low-poly horror, high-contrast lighting, engine capability for GW-SAC vision — see `docs/07_SACRILEGE.md`.
 - Building it in the open within the studio — every architectural decision gets a written record under `docs/10_APPENDIX_ADRS_AND_REFERENCES.md`.
 
@@ -1115,7 +1215,7 @@ The stack is short on purpose. Every tool in it earns its place.
 | **Build generator**     | CMake 3.28+ with **Presets** and **file sets** (+ **Corrosion** for Rust) | CMake is the single source of truth; Corrosion invokes Cargo as a sub-build.        |
 | **Rust/C++ bridge**     | `cxx` (C++ side) + `cbindgen` (Rust → C header)                     | Narrow, well-tested bindings. Firefox-scale production proof.                            |
 | **Dependency manager**  | CPM.cmake (C++) + Cargo `Cargo.lock` (Rust), both pinned            | Reproducible, version-locked, no system-library roulette.                               |
-| **Graphics API**        | Vulkan 1.3 (dynamic rendering, timeline semaphores, bindless)       | Modern, explicit, and the best fit for a frame graph.                                   |
+| **Graphics API**        | Vulkan 1.2 baseline, 1.3 opportunistic (dynamic rendering, timeline semaphores, sync2, bindless) | Modern, explicit, and the best fit for a frame graph. See ADR-0003. |
 | **Editor UI**           | **Dear ImGui (docking + viewports) + ImNodes + ImGuizmo — LOCKED**  | No custom UI framework. Proven, mature, correct tool for an engine editor. Permanent.    |
 | **Visual scripting UI** | ImNodes over a typed text IR (IR is ground-truth, graph is a view)  | AI-native, diff-friendly, merge-resolvable. No Blueprint-style graph-as-ground-truth.   |
 | **Profiler**            | Tracy (+ Rust bindings via `tracy-client` for BLD)                  | Frame-level, low overhead, remote-capable, language-neutral.                             |
@@ -1127,7 +1227,7 @@ The stack is short on purpose. Every tool in it earns its place.
 | **Local LLM**           | `candle` (pure-Rust) primary, `llama-cpp-rs` fallback, with GBNF grammars | Offline inference; structurally valid tool calls even on small models.              |
 | **Code chunking (RAG)** | `tree-sitter` (Rust bindings) — grammars: C++, GLSL, HLSL, JSON, vscript IR, `.gwscene` | AST-aware chunks; one function/class/component per chunk.              |
 | **Embeddings (default)**| `nomic-embed-code` model via `candle`                               | Offline, no API keys. Cloud embedding providers pluggable for studio upgrade.             |
-| **Vector index**        | SQLite + `sqlite-vss` via `rusqlite`                                | Embedded, no server process. LanceDB embedded as alternate.                              |
+| **Vector index**        | SQLite + `sqlite-vec` via `rusqlite` (ADR-0013)                     | Embedded, no server process. LanceDB embedded as alternate.                              |
 | **HTTP/SSE**            | `reqwest` + `eventsource-stream` (Rust)                             | Used by `ILLMProvider` backends.                                                         |
 | **Markdown (editor UI)**| `imgui_md` (MD4C-based)                                             | Streaming token rendering in the BLD chat panel, driven by callbacks from Rust.         |
 | **Secret storage**      | OS keychain via `keyring` crate (Windows Credential Manager / libsecret) | API keys never plaintext on disk, never reach model context.                        |
@@ -1138,7 +1238,7 @@ Tools explicitly **not** in the stack: MSBuild, `.sln`/`.vcxproj` files, Visual 
 
 ## Chapter 5 — Project Structure
 
-Greywater_Engine ships as **four linkable artifacts** plus one hot-reloadable module. The boundary between them is enforced by CMake target visibility — it is not a suggestion.
+Greywater Engine ships as **four linkable artifacts** plus one hot-reloadable module. The boundary between them is enforced by CMake target visibility — it is not a suggestion.
 
 ```
 cold-coffee-labs/
@@ -1181,7 +1281,7 @@ cold-coffee-labs/
 │   ├── bld-mcp/            # rmcp-based MCP server
 │   ├── bld-tools/          # #[bld_tool] proc macro, registry, dispatcher, tier/permission
 │   ├── bld-provider/       # ILLMProvider trait + Claude cloud + alternate-cloud + candle backends
-│   ├── bld-rag/            # tree-sitter chunking, embeddings, sqlite-vss, symbol graph + PageRank
+│   ├── bld-rag/            # tree-sitter chunking, embeddings, sqlite-vec, symbol graph + PageRank
 │   ├── bld-agent/          # plan/act/verify loop, sessions, memory, audit log, replay
 │   ├── bld-governance/     # tier policy, HITL elicitation handlers, secret filter
 │   ├── bld-bridge/         # cbindgen-generated C header + cxx-facing exported API
@@ -1221,7 +1321,7 @@ The editor is **not** shipped inside the game runtime. Editor code never reaches
 
 ## Chapter 6 — Feature List
 
-This is not an exhaustive roadmap — it is the feature set that defines what "Greywater_Engine Phase 1-4 complete" means. Everything here is scheduled in the companion blueprint.
+This is not an exhaustive roadmap — it is the feature set that defines what "Greywater Engine Phase 1-4 complete" means. Everything here is scheduled in the companion blueprint.
 
 **Build & Infrastructure**
 - Reproducible build on Windows and Linux via a single preset
@@ -1260,7 +1360,7 @@ This is not an exhaustive roadmap — it is the feature set that defines what "G
 
 **Renderer**
 - Hardware Abstraction Layer: ~30 types, backend-agnostic
-- Vulkan 1.3 backend: dynamic rendering, timeline semaphores, bindless descriptors, VMA for allocation
+- Vulkan 1.2-baseline backend (1.3 features opportunistic): dynamic rendering, timeline semaphores, bindless descriptors, VMA for allocation
 - Frame graph with explicit resource lifetimes and automatic barrier insertion
 - Forward+ reference renderer capable of sponza-class scenes at 144 FPS @ 1440p on reference hardware
 - Shader pipeline: GLSL/HLSL → SPIR-V, content-hashed cache
@@ -1468,7 +1568,7 @@ The engine is organized as concentric layers. Each layer may depend **only on la
   ├─────────────────────────────────────────────────────────┤
   │  Render Layer  —  frame graph, HAL front-end            │
   ├─────────────────────────────────────────────────────────┤
-  │  Render Back-end  —  Vulkan 1.3 (WebGPU planned)        │
+  │  Render Back-end  —  Vulkan 1.2 (1.3 opt) / WebGPU TBD  │
   ├─────────────────────────────────────────────────────────┤
   │  Engine Core  —  ECS, math, memory, containers, logger, │
   │                  command bus (undo/redo)                │
@@ -1482,7 +1582,7 @@ The engine is organized as concentric layers. Each layer may depend **only on la
   │  bld-agent      → plan/act/verify, sessions, audit      │
   │  bld-tools      → #[bld_tool] proc macro, registry      │
   │  bld-mcp        → rmcp MCP server                       │
-  │  bld-rag        → tree-sitter + candle + sqlite-vss     │
+  │  bld-rag        → tree-sitter + candle + sqlite-vec     │
   │  bld-provider   → Claude cloud + alt-cloud + candle     │
   │  bld-governance → tier policy, HITL gates, secret filter│
   │  bld-ffi        → C-ABI boundary (opaque handles, POD)  │
@@ -1500,7 +1600,7 @@ The *only* place in the engine where `#include <windows.h>` or `<unistd.h>` is a
 Logger, assertions, errors, containers, strings, math, memory allocators, and the ECS. This is the layer that most other code in the engine spends its time calling. It has zero external dependencies beyond the C++ standard library and is the most heavily unit-tested module in the codebase.
 
 ### Render Back-end & HAL
-The HAL is the vocabulary of a modern GPU, expressed in ~30 types: devices, queues, command buffers, pipelines, descriptor sets, synchronization primitives, swapchains, resources. The Vulkan 1.3 backend is the first implementation. A WebGPU backend is planned and the HAL is designed to accept it without front-end changes.
+The HAL is the vocabulary of a modern GPU, expressed in ~30 types: devices, queues, command buffers, pipelines, descriptor sets, synchronization primitives, swapchains, resources. The Vulkan 1.2-baseline backend (with 1.3 features opportunistic per ADR-0003) is the first implementation. A WebGPU backend is planned and the HAL is designed to accept it without front-end changes.
 
 Above the HAL sits a **frame graph**: the front-end declares render passes and their resource reads/writes, and the frame graph inserts barriers, aliases transient resources, and schedules work. Gameplay code and the editor both render through the frame graph — there is no "editor-only" rendering path.
 
@@ -1573,7 +1673,7 @@ Native ImGui tooling is the right default for an engine editor in 2026 and will 
 
 The canonical repository is `git@github.com:SL1C3D-L4BS/cold-coffee-labs.git`. Branch protection is enforced on `main`: PR required, CI must pass, one approving review from an engineering lead.
 
-Licensing is a **studio-internal** matter — Greywater_Engine is not open source. It is Cold Coffee Labs intellectual property. Contributor agreements are on file for every committer. Third-party dependencies brought in via CPM are audited for license compatibility before their pin lands in `cmake/dependencies.cmake`.
+Licensing is a **studio-internal** matter — Greywater Engine is not open source. It is Cold Coffee Labs intellectual property. Contributor agreements are on file for every committer. Third-party dependencies brought in via CPM are audited for license compatibility before their pin lands in `cmake/dependencies.cmake`.
 
 ---
 
@@ -1605,7 +1705,7 @@ With this architecture signed off:
 ***Sacrilege* / Blacklake phases (19–23)** — see `docs/README.md` and `docs/02_ROADMAP_AND_OPERATIONS.md` for week rows.
 
 - **Phase 19 — Blacklake Core & Deterministic Genesis (8w).** Σ₀, HEC-style seeds, streaming, SDR + noise masks, WFC/constraint content → *Infinite Seed*.
-- **Phase 20 — Arena Topology, GPTM & Sacrilege LOD (8w).** Large arena GPTM slice, GPU mesh, tessellation/LOD, floating origin, circle-themed materials → *Nine Circles Ground*.
+- **Phase 20 — GPTM, Nine Circles Geometry, Floating Origin (8w).** Large arena GPTM slice, GPU mesh, tessellation/LOD, floating origin, circle-themed materials → *Nine Circles Ground*.
 - **Phase 21 — Sacrilege Frame — Rendering, Atmosphere, Audio (8w).** Horror-forward rendering, volumetrics, decals, dynamic score → *Hell Frame*.
 - **Phase 22 — Martyrdom Combat & Player Stack (6w).** Sin/Mantra/Rapture/Ruin, Blasphemies, weapons, locomotion → *Martyrdom Online*.
 - **Phase 23 — Damned Host, Circles Pipeline & Boss (6w).** Roster, encounters, authoring pipeline, boss phases → *God Machine RC*.
@@ -1621,7 +1721,7 @@ With this architecture signed off:
 
 ## Chapter 11 — BLD: The Brewed Logic Directive
 
-BLD is what makes Greywater_Engine different.
+BLD is what makes Greywater Engine different.
 
 Every major engine in 2026 either has an AI feature bolted onto a mature editor, or a third-party plugin riding on reflection-based automation. None of them treat an agentic AI copilot as a core engine subsystem with compile-time-generated tool surfaces and undo-stack integration. BLD does — and the architectural consequences compound into a materially different developer experience.
 
@@ -1658,7 +1758,7 @@ The Rust↔C++ boundary runs through a single narrow C-ABI (generated by `cbindg
 
 BLD is eight Rust crates under `bld/` — `bld-mcp`, `bld-tools`, `bld-provider`, `bld-rag`, `bld-agent`, `bld-governance`, `bld-bridge`, `bld-ffi` — built by Cargo as a workspace and imported into CMake via Corrosion as a single static library. The editor contains a small `bld_bridge/` module that holds the `cxx` bindings, wraps the C-ABI handle types in C++ RAII, and adapts BLD's command submissions to the editor's `CommandStack`.
 
-The RAG layer (`bld-rag`) indexes two corpora: the engine's source and docs (shipped pre-built) and the user's project (built incrementally on filesystem-watch events). `tree-sitter` provides AST-aware chunking; `petgraph` builds the symbol graph and runs a structural-importance ranking. Embeddings default to `nomic-embed-code` via `candle` — offline, no API keys required on first run. Storage is SQLite + sqlite-vss via `rusqlite`. No server process.
+The RAG layer (`bld-rag`) indexes two corpora: the engine's source and docs (shipped pre-built) and the user's project (built incrementally on filesystem-watch events). `tree-sitter` provides AST-aware chunking; `petgraph` builds the symbol graph and runs a structural-importance ranking. Embeddings default to `nomic-embed-code` via `candle` — offline, no API keys required on first run. Storage is SQLite + sqlite-vec via `rusqlite` (ADR-0013 supersedes the original sqlite-vss decision). No server process.
 
 LLM providers are pluggable behind an `ILLMProvider` trait. Claude Opus 4.6+ is the default for cloud work because it leads on agentic tool-use for our workloads. Alternate cloud LLMs configurable via `ILLMProvider`. For offline work, `candle` (or `llama-cpp-rs` as fallback) drives a local model with a GBNF grammar derived from the tool registry's schemas at startup — small local models emit structurally valid tool calls. Offline mode shows an explicit "reduced capability" banner; we never silently degrade.
 
@@ -1681,7 +1781,7 @@ BLD is not a feature added to an engine. It is an engine designed with the assum
 
 ## Chapter 12 — Visual Scripting: Text IR as Ground-Truth
 
-Visual scripting in Greywater_Engine is **text-first, AI-native, and graph-visualized**. This is a deliberate departure from the Blueprint convention.
+Visual scripting in Greywater Engine is **text-first, AI-native, and graph-visualized**. This is a deliberate departure from the Blueprint convention.
 
 ### The rule
 

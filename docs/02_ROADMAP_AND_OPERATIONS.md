@@ -1,8 +1,8 @@
 # 02 — Roadmap & Operations
 
 **Status:** Operational — updated as phases complete  
-**Horizon:** 162 weeks · ~37 months · 25 phases  
-**Start:** 2026-04-20 · **Planned RC:** 2029-05-28
+**Horizon:** ~190 weeks · ~44 months · 29 phases (Sacrilege ships on the Phase 24 RC in week 162; Phases 26–29 are the franchise-platform tail)  
+**Start:** 2026-04-20 · **Planned Sacrilege RC:** 2029-05-28 · **Planned Franchise Pre-Prod close:** 2030-01-??
 
 > **The phase is the contract. The week is the budget. The milestone is the proof.**
 
@@ -32,11 +32,15 @@
 | 18 | Cinematics & Editor Toolchain | 114–118 | 5w | *Studio Ready* | ✅ Complete |
 | 19 | **Blacklake Core: HEC, SDR, Chunk Streaming** | 119–126 | 8w | *Infinite Seed* | ✅ Complete (26 universe_tests) |
 | 20 | **GPTM, Nine Circles Geometry, Floating Origin** | 127–134 | 8w | *Nine Circles Ground* | 🔜 Active |
-| 21 | **Hell Frame: Horror Post, Decals, HUD, Audio** | 135–142 | 8w | *Hell Frame* | 🔜 Planned |
-| 22 | **Martyrdom Combat & Player Stack** | 143–148 | 6w | *Martyrdom Online* | 🔜 Planned |
-| 23 | **Damned Host, Encounters, God Machine Boss** | 149–154 | 6w | *God Machine RC* | 🔜 Planned |
-| 24 | Hardening & Release | 155–162 | 8w | *Release Candidate* | 🔜 Planned |
+| 21 | **Hell Frame & Narrative Skin** | 135–142 | 8w | *Hell Frame* | 🔜 Planned |
+| 22 | **Martyrdom & God Mode** | 143–148 | 6w | *Martyrdom Online* | 🔜 Planned |
+| 23 | **Damned Host, Encounters, God Machine + Logos** | 149–154 | 6w | *God Machine RC* | 🔜 Planned |
+| 24 | Hardening & Release (**Sacrilege ships**) | 155–162 | 8w | *Release Candidate* | 🔜 Planned |
 | 25 | LTS Sustenance | 163–∞ | Ongoing | Quarterly LTS | 🔜 Ongoing |
+| 26 | **Runtime AI Stack** (ai_runtime, hybrid Director, symbolic music) | parallel 135–162 | 8w | *Living Director* | 🔜 Planned |
+| 27 | **Franchise Services Hardening** (seven IP-agnostic services) | parallel 143–162 | 6w | *Content Engine* | 🔜 Planned |
+| 28 | **Cook-time AI Pipeline** (VAE weapons, WFC+RL, neural material, symbolic music training) | parallel 149–162 | 6w | *Forge Online* | 🔜 Planned |
+| 29 | **Franchise Pre-Production** (Apostasy / Silentium / The Witness design + prototype slots) | 163–190 | ~28w | *Second IP Ready* | 🔜 Planned |
 
 ---
 
@@ -67,9 +71,9 @@
 
 ---
 
-## Upcoming Phase: Phase 21 — Hell Frame
+## Upcoming Phase: Phase 21 — Hell Frame & Narrative Skin
 
-*The phase that makes Greywater Engine look and sound like Sacrilege.*
+*The phase that makes Greywater Engine look and sound like Sacrilege — and gives the Nine Circles their Story-Bible Location Skins.*
 
 ### Week-by-Week
 
@@ -78,34 +82,34 @@
 | 135 | `horror_post.hlsl` — chromatic aberration, film grain, screen shake in single pass | A |
 | 136 | Sin tendril vignette shader; Ruin desaturation; Rapture whiteout (post-process CVars) | A |
 | 137 | `BloodDecalSystem` — compute stamp + drip; 512-entry ring buffer; `DecalComponent` | A |
-| 138 | Circle-specific fog parameters — per-biome ambient, fog colour, visibility range | A |
-| 139 | `MartyrdomAudioController` — Sin choir, Rapture thunder, Ruin drone, BPM layer crossfade | A |
-| 140 | Diegetic HUD — blood vial, runic Sin ring, Mantra counter in RmlUi | A |
-| 141 | Performance gate: RX 580 @ 1080p / 144 FPS with full horror post stack | A |
-| 142 | *Hell Frame* exit gate: `sandbox_hell_frame` — Violence Circle, full post, decals, HUD | A |
+| 138 | Circle-specific fog parameters + **Location Skins** (Vatican Necropolis, Colosseum of Echoes, Sewer of Grace, Hell's Factory, Rome Above, Palazzo of the Unspoken, Open Arena, Heaven's Back Door, Silentium) wired as `CircleProfile::location_skin` data | A |
+| 139 | `MartyrdomAudioController` — Sin choir, Rapture thunder, Ruin drone, BPM layer crossfade; `engine/narrative/dialogue_graph` line-trigger events on the horror post stack | A |
+| 140 | Diegetic HUD — blood vial, runic Sin ring, Mantra counter in RmlUi; editor **Circle Editor** + **Encounter Editor** panels land for Location Skin authoring | A |
+| 141 | Performance gate: RX 580 @ 1080p / 144 FPS with full horror post stack + narrative-line trigger overhead | A |
+| 142 | *Hell Frame* exit gate: `sandbox_hell_frame` — Violence Circle (**Open Arena** skin), full post, decals, HUD, three Malakor / Niccolò voice lines triggered by Sin thresholds | A |
 
 ---
 
-## Upcoming Phase: Phase 22 — Martyrdom Combat & Player Stack
+## Upcoming Phase: Phase 22 — Martyrdom & God Mode
 
-*The phase where Sacrilege becomes playable.*
+*The phase where Sacrilege becomes playable and the Sin 70–100 band escalates into Blasphemy State / God Mode.*
 
 ### Week-by-Week
 
 | Week | Deliverable | Tier |
 |------|-------------|------|
-| 143 | Martyrdom ECS components: `SinComponent`, `MantraComponent`, `RaptureState`, `RuinState`, `ResolvedStats` | A |
-| 144 | `SinAccrualSystem`, `MantraAccrualSystem`, `RaptureCheckSystem`, `RaptureTickSystem`, `RuinTickSystem` | A |
-| 145 | `BlasphemySystem` — all 5 Blasphemies; `StatCompositionSystem` | A |
-| 146 | Player controller: swept-AABB, bunny hop, slide, wall kick | A |
-| 147 | Grapple hook, blood surf, Glory Kill trigger | A |
-| 148 | *Martyrdom Online* exit gate: 2-player session, full Martyrdom loop, no desync over 5 min | A |
+| 143 | Martyrdom ECS components: `SinComponent`, `MantraComponent`, `RaptureState`, `RuinState`, `ResolvedStats`; `gameplay/martyrdom/god_mode.hpp` + `blasphemy_state.hpp` additions | A |
+| 144 | `SinAccrualSystem`, `MantraAccrualSystem`, `RaptureCheckSystem`, `RaptureTickSystem`, `RuinTickSystem`; `engine/narrative/sin_signature` rolling fingerprint | A |
+| 145 | `BlasphemySystem` — all 5 canon Blasphemies + three Story-Bible unlockables (Salt Pillar, Inverted Gravity, Hymn Needles) gated to Acts II/III; `StatCompositionSystem` | A |
+| 146 | Player controller: swept-AABB, bunny hop, slide, wall kick; **Malakor / Niccolò voice director** with mirror-step ability | A |
+| 147 | Grapple hook, blood surf, Glory Kill trigger; **God Mode / Blasphemy State** reality-warp post hooks (Act II mirror-step, gravity invert) | A |
+| 148 | *Martyrdom Online* exit gate: 2-player session, full Martyrdom loop, God Mode onset + exit parity, no desync over 5 min; editor **Dialogue Graph** + **Sin-Signature** + **Act / Phase State** panels land | A |
 
 ---
 
-## Upcoming Phase: Phase 23 — Damned Host, Encounters, God Machine
+## Upcoming Phase: Phase 23 — Damned Host, Encounters, God Machine + Logos
 
-*The phase that makes Sacrilege a game, not a tech demo.*
+*The phase that makes Sacrilege a game, not a tech demo — and adds the Grace finale (Logos alternate Phase 4).* 
 
 ### Week-by-Week
 
@@ -113,10 +117,10 @@
 |------|-------------|------|
 | 149 | Enemy archetypes: Cherubim, Deacon, Leviathan, Warden — ECS + BT wiring | A |
 | 150 | Enemy archetypes: Martyr, Hell Knight, Painweaver, Abyssal — ECS + BT wiring | A |
-| 151 | Gore system: dismemberment, limb entities as nav obstacles, blood decal placement on hit | A |
+| 151 | Gore system: dismemberment, limb entities as nav obstacles, blood decal placement on hit; **hybrid AI Director** (rule state machine + bounded RL params) wired from Phase 26 | A |
 | 152 | Full weapon roster: all 6 weapons, hitscan/projectile/melee, alt-fires, Sin/Mantra coupling | A |
-| 153 | God Machine boss: 4 phases, arena collapse, Martyrdom economy gating | A |
-| 154 | *God Machine RC* exit gate: Circle IX (Treachery) end-to-end playable; God Machine defeatable | A |
+| 153 | God Machine boss: 4 phases, arena collapse, Martyrdom economy gating; **Logos alternate Phase 4** — Silent God speaks with player's own voice from Sin-signature data; **Grace meter** unlocks in Act III | A |
+| 154 | *God Machine RC* exit gate: Circle IX (**The Silentium / Throne of the Logos** skin) end-to-end playable; God Machine defeatable by damage **and** Logos defeatable by Grace (`forgive` Blasphemy); editor **AI Director Sandbox** + **Editor Copilot** panels land | A |
 
 ---
 
@@ -124,13 +128,73 @@
 
 | Week | Deliverable | Tier |
 |------|-------------|------|
-| 155–156 | Full regression: 711+ tests green all presets; zero sanitizer warnings | A |
-| 157 | WCAG 2.2 AA audit pass; post-effect accessibility toggles all functional | A |
-| 158 | Platform builds: Windows installer + Linux AppImage/DEB, signed | A |
-| 159 | BLD ships ~60 tools; RAG index shipped as asset; all editor tools functional | A |
-| 160 | 4-client co-op session stable 15+ min; voice chat works | B |
-| 161 | Engineering handbook, LTS runbook, onboarding guide — all indexable by BLD | A |
-| 162 | *Release Candidate* — all 9 Circles completable; God Machine defeatable; 10-min demo | A |
+| 155–156 | Full regression: 711+ tests green all presets; zero sanitizer warnings; fuzz (tests/fuzz/) + determinism (nightly `determinism.yml`) + Steam Deck probe all green | A |
+| 157 | WCAG 2.2 AA audit pass (gameplay + editor); post-effect accessibility toggles all functional; photosensitivity pre-warning | A |
+| 158 | Platform builds: Windows installer + Linux AppImage/DEB + Steam Deck (steamrt-sniper) — Ed25519-signed cooked asset verification enabled in Release | A |
+| 159 | BLD ships ~60 tools; RAG index shipped as asset; all editor tools functional (incl. concept-to-material, encounter-suggest, exploit-detect, scene-heatmap, voice-line-generate) | A |
+| 160 | 4-client co-op session stable 15+ min; voice chat works; gameplay_replay capture (< 1 MB per run) round-trips deterministically | B |
+| 161 | Engineering handbook, LTS runbook, onboarding guide, Mod SDK docs — all indexable by BLD | A |
+| 162 | *Release Candidate* — all 9 Circles completable; God Machine defeatable; Logos defeatable by Grace; 10-min demo; **Sacrilege ships** | A |
+
+---
+
+## Phase 26 — Runtime AI Stack  *(parallel with 21–24, 8w)*
+
+*Living Director — on-device ML under the `01` §2.2.2 carve-out. Hybrid rule state machine + bounded RL params; symbolic-transformer music; optional neural material eval.*
+
+| Week (par. offset) | Deliverable | Tier |
+|-|-------------|------|
+| W+0 | `engine/ai_runtime/inference_runtime.{hpp,cpp}` — ggml CPU wrapper (opt-in Vulkan behind `GW_AI_VULKAN=OFF`); `model_registry.hpp` with BLAKE3 + Ed25519 verify | A |
+| W+1 | `director_policy.hpp` — L4D-style state machine (Build-Up / Sustained Peak / Peak Fade / Relax); bounded RL parameter clamps; reset-on-rewind for rollback safety | A |
+| W+2 | `music_symbolic.hpp` — ≤1M param RoPE transformer picking BPM-sync layer crossfade over cooked stems; presentation-only | A |
+| W+3 | `material_eval.hpp` — ggml Vulkan compute shader eval of cooked neural material weights; non-authoritative | A |
+| W+4 | `ai_cvars.hpp` + perf gates: `gw_perf_gate_ai_runtime` enforces ≤ 0.74 ms total budget on RX 580 | A |
+| W+5 | `apps/sandbox_director/` — standalone headless-CI + interactive ImGui modes; `gw_perf_gate_director` ≤ 0.1 ms | A |
+| W+6 | Determinism validator extension: same seed + same checkpoint + same synthetic input = bitwise-identical state hash Linux ↔ Windows | A |
+| W+7 | *Living Director* milestone: sandbox_director prints `DIRECTOR SANDBOX OK`, determinism.yml passes, editor AI Director Sandbox panel reads the same library | A |
+
+---
+
+## Phase 27 — Franchise Services Hardening  *(parallel with 22–24, 6w)*
+
+*Content Engine — declare, contract-test, and ship the seven IP-agnostic services. Sacrilege consumes all seven; no second IP required yet.*
+
+| Week (par. offset) | Deliverable | Tier |
+|-|-------------|------|
+| W+0 | `engine/services/material_forge/` INTERFACE schema + impl shim wrapping `engine/render/material/` | A |
+| W+1 | `engine/services/level_architect/` wrapping `engine/world/` + cook-time WFC/RL hooks | A |
+| W+2 | `engine/services/combat_simulator/` wrapping `engine/ai/` + enemy DNA schema; `engine/services/gore/` schema + impl | A |
+| W+3 | `engine/services/audio_weave/` wrapping `engine/audio/` + symbolic-music runtime; `engine/services/director/` wrapping Phase 26 Director | A |
+| W+4 | `engine/services/editor_copilot/` wrapping BLD tool surface + HITL approval | A |
+| W+5 | *Content Engine* milestone: each service has a `schema/` header, an impl target, a doctest, and an integration test that a dummy "Apostasy" pre-prod prototype can link to without touching Sacrilege | A |
+
+---
+
+## Phase 28 — Cook-time AI Pipeline  *(parallel with 23–24, 6w)*
+
+*Forge Online — offline ML bakeries under §2.2.1 (Python). No shipped runtime impact beyond pinned cooked weights.*
+
+| Week (par. offset) | Deliverable | Tier |
+|-|-------------|------|
+| W+0 | `tools/cook/ai/vae_weapons/` — VAE generates weapon permutations; balance filter emits cooked `.gwweapon` | A |
+| W+1 | `tools/cook/ai/wfc_rl_scorer/` — scores WFC layouts with trained RL agent; emits baked parameter sets consumed by Blacklake | A |
+| W+2 | `tools/cook/ai/music_symbolic_train/` — trains the symbolic transformer used by `audio_weave` | A |
+| W+3 | `tools/cook/ai/neural_material/` — concept/prompt → baked `.gwmat` nodes | A |
+| W+4 | `tools/cook/ai/director_train/` — produces pinned Director policy checkpoints (ADR-0097) | A |
+| W+5 | *Forge Online* milestone: all five pipelines reproduce deterministic outputs on CI; pinned weights live under `assets/ai/` with signatures | A |
+
+---
+
+## Phase 29 — Franchise Pre-Production  *(163–190, non-blocking)*
+
+*Second IP Ready — design docs, prototype slots, and platform-fit validation for the Sacrilege family. Never competes with flagship resources.*
+
+| Weeks | Deliverable | Tier |
+|-------|-------------|------|
+| 163–170 | ***Sacrilege 2: Apostasy*** one-page vision in `docs/11_NARRATIVE_BIBLE.md` + 2-week prototype slot in `apps/sandbox_apostasy_prototype/` | B |
+| 171–178 | ***Sacrilege: Silentium*** (survival-horror in the mirror dimension) vision + prototype slot | B |
+| 179–186 | ***Sacrilege: The Witness*** (prequel) vision + prototype slot | B |
+| 187–190 | *Second IP Ready* milestone — one prototype completes a 10-min loop using the seven services unchanged; zero patches to Sacrilege runtime | B |
 
 ---
 

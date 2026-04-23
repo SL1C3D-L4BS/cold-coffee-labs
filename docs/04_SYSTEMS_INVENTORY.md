@@ -18,10 +18,10 @@
 
 ## Scope Note
 
-*Sacrilege* is a **3D arena FPS**. The systems below reflect that scope:
+*Sacrilege* is a **3D arena FPS** layered with a theological-horror Story Bible. Cold Coffee Labs is a **horror studio** and Greywater is a **franchise content platform**. The systems below reflect both scopes:
 
-- **In:** arena-scale procedural generation, fast FPS combat, persistent gore, Martyrdom loop, Nine Circles
-- **Out:** planetary simulation, orbital mechanics, atmospheric layers (flight), galaxy generation, open-world survival, base building, territory systems, faction utility AI — none of these are *Sacrilege*
+- **In:** arena-scale procedural generation, fast FPS combat, persistent gore, Martyrdom loop, Nine Circles (with Location Skins), runtime AI (bounded, deterministic, §2.2.2), narrative reactivity (dialogue graph, Sin-signature, Acts I–III, Grace finale), seven IP-agnostic franchise services
+- **Out:** planetary simulation, orbital mechanics, atmospheric layers (flight), galaxy generation, open-world survival, base building, territory systems, faction utility AI, unbounded runtime ML, internet-connected AI
 
 ---
 
@@ -53,7 +53,7 @@
 | System | Module | Library / Decision | Phase | Tier |
 |--------|--------|--------------------|-------|------|
 | Rendering HAL | `engine/render/hal/` | Custom ~30-type abstraction | 4 | A |
-| Vulkan 1.2 backend (1.3 opportunistic) | `engine/render/` | volk + VMA | 4 | A |
+| Vulkan 1.3 backend | `engine/render/` | volk + VMA (ADR-0111 baseline) | 4 | A |
 | Descriptor system (bindless) | `engine/render/` | `VK_EXT_descriptor_indexing` | 4 | A |
 | Pipeline cache | `engine/render/` | Vulkan pipeline cache + content hashes | 4 | A |
 | Frame graph | `engine/render/` | Custom DAG; auto-barriers, transient aliasing | 5 | A |
@@ -64,7 +64,11 @@
 | Cascaded shadows | `engine/render/` | Custom | 5 | A |
 | IBL | `engine/render/` | Split-sum approximation | 5 | A |
 | Tonemapping | `engine/render/post/` | PBR Neutral (default) + ACES | 5, 17 | A |
-| Horror post stack | `engine/render/post/` | CA, film grain, screen shake, Sin tendrils, Ruin desaturation, Rapture whiteout — all in one pass | 21 | A |
+| Horror post stack | `engine/render/post/` | CA, film grain, screen shake, Sin tendrils, Ruin desaturation, Rapture whiteout, **God Mode reality warp** (mirror-step, gravity invert) — all in one pass | 21/22 | A |
+| FSR 2 upscaling (Vulkan) | `engine/render/post/fsr2/` | AMD FSR 2/3.1 (no Frame Gen on Polaris); `GW_ENABLE_FSR2` | 24 | B |
+| HDR10 swapchain output | `engine/render/hal/` | `VK_EXT_hdr_metadata` + PQ tonemap `shaders/post/tonemap_pq.frag.hlsl`; `r.HDROutput` | 24 | B |
+| Frame pacing / present timing | `engine/render/hal/swapchain.cpp` | `VK_KHR_present_id` + `VK_KHR_present_wait` | 24 | A |
+| GPU-driven occlusion culling | `engine/render/forward_plus/` | Hi-Z + `VK_KHR_draw_indirect_count`; `r.GPUCulling` | 24 | B |
 | GPU blood decal system | `engine/render/vfx/` | Compute stamp + drip; 512 ring buffer | 21 | A |
 | Circle-specific atmosphere | `engine/render/` | Per-circle fog/ambient parameters; no full raymarched scattering | 21 | A |
 | GPU particles | `engine/vfx/particles/` | Compute emit/sim; muzzle flash, blood spray, explosions | 17 | B |
@@ -139,6 +143,46 @@ These systems generate the Nine Inverted Circles. They are **arena-scale** — n
 | Arena collapse system | `gameplay/boss/` | 23 | A |
 | Circle transition system | `gameplay/circles/` | 23 | A |
 | Speedrun timer + seed display | `gameplay/ui/` | 24 | B |
+| **God Mode / Blasphemy State** onset + VFX hooks | `gameplay/martyrdom/god_mode.hpp` | 22 | A |
+| **Blasphemy State** reality-warp transitions | `gameplay/martyrdom/blasphemy_state.hpp` | 22 | A |
+| **Grace meter** (Act III terminal Blasphemy `forgive`) | `gameplay/martyrdom/grace_meter.hpp` | 23 | A |
+| **Malakor / Niccolò** dual-consciousness voice director | `gameplay/characters/malakor_niccolo/` | 22 | A |
+| **Acts I / II / III** encounter gates | `gameplay/acts/` | 22–23 | A |
+| **Logos alternate Phase 4** (Silent God, Grace finale) | `gameplay/boss/logos/` | 23 | A |
+
+---
+
+## 2c. Runtime AI (Tier A — seed-fed, deterministic, §2.2.2 carve-out)
+
+On-device C++ inference only. Bounded per-system budgets on RX 580; total ≤ 0.74 ms/frame. All weights are pinned, versioned, Ed25519-signed cooked assets under `assets/ai/`.
+
+| System | Module | Library / Decision | Phase | Tier | Budget |
+|--------|--------|--------------------|-------|------|--------|
+| Inference runtime (CPU) | `engine/ai_runtime/inference_runtime.*` | ggml / llama.cpp C++ headers, CPU backend (ADR-0095) | 26 | A | n/a |
+| Inference runtime (GPU, opt-in read-only) | `engine/ai_runtime/inference_runtime.*` | ggml Vulkan backend behind `GW_AI_VULKAN=OFF` | 26 | B | n/a |
+| Pinned model registry | `engine/ai_runtime/model_registry.hpp` | BLAKE3 + Ed25519 verify; semantic versioning | 26 | A | n/a |
+| **Hybrid AI Director** — rule state machine + bounded RL params | `engine/ai_runtime/director_policy.hpp` | L4D-style Build-Up/Sustained/Fade/Relax + PPO-tuned parameter clamps (ADR-0097) | 26 | A | ≤ 0.1 ms |
+| **Symbolic adaptive music** — layered stems + tiny transformer | `engine/ai_runtime/music_symbolic.hpp` | RoPE ≤ 1M params, CPU (ADR-0098) | 26 | A | ≤ 0.2 ms |
+| **Neural material evaluator** — runtime eval of cooked weights | `engine/ai_runtime/material_eval.hpp` | ggml Vulkan compute; non-authoritative | 26 | B | ≤ 0.4 ms |
+| AI CVars / budgets / toggles | `engine/ai_runtime/ai_cvars.hpp` | Perf gate `gw_perf_gate_ai_runtime` | 26 | A | n/a |
+| AI Director Sandbox (standalone app) | `apps/sandbox_director/` | Headless-CI + interactive ImGui modes; `gw_perf_gate_director` (ADR-0107) | 26 | A | ≤ 0.1 ms |
+
+**Explicit rejections on RX 580 hardware floor:** full neural audio synthesis at runtime, on-device LLM dialog generation, Internet-sourced model updates, on-device fine-tuning outside replicated save-state.
+
+---
+
+## 2d. Narrative Layer (Tier A — Story Bible runtime)
+
+Story-Bible-aware systems that skin the Martyrdom spine with Malakor / Niccolò, Acts I–III, and the Grace finale. All dialogue and Act data is cooked data (`.gwdlg`, `.gwact`); runtime is deterministic and rollback-safe.
+
+| System | Module | Library / Decision | Phase | Tier |
+|--------|--------|--------------------|-------|------|
+| Dialogue graph runtime | `engine/narrative/dialogue_graph.hpp` | `.gwdlg` reader; typed IR (speaker / line / trigger / consequence) | 21 | A |
+| Act / Phase state machine | `engine/narrative/act_state.hpp` | Acts I / II / III with phase gates (ADR-0099) | 21 | A |
+| Sin-signature fingerprint | `engine/narrative/sin_signature.hpp` | Rolling table (God-Mode-uptime, Precision, Cruelty, Hitless, Deaths/area) (ADR-0100) | 22 | A |
+| Malakor / Niccolò voice director | `engine/narrative/voice_director.hpp` | Speaker selection + line pick (ADR-0099) | 22 | A |
+| Grace meter | `engine/narrative/grace_meter.hpp` | Act III-only; terminal `forgive` Blasphemy (ADR-0101) | 23 | A |
+| Dialogue reachability analysis | BLD tool `dialogue_reachability` | Agent-side graph analysis of `.gwdlg` (HITL) | 23 | B |
 
 ---
 
@@ -213,8 +257,21 @@ These systems generate the Nine Inverted Circles. They are **arena-scale** — n
 |--------|--------|---------|-------|------|
 | **Editor UI** | `editor/` | Dear ImGui + docking + viewports + ImNodes + ImGuizmo | 7 | A |
 | **In-game HUD** | `gameplay/hud/` | RmlUi + HarfBuzz + FreeType | 21 | A |
+| **In-game UI runtime** | `engine/ui/` | RmlUi service + Vulkan HAL backend + text shaping | 11 | A |
+| **Shipped RML/HTML/CSS assets** | `assets/ui/` | — (cooked UI content) | 11+ | A |
+| **Privacy / DSAR UI fragments** | `ui/privacy/` | RmlUi (GDPR consent, data-export dialogs) | 16 | A |
 
 **Rule:** ImGui is for the editor. RmlUi is for in-game. These are permanent, non-negotiable choices.
+
+### 8.1 UI root ownership
+
+Three directories participate in the in-game UI stack and each has a distinct role:
+
+- **`engine/ui/`** — C++23 runtime only. Owns the RmlUi service, the Vulkan HAL backend adapter, text shaping, and the event plumbing. No art, no markup. ADR-0026..0028.
+- **`assets/ui/`** — Cooked, version-stable RML/HTML/CSS/images referenced by the shipping game. Built through the `gw_cook` pipeline like any other asset. Human-authored sources live under `content/ui/`.
+- **`ui/privacy/`** — Phase 16 DSAR / consent UI fragments (GDPR, COPPA). Kept as a separate root because the privacy surface has stricter review and ships in every build including demo / free trials. ADR-0062.
+
+All three are **additive**, not layered. Nothing under `assets/ui/` or `ui/privacy/` is compiled C++; they are data consumed by `engine/ui/`.
 
 ---
 
@@ -243,6 +300,9 @@ These systems generate the Nine Inverted Circles. They are **arena-scale** — n
 | Locale runtime | `engine/i18n/` | ICU | 16 | B |
 | WCAG 2.2 AA accessibility | `engine/a11y/` | AccessKit-C | 16 | B |
 | Post-effect accessibility toggles | `gameplay/hud/` | CVar-driven | 21 | A |
+| Gameplay a11y toggles (Tier A, ADR-0116) | `engine/a11y/` + `gameplay/hud/` | Colour-blind palettes, chromatic/shake/motion-blur sliders, subtitles + speaker labels, gore slider, photosensitivity pre-warning, audio mono-mix + per-channel sliders, one-hand input preset | 24 | A |
+| Editor a11y toggles | `editor/a11y/` | Reduce corruption, disable vignette/glitch, force HC, force mono font | 21–23 | A |
+| Narrative localization (`.gwdlg` strings) | `engine/narrative/` + `engine/i18n/` | CSV round-trip via `editor/panels/localization_panel` | 21–23 | B |
 
 ---
 
@@ -253,7 +313,12 @@ These systems generate the Nine Inverted Circles. They are **arena-scale** — n
 | Save/load (`.gwsave`) | `engine/persistence/` | Custom + SQLite | 15 | A |
 | Hell Seed save/restore | `gameplay/` | Custom via persistence | 22 | A |
 | Speedrun timer persistence | `gameplay/ui/` | Custom | 24 | B |
-| Crash reporting | `engine/telemetry/` | Sentry Native SDK | 15 | B |
+| Crash reporting | `engine/core/crash_reporter.cpp` | Sentry Native SDK via `GW_ENABLE_SENTRY`; minidump upload + symbol server (ADR-0114) | 15/24 | B |
+| Content signing (cooked assets) | `tools/cook/cook_worker.cpp` | Ed25519 signature + BLAKE3 manifest; runtime verify in Release (ADR-0115) | 24 | A |
+| Opt-in telemetry (GDPR) | `engine/telemetry/` | Aggregated crash + seed + completion-rate; first-run opt-in | 24 | B |
+| Gameplay replay capture | `bld/bld-replay/` (extended) | `gameplay_replay` schema: input stream + seed + version; < 1 MB per run; bitwise-deterministic reproduce | 24 | A |
+| Steam Input integration (Tier A) | `engine/input/steam_input_glue.cpp` | Correct Deck glyphs; no M+KB on controller; default bindings complete (ADR-0113) | 24 | A |
+| Mod SDK (formalized) | `gameplay/mod_example/` + docs | Manifest TOML + filesystem jail + IPC channel for BLD tools | 24 | B |
 
 ---
 
@@ -270,6 +335,9 @@ BLD is the AI copilot for the editor. It is a Rust crate linked into the editor 
 | `bld-rag` | RAG pipeline — tree-sitter chunking, sqlite-vec index |
 | `bld-agent` | Main agent loop |
 | `bld-governance` | HITL approval; every BLD action is undoable via CommandStack |
+| `bld-bridge` | Editor ↔ BLD in-process bridge |
+| `bld-tools-macros` | `#[bld_tool]` proc-macro implementation crate |
+| `bld-replay` | Deterministic replay (audit + gameplay_replay extension) |
 
 **BLD tools relevant to Sacrilege authoring:**
 - `encounter.place_enemy(circle, pos, type, patrol_path)`
@@ -279,6 +347,31 @@ BLD is the AI copilot for the editor. It is a Rust crate linked into the editor 
 - `asset.place_mesh(path, pos, rot, scale)`
 - `behavior_tree.create_node(bt_asset, node_type, parent_id)`
 - `debug.spawn_enemy(type, pos)` — in play mode
+- `concept_to_material(prompt | concept_image) -> .gwmat` (cook-time; HITL)
+- `encounter_suggest(circle, difficulty)` → placement set
+- `exploit_detect(level)` → list of stuck spots, soft-locks, infinite loops
+- `scene_heatmap(replay_trace)` → heat visualization
+- `voice_line_generate(character, context)` → line draft (HITL mandatory)
+- `dialogue_reachability(.gwdlg)` → unreachable/dead branches
+- `director_tune(scenario_yaml, reward_weights)` → checkpoint search with early stopping
+
+---
+
+## 13. Franchise Services (Tier A — IP-agnostic content platform, Phase 27)
+
+The engine is factored into **seven services** that define the reusable surface for every Cold Coffee Labs IP. Sacrilege consumes all seven; *Apostasy* / *Silentium* / *The Witness* prove the platform in Phase 29. Data schemas are IP-agnostic; no Sacrilege-specific types leak.
+
+| Service | Module | What it owns | Schema root | Phase | Tier |
+|---------|--------|--------------|-------------|-------|------|
+| **Material Forge** | `engine/services/material_forge/` | `.gwmat` authoring + neural PBR eval hook + node graph IR | `schema/material.hpp` | 27 | A |
+| **Level Architect** | `engine/services/level_architect/` | Blacklake arena layouts + cook-time WFC/RL scorer + deterministic parameter bundles | `schema/layout.hpp` | 27 | A |
+| **Combat Simulator** | `engine/services/combat_simulator/` | Enemy DNA graph + encounter scoring + BT registration index | `schema/encounter.hpp` | 27 | A |
+| **Gore System** | `engine/services/gore/` | Dismemberment rules, decal propagation, limb entities as nav obstacles | `schema/gore.hpp` | 27 | A |
+| **Audio Weave** | `engine/services/audio_weave/` | Layered stems + symbolic transformer music runtime + BPM-sync crossfade | `schema/music.hpp` | 27 | A |
+| **AI Director** | `engine/services/director/` | Hybrid rule state machine + bounded RL params + Sandbox | `schema/director.hpp` | 27 | A |
+| **Editor Co-Pilot** | `engine/services/editor_copilot/` | BLD tool surface + HITL flows + transaction brackets | `schema/copilot.hpp` | 27 | A |
+
+**Contract test:** every service ships a doctest + an "imaginary second IP" integration test (a trivial prototype linking only the service's schema + impl headers) that is required to stay green.
 
 ---
 

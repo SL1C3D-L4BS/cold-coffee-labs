@@ -164,6 +164,10 @@ pub mod tools;
 // The Phase 9 tool taxonomy — 78 additional stubs bring the registry to 79.
 pub mod taxonomy;
 
+// Sacrilege copilot tools (Part B §12.6, ADR-0109). Seven descriptor-only
+// stubs; bodies land in Phase 22/23/26/28.
+pub mod sacrilege_tools;
+
 /// Autogenerate `component.<Type>.{get|set_*|reset}` tool descriptors from
 /// the editor's reflection manifest (ADR-0012 §2.5).
 pub mod component_autogen;

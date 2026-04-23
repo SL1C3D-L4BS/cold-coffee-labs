@@ -7,7 +7,6 @@
 
 #include "engine/net/session.hpp"
 
-#include <algorithm>
 #include <mutex>
 #include <unordered_map>
 
@@ -77,7 +76,7 @@ private:
 } // namespace
 
 std::unique_ptr<ISessionProvider> make_dev_local_session_provider() {
-    return std::unique_ptr<ISessionProvider>{new DevLocalSessionProvider{}};
+    return std::make_unique<DevLocalSessionProvider>();
 }
 
 std::unique_ptr<ISessionProvider> make_steam_session_provider() {

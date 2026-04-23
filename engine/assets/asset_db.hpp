@@ -114,7 +114,7 @@ private:
 
     // Long-lived async-load worker. Managed by engine/jobs/ (NN #10);
     // destruction order: set stop_loader_ → loader_thread_.join() runs
-    // in ~ReservedWorker. See docs/AUDIT_MAP_2026-04-20.md (P2-1).
+    // in ~ReservedWorker. See audit-2026-04-20 (P2-1).
     std::atomic<bool>        stop_loader_{false};
     gw::jobs::ReservedWorker loader_thread_;
 

@@ -1,5 +1,5 @@
 #include "submit.hpp"
-#include <algorithm>
+#include "engine/core/assert.hpp"
 #include <expected>
 
 namespace gw::render::frame_graph {
@@ -298,7 +298,7 @@ Result<std::vector<QueueSubmission>> MultiQueueScheduler::build_submissions(
     for (size_t i = 0; i < execution_order.size(); ++i) {
         PassHandle pass_handle = execution_order[i];
         const auto& pass = passes[pass_handle];
-        const auto& pass_barriers = barriers[i];
+        [[maybe_unused]] const auto& pass_barriers = barriers[i];
         
         QueueSubmission submission(pass.desc.queue);
 
@@ -319,9 +319,14 @@ Result<std::vector<QueueSubmission>> MultiQueueScheduler::build_submissions(
         submission.signal_semaphores.push_back(timeline_result.value());
         submission.signal_values.push_back(submission.signal_timeline_value);
         
-        // TODO: Create actual command buffer for this pass
+        // P20-FRAMEGRAPH-CMDBUF: create_command_buffer_for_pass requires the
+        // per-pass command recorder + barrier emitter that Phase 20 hardening
+        // brings online. Until that lands, rather than pushing a submission
+        // with a null command buffer, the pass stubs out loudly.
+        GW_UNIMPLEMENTED("P20-FRAMEGRAPH-CMDBUF",
+                         "per-pass command buffer creation pending Phase 20 hardening");
         // submission.command_buffer = create_command_buffer_for_pass(pass_handle, pass_barriers);
-        
+
         submissions.push_back(std::move(submission));
     }
     

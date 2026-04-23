@@ -34,7 +34,7 @@ struct Version {
 
 // Returns a stable, null-terminated identifier of the form
 // "Greywater_Engine M.m.p (sha=... build=Debug)" from project(VERSION). Lifetime is 'static;
-// safe to pass directly to C APIs. See docs/12 §E1.
+// safe to pass directly to C APIs. See docs/03_PHILOSOPHY_AND_ENGINEERING.md §E1.
 [[nodiscard]] const char* version_string() noexcept;
 
 }  // namespace gw

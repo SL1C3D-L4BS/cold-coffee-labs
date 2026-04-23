@@ -71,14 +71,37 @@ endif()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 include(cmake/dependencies.cmake)
 
+# --- Vendored third-party (small, provenance-tracked C sources) --------------
+add_subdirectory(third_party/tiny_sha3)
+
 # --- Subsystems ---------------------------------------------------------------
 add_subdirectory(engine)
 add_subdirectory(shaders)
 
 # BLD — Rust workspace compiled via Corrosion (docs/01_CONSTITUTION_AND_PROGRAM.md §2.4, non-negotiable #15).
+#
+# P3.10 (audit-2026-04-20): BLD's Cargo profile now tracks CMAKE_BUILD_TYPE
+# unless overridden via -DGW_BLD_PROFILE=<dev|release>. Rationale:
+#
+#   - Debug CMake build → dev Cargo profile → opt-level 0, debuginfo, fast
+#     link, so stepping through BLD ↔ C++ in a debugger lines up.
+#   - Release CMake build → release Cargo profile → LTO, opt-level 3, as
+#     shipped.
+#
+# Forcing PROFILE=release in Debug made rust-gdb stepping useless and made
+# the editor link stage hide dev-time `debug_assertions` crashes.
+set(GW_BLD_PROFILE "" CACHE STRING "Cargo profile for BLD (dev|release). Empty tracks CMAKE_BUILD_TYPE.")
+if(GW_BLD_PROFILE)
+    set(_gw_bld_profile "${GW_BLD_PROFILE}")
+elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(_gw_bld_profile "dev")
+else()
+    set(_gw_bld_profile "release")
+endif()
+message(STATUS "BLD Cargo profile: ${_gw_bld_profile}  (CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}, GW_BLD_PROFILE=${GW_BLD_PROFILE})")
 corrosion_import_crate(
     MANIFEST_PATH "${CMAKE_SOURCE_DIR}/bld/Cargo.toml"
-    PROFILE release
+    PROFILE ${_gw_bld_profile}
     CRATE_TYPES staticlib
 )
 

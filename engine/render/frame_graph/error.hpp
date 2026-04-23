@@ -42,7 +42,7 @@ struct FrameGraphError {
 // `_Is_specialization_v<T, std::expected>` concept that rejects subclasses —
 // verified against MSVC STL 14.44). Therefore the discard-warning is applied
 // at *function* granularity via `[[nodiscard]]` attributes on each API that
-// returns a `Result<T>`. See docs/AUDIT_MAP_2026-04-20.md finding P3-1.
+// returns a `Result<T>`. See audit-2026-04-20 finding P3-1.
 template<typename T>
 using Result = std::expected<T, FrameGraphError>;
 

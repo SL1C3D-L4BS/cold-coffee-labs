@@ -38,3 +38,18 @@ CMakeLists.txt text
 *.webm   binary
 *.gltf   binary
 *.glb    binary
+
+# Git LFS — cooked content families produced by tools/cook/.
+# audit-2026-04-20 P4.5: declare LFS patterns BEFORE the first cooked asset
+# lands under /assets/, otherwise a 200 MB .gwmesh blob gets baked into the
+# pack history and the repo never shrinks again.
+#
+# Enabling LFS requires `git lfs install` on every developer clone and a
+# server-side LFS endpoint. Until we stand up GitHub LFS / Gitea LFS, the
+# patterns here are declarative: they mark these extensions as `-text` +
+# `filter=lfs` so that a misconfigured checkout fails loud rather than
+# committing a 200 MB binary into pack history.
+*.gwmesh filter=lfs diff=lfs merge=lfs -text
+*.gwtex  filter=lfs diff=lfs merge=lfs -text
+*.gwanim filter=lfs diff=lfs merge=lfs -text
+*.gwaud  filter=lfs diff=lfs merge=lfs -text

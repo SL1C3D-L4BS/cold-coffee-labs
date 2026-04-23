@@ -1,21 +1,43 @@
 #pragma once
 // engine/ecs/world.hpp
 // Top-level ECS container. See docs/10_APPENDIX_ADRS_AND_REFERENCES.md §2.1.
+//
+// IWYU audit (audit-2026-04-20 P5): every include below is load-bearing for the
+// inline template machinery at the foot of this header. We cannot drop any
+// without breaking a consumer. The god-header pressure this header exerts
+// ~350 KLOC across the engine is the cost of exposing archetype/chunk
+// internals so that `for_each<>`, `add_component<>`, `get_component<>` can
+// inline into the hot loop.
+//
+// Future-work burn-down (tracked in docs/10 ADR-0094 skeleton, not yet filed):
+//   1. Move the template implementations (§ "Template implementations" below)
+//      into `world.inl` included only at the bottom, so every consumer of
+//      `World` still pays the same include cost today but a future
+//      `IWorld` forward-decl can be split out into `world_fwd.hpp` for
+//      headers that only need to refer to `World*`.
+//   2. Most subsystems pass `World&` through and only need a forward-decl;
+//      `engine/ecs/world_fwd.hpp` (not yet extracted) would break the
+//      header chain.  Estimated .cpp recompile win: 30-40 % for
+//      engine/input, engine/telemetry, engine/persist headers that only
+//      need `class World;`.
+// The ratchet approach: when a consumer is refactored to take `World*`
+// through a pImpl or interface, flip its `#include "engine/ecs/world.hpp"` to
+// `#include "engine/ecs/world_fwd.hpp"`. No one-shot sweep.
 
-#include "archetype.hpp"
-#include "component_registry.hpp"
-#include "entity.hpp"
+#include "archetype.hpp"            // ArchetypeId, ArchetypeTable, kInvalidArchetypeId, archetype() — full type required for inline template access.
+#include "component_registry.hpp"   // ComponentRegistry + ComponentTypeId / ComponentMask — required by template bodies.
+#include "entity.hpp"               // Entity, Entity::null(), index() — trivially-copyable handle type, inlined everywhere.
 
-#include <algorithm>
-#include <array>
-#include <cstddef>
-#include <cstdint>
-#include <functional>
-#include <limits>
-#include <new>
-#include <stdexcept>
-#include <utility>
-#include <vector>
+#include <algorithm>    // std::ranges::sort in add_component<> template body.
+#include <array>        // std::array in for_each<> template body.
+#include <cstddef>      // std::byte (migrate_entity_ return type) + std::size_t.
+#include <cstdint>      // std::uint16_t / std::uint32_t / std::uint64_t in EntitySlot + restore_entity_with_bits.
+#include <functional>   // std::function<void(Entity)> used by visit_*.
+#include <limits>       // std::numeric_limits<std::uint16_t>::max() sentinel in EntitySlot.
+#include <new>          // std::launder + placement-new in add_component<>.
+#include <stdexcept>    // std::runtime_error thrown once in add_component<>; quarantined exception boundary per ADR-0086.
+#include <utility>      // std::move / std::forward / std::index_sequence used by for_each<>.
+#include <vector>       // std::vector return in children_of + internal slot table.
 
 namespace gw::ecs {
 

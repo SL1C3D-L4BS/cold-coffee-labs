@@ -52,7 +52,7 @@ public:
     // returns. The returned ReservedWorker owns the std::thread and joins
     // on destruction. Use for subsystems (asset loader, cook pool) whose
     // work does not fit the fork-join job-queue model.
-    // See CLAUDE.md non-negotiable #10 and docs/AUDIT_MAP_2026-04-20.md P2-1/P2-2.
+    // See CLAUDE.md non-negotiable #10 and audit-2026-04-20 P2-1/P2-2.
     [[nodiscard]] static ReservedWorker reserve_worker(ReservedWorker::Fn fn) {
         return ReservedWorker{std::move(fn)};
     }

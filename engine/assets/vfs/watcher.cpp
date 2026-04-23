@@ -1,6 +1,6 @@
 // engine/assets/vfs/watcher.cpp
 // Thin facade over gw::platform::FileWatch. All OS-level detail lives in
-// engine/platform/file_watch.cpp. See docs/AUDIT_MAP_2026-04-20.md (P2-3).
+// engine/platform/file_watch.cpp. See audit-2026-04-20 (P2-3).
 
 #include "watcher.hpp"
 

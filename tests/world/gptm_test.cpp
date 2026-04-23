@@ -1,8 +1,8 @@
 #include <doctest/doctest.h>
 
 #include "engine/memory/arena_allocator.hpp"
-#include "engine/world/planet/gptm_lod_selector.hpp"
-#include "engine/world/planet/gptm_mesh_builder.hpp"
+#include "engine/world/gptm/gptm_lod_selector.hpp"
+#include "engine/world/gptm/gptm_mesh_builder.hpp"
 #include "engine/world/streaming/chunk_data.hpp"
 #include "engine/world/streaming/heightmap_synthesis.hpp"
 #include "engine/world/universe/hec.hpp"
@@ -17,10 +17,10 @@
 using gw::universe::hec_derive;
 using gw::universe::HecDomain;
 using gw::universe::UniverseSeed;
-using gw::world::planet::ArenaAllocatorRef;
-using gw::world::planet::GptmLod;
-using gw::world::planet::GptmMeshBuilder;
-using gw::world::planet::GptmLodSelector;
+using gw::world::gptm::ArenaAllocatorRef;
+using gw::world::gptm::GptmLod;
+using gw::world::gptm::GptmMeshBuilder;
+using gw::world::gptm::GptmLodSelector;
 using gw::world::streaming::ChunkCoord;
 using gw::world::streaming::HeightmapChunk;
 using gw::world::streaming::chunk_origin;
@@ -89,7 +89,7 @@ TEST_CASE("gptm: lod0 mesh topology and bounds") {
         REQUIRE(wy >= min_h - 0.05f);
         REQUIRE(wy <= max_h + 0.05f);
 
-        const auto n = gw::world::planet::gptm_decode_oct_normal(v.n_oct_x, v.n_oct_y);
+        const auto n = gw::world::gptm::gptm_decode_oct_normal(v.n_oct_x, v.n_oct_y);
         const float len = std::sqrt(n.dot(n));
         REQUIRE(len == doctest::Approx(1.0f).epsilon(1e-5f));
     }

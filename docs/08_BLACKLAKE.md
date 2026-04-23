@@ -438,6 +438,30 @@ The `GoldenHashes` namespace contains the expected MurmurHash3 values for the ca
 
 ---
 
+## Cook-time AI Augmentation (Phase 28)
+
+Blacklake is **pure deterministic math at runtime**. Cook-time AI pipelines live under `tools/cook/ai/` (Python, `docs/01` §2.2.1 carve-out) and **augment** Blacklake's input parameters; they never touch runtime generation. Cooked output feeds the runtime RNG pipeline, not an online model.
+
+| Pipeline | Input | Output | Consumer |
+|----------|-------|--------|----------|
+| `vae_weapons/` | Player loadout telemetry + weapon archetype schemas | Pinned VAE checkpoint → offline-sampled weapon variant packs | `gameplay/weapons/variants/*.gwweap` |
+| `wfc_rl_scorer/` | WFC level tiles + encounter rules | RL-scored tile-weight table per Circle profile | `engine/world/wfc/wfc_scorer.hpp` at cook time; runtime still uses deterministic WFC |
+| `music_symbolic_train/` | Offline-composed stem library + combat intensity traces | Pinned symbolic transformer weights (≤ 1M params) | `engine/ai_runtime/music_symbolic.hpp` |
+| `neural_material/` | Captured micro-photographs of decals + reference materials | Pinned neural material network weights | `engine/ai_runtime/material_eval.hpp` |
+| `director_train/` | Replay logs with intensity labels | Pinned Director policy checkpoint (bounded RL params) | `engine/ai_runtime/director_policy.hpp` |
+
+**Discipline rules (governed by ADR-0095 and `docs/05` §14):**
+
+1. Every pipeline produces **pinned, content-addressed weights** (BLAKE3 + Ed25519). Promotion to `assets/ai/` requires HITL approval through `bld-governance`.
+2. Every pipeline has a **reproducibility script** (seed + dataset manifest + commit SHA) checked into `tools/cook/ai/<pipeline>/`.
+3. Pipelines **must not** run during CI per-PR builds. They run on explicit "retrain" workflow (`.github/workflows/ai_retrain.yml`).
+4. Generated content that enters the runtime (weapon variants, tile-weight tables) is **frozen per release**. Seeds do not sample from training distributions at runtime.
+5. No pipeline may call an external LLM API. All training is self-hosted.
+
+The practical result: every Blacklake-generated world is still a pure function of `(Hell Seed, content SHA)`. The content SHA now includes AI-cooked artefacts; changing training data requires a `GoldenHashes` bump like any other determinism-affecting change.
+
+---
+
 ## Patent Claims (Summary)
 
 Full language is maintained by Cold Coffee Labs internal counsel.
@@ -447,6 +471,8 @@ Full language is maintained by Cold Coffee Labs internal counsel.
 **Claim 2 — SDR Noise.** Continuous scalar field generation via superposition of phase-coherent Gabor wavelets over a Poisson-disc lattice; geologically coherent anisotropic terrain.
 
 **Claim 3 — GPTM.** Hybrid heightmap/sparse-voxel-octree for real-time arena terrain with seamless LOD and Vulkan clipmap handoff.
+
+**Claim 4 — Cook-time AI Parameter Seeding.** A cook-time machine-learning pipeline whose output is content-addressed, signature-verified weights consumed by a purely deterministic runtime generator, such that runtime output remains a pure function of `(seed, content_sha)` while the parameter space itself is ML-tuned offline — preserving replay determinism and speedrun-verifiability across both ML updates and engine updates via explicit `GoldenHashes` version bumps.
 
 ---
 

@@ -28,6 +28,11 @@ use std::path::Path;
 use bld_governance::audit::{canonical_json, read_jsonl, AuditError, AuditEvent};
 use serde_json::Value as JsonValue;
 
+// Part C §22 scaffold (ADR-0015 + ADR-0107b): gameplay replay schema.
+// Lives alongside the BLD audit replay so both share the deterministic
+// ReplayHost trait and crate-level no-wall-time / no-network invariants.
+pub mod gameplay_schema;
+
 /// Replay errors.
 #[derive(Debug, thiserror::Error)]
 pub enum ReplayError {

@@ -8,7 +8,7 @@
 // background thread (async asset loader, asset cooker worker pool, etc.).
 // The ReservedWorker owns its std::thread and joins on destruction; the
 // callable is responsible for its own shutdown signalling (atomic flag,
-// condvar, queue sentinel, …). See docs/AUDIT_MAP_2026-04-20.md (P2-1,P2-2).
+// condvar, queue sentinel, …). See audit-2026-04-20 (P2-1,P2-2).
 
 #include <functional>
 #include <thread>

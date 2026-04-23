@@ -6,7 +6,9 @@
 
 ## The Project in One Sentence
 
-**Cold Coffee Labs** builds **Greywater Engine** (C++23 / Vulkan) to ship ***Sacrilege*** — a fast, gory, 3D first-person action game that is the spiritual heir of Quake's movement, Doom's aggression, and Ultrakill's speed, rebuilt from scratch with infinite procedural hellscapes and a unique risk/reward resource system.
+**Cold Coffee Labs** is a **horror studio** building **Greywater Engine** (C++23 / Vulkan) as a **franchise content platform** and shipping ***Sacrilege*** as its flagship — a fast, gory, 3D first-person action game (spiritual heir of Quake's movement, Doom's aggression, Ultrakill's speed, and Bloodthief's gothic punch), layered with the Malakor / Niccolò Story Bible (Vatican / Heaven / Hell / Silentium, three Acts, God Mode) over deterministic Nine-Circles procedural hellscapes and the Martyrdom Engine.
+
+The engine is factored into **seven IP-agnostic franchise services** (Material Forge, Level Architect, Combat Simulator, Gore System, Audio Weave, AI Director, Editor Co-Pilot) so future IPs (*Apostasy*, *Silentium*, *The Witness*) can be built on the same spine without re-tooling. *Sacrilege* is v1; the platform is what comes after.
 
 ---
 
@@ -14,7 +16,7 @@
 
 | Domain | Language | Rule |
 |--------|----------|------|
-| Engine, editor, gameplay, all *Sacrilege* logic | **C++23** | No exceptions. No scripting VM. No Lua. No Python in binaries or runtime (offline `tools/` only: `docs/01_CONSTITUTION_AND_PROGRAM.md` §2.2.1). |
+| Engine, editor, gameplay, all *Sacrilege* logic | **C++23** | No exceptions (ratcheted; see ADR-0086 in `docs/10`). No scripting VM. No Lua. No Python in binaries or runtime (offline `tools/` only: `docs/01_CONSTITUTION_AND_PROGRAM.md` §2.2.1). |
 | BLD AI copilot only | **Rust 2024** | Lives in `bld/`. Nowhere else. |
 | Shaders | **HLSL** → DXC → SPIR-V | GLSL for ports only. |
 | Compiler | **Clang/LLVM 18+** | `clang-cl` on Windows, `clang` on Linux. MSVC and GCC not supported. |
@@ -55,7 +57,10 @@ The **Greywater Editor** is a native C++ application built into the engine runti
 
 ### Hardware & Performance
 1. **RX 580 @ 144 FPS** is the Tier A baseline. Features that break this are Tier G (gated).
-2. **Vulkan 1.2 baseline** with opportunistic 1.3 features via `RHICapabilities`.
+2. **Vulkan 1.3 baseline** on desktop (dynamic rendering + sync2 + timeline semaphores per ADR-0003); Vulkan 1.2 fallback only where a vendor driver refuses 1.3. Mesh shaders / ray tracing / work graphs remain Tier G (post-v1).
+
+### Runtime AI (NEW — `docs/01` §2.2.2 carve-out)
+2a. **On-device ML at runtime is permitted** under the six binding rules of §2.2.2: C++ inference only (no Python, no VM), pinned versioned weights under `assets/ai/`, deterministic topology + fixed precision + seed-fed, rollback-safe or presentation-only, no internet / no telemetry / no runtime fine-tune beyond replicated save-state, strict per-system perf budgets (Director ≤ 0.1 ms, symbolic music ≤ 0.2 ms, neural material ≤ 0.4 ms — total ≤ 0.74 ms on RX 580). Primary library: **ggml / llama.cpp C++ CPU backend** (deterministic); Vulkan backend opt-in only for read-only material eval.
 
 ### Language & Build
 3. **Clang only** for C++. MSVC and GCC are not supported.
@@ -63,10 +68,10 @@ The **Greywater Editor** is a native C++ application built into the engine runti
 
 ### Code Discipline
 5. No raw `new` / `delete` in engine hot paths. Use `std::unique_ptr`, `gw::Ref<T>`, or arena allocators.
-6. No two-phase public `init()` / `shutdown()`. RAII only.
+6. RAII lifetime management. Either (a) usable immediately after construction, or (b) default-constructed valid-but-uninitialized with a public `initialize(...)` returning `Result<void, E>` / `bool` paired with an idempotent `shutdown()` that the destructor always calls. Never a `void init()` that fails silently. See ADR-0087 in `docs/10`.
 7. No C-style casts. Use `static_cast`, `reinterpret_cast` with `// SAFETY:` comments.
 8. No `std::string_view` passed to C APIs expecting null-termination.
-9. No STL containers in hot paths. Use `engine/core/` containers.
+9. No per-frame STL allocation in render/simulation/physics/anim/audio/AI/net tick code (see ADR-0089). Setup-time `std::vector` with `reserve()` is fine. `std::unordered_map` / `std::map` in hot loops must be replaced by `engine/core/hash_map.hpp` or `gw::core::FlatMap`.
 10. No `std::async` or raw `std::thread`. All concurrency through `engine/jobs/`.
 11. OS headers only inside `engine/platform/`.
 
@@ -102,10 +107,25 @@ The **Greywater Editor** is a native C++ application built into the engine runti
 ## Where to Start (First Time on the Project)
 
 1. `docs/README.md` — The map of all docs.
-2. `docs/01_CONSTITUTION_AND_PROGRAM.md` — What is allowed and what is forbidden.
+2. `docs/01_CONSTITUTION_AND_PROGRAM.md` — What is allowed and what is forbidden (including the §2.2.2 runtime-AI carve-out).
 3. `docs/07_SACRILEGE.md` — The game we are building.
-4. `docs/03_PHILOSOPHY_AND_ENGINEERING.md` — Why we make the choices we make.
-5. `docs/06_ARCHITECTURE.md` — How the engine hangs together.
+4. `docs/11_NARRATIVE_BIBLE.md` — The Story Bible (Malakor / Niccolò, cosmology, three Acts, location skins, Grace finale).
+5. `docs/03_PHILOSOPHY_AND_ENGINEERING.md` — Why we make the choices we make.
+6. `docs/06_ARCHITECTURE.md` — How the engine hangs together.
+
+### Seven Franchise Services (engine as platform)
+
+The engine is factored into seven IP-agnostic services. Any new IP picks up the whole set:
+
+| Service | Module | What it owns |
+|---------|--------|--------------|
+| **Material Forge** | `engine/services/material_forge/` | `.gwmat` authoring + neural PBR eval |
+| **Level Architect** | `engine/services/level_architect/` | Blacklake WFC/RL scored layouts |
+| **Combat Simulator** | `engine/services/combat_simulator/` | Enemy DNA + encounter scoring |
+| **Gore System** | `engine/services/gore/` | Dismemberment + decal propagation |
+| **Audio Weave** | `engine/services/audio_weave/` | Layered stems + symbolic music |
+| **AI Director** | `engine/services/director/` | Hybrid rule state machine + bounded RL |
+| **Editor Co-Pilot** | `engine/services/editor_copilot/` | BLD tool surface + HITL flows |
 
 ---
 

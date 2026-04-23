@@ -1,0 +1,11 @@
+id: neural_material
+adr: ADR-0095
+seed: 0xF00DC4FE
+dataset_manifest: null
+runtime_consumer: engine/ai_runtime/material_eval.hpp
+output_dir: assets/ai/neural_material/
+budget_ms_rx580: 0.40
+notes: >
+  Trains a small neural PBR evaluator. Runtime consumption is PRESENTATION
+  ONLY — tagged GW_AI_PRESENTATION_ONLY and excluded from the replay hash
+  (ADR-0096). Vulkan runtime backend allowed (ADR-0095 rule 2).

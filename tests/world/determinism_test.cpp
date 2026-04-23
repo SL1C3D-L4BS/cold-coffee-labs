@@ -1,10 +1,10 @@
 #include <doctest/doctest.h>
 
+#include "engine/jobs/reserved_worker.hpp"
 #include "engine/world/streaming/heightmap_synthesis.hpp"
 #include "engine/world/universe/determinism_validator.hpp"
 
 #include <array>
-#include <thread>
 #include <vector>
 
 #include "engine/world/universe/hec.hpp"
@@ -40,15 +40,16 @@ namespace {
 TEST_CASE("determinism: parallel chunk(0,0,0) generation — identical proof hash") {
     const UniverseSeed  world = UniverseSeed("TEST_SEED");
     constexpr int       n     = 100;
-    std::vector<std::uint64_t>       hashes;
-    std::vector<std::thread>          threads;
+    std::vector<std::uint64_t>              hashes;
+    std::vector<gw::jobs::ReservedWorker>   workers;
     hashes.resize(static_cast<std::size_t>(n));
+    workers.reserve(static_cast<std::size_t>(n));
     for (int i = 0; i < n; ++i) {
-        threads.emplace_back(
+        workers.emplace_back(
             [i, &world, &hashes] { hashes[static_cast<std::size_t>(i)] = hash_chunk_000(world); });
     }
-    for (auto& t : threads) {
-        t.join();
+    for (auto& w : workers) {
+        w.join();
     }
     for (int i = 1; i < n; ++i) {
         REQUIRE(hashes[static_cast<std::size_t>(i)] == hashes[0]);

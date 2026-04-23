@@ -9,9 +9,17 @@
 //
 // Monadic operations (map, and_then, or_else, transform_error) follow the
 // C++23 std::expected API surface so code can be mechanically migrated later.
+//
+// Exception policy (see docs/10 ADR-0086 "Exception Boundary & Burn-Down"):
+// Misuse of value() / error() in the wrong state aborts via GW_ASSERT. This
+// type never throws. Callers MUST check has_value() / operator bool() first,
+// or use value_or() / the monadic combinators. This preserves the
+// constitutional "no exceptions — not the keyword, not the concept" rule
+// (docs/01 §2.2).
+
+#include "engine/core/assert.hpp"
 
 #include <functional>
-#include <stdexcept>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -66,28 +74,28 @@ public:
     [[nodiscard]] explicit operator bool() const noexcept { return has_value(); }
 
     [[nodiscard]] const T& value() const& {
-        if (!has_value()) throw std::bad_variant_access{};
+        GW_ASSERT(has_value(), "Result::value() called on error state");
         return std::get<0>(storage_);
     }
     [[nodiscard]] T& value() & {
-        if (!has_value()) throw std::bad_variant_access{};
+        GW_ASSERT(has_value(), "Result::value() called on error state");
         return std::get<0>(storage_);
     }
     [[nodiscard]] T&& value() && {
-        if (!has_value()) throw std::bad_variant_access{};
+        GW_ASSERT(has_value(), "Result::value() called on error state");
         return std::get<0>(std::move(storage_));
     }
 
     [[nodiscard]] const E& error() const& {
-        if (has_value()) throw std::bad_variant_access{};
+        GW_ASSERT(!has_value(), "Result::error() called on value state");
         return std::get<1>(storage_);
     }
     [[nodiscard]] E& error() & {
-        if (has_value()) throw std::bad_variant_access{};
+        GW_ASSERT(!has_value(), "Result::error() called on value state");
         return std::get<1>(storage_);
     }
     [[nodiscard]] E&& error() && {
-        if (has_value()) throw std::bad_variant_access{};
+        GW_ASSERT(!has_value(), "Result::error() called on value state");
         return std::get<1>(std::move(storage_));
     }
 

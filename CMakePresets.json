@@ -263,6 +263,18 @@
             "execution": { "noTestsAction": "error", "stopOnFailure": false }
         },
         {
+            "name": "release-linux",
+            "configurePreset": "release-linux",
+            "output": { "outputOnFailure": true },
+            "execution": { "noTestsAction": "error", "stopOnFailure": false }
+        },
+        {
+            "name": "release-win",
+            "configurePreset": "release-win",
+            "output": { "outputOnFailure": true },
+            "execution": { "noTestsAction": "error", "stopOnFailure": false }
+        },
+        {
             "name": "playable-linux",
             "configurePreset": "playable-linux",
             "output": { "outputOnFailure": true },
@@ -295,6 +307,30 @@
         {
             "name": "living-win",
             "configurePreset": "living-win",
+            "output": { "outputOnFailure": true },
+            "execution": { "noTestsAction": "error", "stopOnFailure": false }
+        },
+        {
+            "name": "netplay-linux",
+            "configurePreset": "netplay-linux",
+            "output": { "outputOnFailure": true },
+            "execution": { "noTestsAction": "error", "stopOnFailure": false }
+        },
+        {
+            "name": "netplay-win",
+            "configurePreset": "netplay-win",
+            "output": { "outputOnFailure": true },
+            "execution": { "noTestsAction": "error", "stopOnFailure": false }
+        },
+        {
+            "name": "persist-linux",
+            "configurePreset": "persist-linux",
+            "output": { "outputOnFailure": true },
+            "execution": { "noTestsAction": "error", "stopOnFailure": false }
+        },
+        {
+            "name": "persist-win",
+            "configurePreset": "persist-win",
             "output": { "outputOnFailure": true },
             "execution": { "noTestsAction": "error", "stopOnFailure": false }
         },
@@ -386,6 +422,38 @@
                 { "type": "configure", "name": "living-win" },
                 { "type": "build",     "name": "living-win" },
                 { "type": "test",      "name": "living-win" }
+            ]
+        },
+        {
+            "name": "netplay-linux",
+            "steps": [
+                { "type": "configure", "name": "netplay-linux" },
+                { "type": "build",     "name": "netplay-linux" },
+                { "type": "test",      "name": "netplay-linux" }
+            ]
+        },
+        {
+            "name": "netplay-win",
+            "steps": [
+                { "type": "configure", "name": "netplay-win" },
+                { "type": "build",     "name": "netplay-win" },
+                { "type": "test",      "name": "netplay-win" }
+            ]
+        },
+        {
+            "name": "persist-linux",
+            "steps": [
+                { "type": "configure", "name": "persist-linux" },
+                { "type": "build",     "name": "persist-linux" },
+                { "type": "test",      "name": "persist-linux" }
+            ]
+        },
+        {
+            "name": "persist-win",
+            "steps": [
+                { "type": "configure", "name": "persist-win" },
+                { "type": "build",     "name": "persist-win" },
+                { "type": "test",      "name": "persist-win" }
             ]
         },
         {

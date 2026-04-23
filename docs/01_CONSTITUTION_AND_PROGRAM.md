@@ -9,25 +9,33 @@
 
 ## §0. Project Identity
 
-**One program:**
+**One studio, one engine, one flagship, one platform:**
 
-- **Cold Coffee Labs** — the studio.
-- **Greywater Engine** — the proprietary C++23 / Vulkan platform.
-- ***Sacrilege*** — the game. The only reason the engine exists. The only thing that ships.
-
-The engine exists to ship *Sacrilege*. Every feature decision, every architectural choice, every hour of work is evaluated against one question: **does this make *Sacrilege* better?**
+- **Cold Coffee Labs** — a **horror studio**.
+- **Greywater Engine** — the proprietary C++23 / Vulkan platform, factored as a **franchise content platform** (seven IP-agnostic services).
+- ***Sacrilege*** — the flagship game. The only thing that ships in v1. Every feature decision is evaluated against: **does this make *Sacrilege* better, and does it generalize to the next IP without cost?**
+- **The Sacrilege family** — *Apostasy*, *Silentium*, *The Witness* — is pre-production only (Phase 29); it never steals resources from the flagship.
 
 ### §0.1 What We Are Building
 
-***Sacrilege*** is a **3D first-person action game**. Fast. Gory. Procedurally infinite. The spiritual heir of 1990s arena shooters — Quake's movement, Doom's aggression, built from scratch in 2026 on a custom engine with a custom toolchain.
+***Sacrilege*** is a **3D first-person action game** draped across a theological horror Story Bible. Fast. Gory. Procedurally infinite. The spiritual heir of 1990s arena shooters (Quake movement, Doom aggression, Ultrakill speed, Bloodthief gothic punch), built from scratch in 2026 on a custom engine and toolchain.
 
-- Nine Inverted Circles of Hell, each procedurally generated from a Hell Seed
-- Same seed = same level, always — shareable, speedrun-verifiable
-- Persistent gore, severed limbs, blood that stains the geometry
-- The Martyrdom Engine — a dual-resource Sin/Mantra system unique to *Sacrilege*
+**Mechanical spine (unchanged):**
+- Nine Inverted Circles of Hell, each procedurally generated from a Hell Seed.
+- Same seed = same level, always — shareable, speedrun-verifiable.
+- Persistent gore, severed limbs, blood that stains the geometry.
+- The Martyrdom Engine — a dual-resource Sin/Mantra system unique to *Sacrilege*.
 - 144 FPS on an RX 580. No exceptions.
 
-**All gameplay logic is C++23.** There is no scripting language. There is no node graph for gameplay. There is no Lua. There is no Python **in engine, editor, gameplay, or BLD binaries** (see §2.2.1 for the offline `tools/` carve-out). There is no custom language called Ripple Script in the shipping game. Logic is compiled C++ code.
+**Story Bible skin (new canonical narrative — see `docs/11_NARRATIVE_BIBLE.md`):**
+- **Cosmology** — the Absolute fractures into **The One** (order), **The Other** (chaos), **The Witness** (indifferent observer). The Unwritten (fallen angels) are refugees from the schism.
+- **Protagonist** — **Malakor**, an Unwritten fallen angel, is fused to **Father Niccolò Bianchi**, an exorcist priest of the corrupted Church. The player plays both as a dual consciousness; Malakor drives combat, Niccolò drives moral cost.
+- **Factions** — **The CORE** (Church of the Recycled Eden, institutional corruption), **The LEGION** (Hell's recyclers), **The UNWRITTEN** (Malakor's kin, player's faction).
+- **Locations** — Vatican Necropolis, Colosseum of Echoes, Palazzo of the Unspoken, Sewer of Grace, Rome Above (siege), Hell's Factory Floor, Heaven's Back Door, The Silentium (mirror dimension), Throne of the Logos. Each is a **Location Skin** of a procedural Circle (see `docs/07_SACRILEGE.md` §6) — mechanics stay, labels/assets change.
+- **Three Acts** — I *The Rite of Unspeaking*, II *The Blasphemy Circuit*, III *The Unmaking*. The Sin 70–100 band is re-skinned as **God Mode / Blasphemy State**; Act III unlocks the **Grace meter** whose full Blasphemy (`forgive`) ends the game.
+- **Final boss** — **Logos**, the silent God, fought as an alternate Phase 4 of the existing God Machine. Defeated by Grace, not damage.
+
+**All gameplay logic is C++23.** There is no scripting language. There is no node graph for gameplay. There is no Lua. There is no Python **in engine, editor, gameplay, or BLD binaries** (see §2.2.1 for the offline `tools/` carve-out). There is no custom language called Ripple Script in the shipping game. Logic is compiled C++ code. **Runtime ML inference is now permitted under the strict §2.2.2 carve-out** — C++ only, deterministic, seed-fed, no internet.
 
 ### §0.2 What The Editor Is
 
@@ -81,10 +89,14 @@ Claude is **not** authorized to:
 The **AMD Radeon RX 580 8 GB** is the baseline. *Sacrilege* targets **144 FPS at 1080p** on this card. Every Tier A feature must hit this target.
 
 **Tier A — ships on RX 580:**
-- Vulkan 1.2 core + 1.3 features (dynamic rendering, timeline semaphores, sync2, descriptor indexing, BDA)
+- **Vulkan 1.3 baseline** on desktop (dynamic rendering, timeline semaphores, sync2, descriptor indexing, BDA — promoted to core per ADR-0003 / ADR-0111). Vulkan 1.2 fallback only where a vendor driver refuses 1.3.
 - Compute shaders, async compute queue, hardware tessellation
 - Bindless descriptors via `VK_EXT_descriptor_indexing`
+- FSR 2 (Vulkan) upscaling behind `GW_ENABLE_FSR2` (ADR-0112, no Frame Gen on Polaris)
+- HDR10 swapchain output via `VK_EXT_hdr_metadata` (opt-in CVar `r.HDROutput`)
+- `VK_KHR_present_id` / `VK_KHR_present_wait` for accurate frame pacing
 - 1080p @ 144 FPS for *Sacrilege* arenas
+- **Steam Deck verified** as Tier A platform (ADR-0113)
 
 **Tier G — hardware-gated, post-v1:**
 - Ray tracing, mesh shaders, GPU work graphs — not required for *Sacrilege*
@@ -97,7 +109,7 @@ The **AMD Radeon RX 580 8 GB** is the baseline. *Sacrilege* targets **144 FPS at
 | BLD AI copilot only | **Rust 2024** | Only in `bld/`. Nowhere else. |
 | Shaders | **HLSL** → DXC → SPIR-V | GLSL for ports |
 
-- **No scripting VM.** No Lua. No JavaScript. No custom language. Gameplay is C++23. **No Python** in shipped binaries or runtime-loaded code paths (see §2.2.1).
+- **No scripting VM.** No Lua. No JavaScript. No custom language. Gameplay is C++23. **No Python** in shipped binaries or runtime-loaded code paths (see §2.2.1). Runtime ML inference *in C++* is allowed only under the §2.2.2 carve-out.
 - **Clang / LLVM 18+ only.** `clang-cl` on Windows. MSVC and GCC are not supported.
 - **CMake 3.28+** with Presets + Ninja. Corrosion for Rust.
 - **Windows (x64) + Linux (x64)** from day one. macOS and consoles: post-scope.
@@ -111,6 +123,27 @@ The **AMD Radeon RX 580 8 GB** is the baseline. *Sacrilege* targets **144 FPS at
 3. They **do not** implement *Sacrilege* mechanics, engine subsystems, or BLD logic.
 
 Examples: doc lint gates, link checkers, namespace or markdown migration scripts. **Expanding Python beyond this boundary requires an ADR.** BLD remains **Rust-only** in `bld/`.
+
+### §2.2.2 Runtime AI — the deterministic carve-out (ADR-0095 / ADR-0096)
+
+**Amendment of record:** the prior constitutional prohibition on runtime ML is replaced by this carve-out. On-device machine-learning inference is permitted **only** when **all** six rules hold. Violating any one rule means the feature ships at cook time (`tools/cook/ai/`) instead.
+
+1. **C++ inference only.** No Python, no scripting VM, no managed runtime, no network call out of process. Primary library: **ggml / llama.cpp C++ headers** (CPU backend for determinism-critical paths; Vulkan backend opt-in behind `GW_AI_VULKAN=OFF` default, allowed only for read-only evaluation that never participates in authoritative simulation state).
+2. **Weights are pinned, versioned, cooked assets** under `assets/ai/`. Every model carries a semantic version, a BLAKE3 hash, and an Ed25519 signature (ADR-0115 content signing). The loader rejects mismatches at runtime.
+3. **Deterministic topology, fixed precision, seed-fed.** No dynamic control flow in the model graph. Weights are loaded verbatim; no runtime fine-tune unless the fine-tune state is part of the replicated / save-state surface and passes the determinism validator. **Rollback-safe** for any model whose output feeds authoritative state (AI Director); **presentation-only** is permitted for music mix crossfade (symbolic music transformer).
+4. **No internet. No telemetry. No runtime fine-tuning on remote data.** Model training lives entirely offline under `tools/cook/ai/` (Python carve-out §2.2.1).
+5. **Per-system perf budgets** (authoritative table in `docs/09_NETCODE_DETERMINISM_PERF.md`). Aggregate runtime-AI budget on RX 580 is **≤ 0.74 ms/frame**: Director policy ≤ 0.1 ms, symbolic-music transformer ≤ 0.2 ms, neural-material shader ≤ 0.4 ms, overhead ≤ 0.04 ms. The 144 FPS Tier A floor is non-negotiable. CI perf gates fail the build on regression.
+6. **Any ML feature that cannot meet 1–5 ships at cook time** inside `tools/cook/ai/` (VAE weapons, WFC+RL layout scorer, neural material baker, symbolic music training). Cook-time outputs become baked deterministic assets; the runtime only uses tiny inference over them.
+
+The three initial runtime-AI consumers are:
+
+| System | Library | Rollback-safe? | Budget |
+|--------|---------|----------------|--------|
+| **AI Director** (hybrid L4D-state + bounded RL params, ADR-0097) | ggml CPU | **Yes** — seed-fed, deterministic | ≤ 0.1 ms |
+| **Adaptive music** (offline stems + symbolic transformer, ADR-0098) | ggml CPU | Presentation-only | ≤ 0.2 ms |
+| **Neural material evaluator** (cooked weights, runtime eval, ADR-0095) | ggml Vulkan (opt-in) | Presentation-only | ≤ 0.4 ms |
+
+All other implied runtime ML features (full neural audio synthesis, on-device LLM dialog, internet-sourced content) are **rejected** on the RX 580 hardware floor and the no-internet rule.
 
 ### §2.3 UI Stack — Locked
 
@@ -137,7 +170,7 @@ Enemy behavior trees are **data-driven** (tree structure loaded from `.gwbt` fil
 ### §2.6 *Sacrilege* Mandates
 
 - **Procedural generation is deterministic.** Same Hell Seed + same Circle index = identical level, every run, every machine.
-- **Arena-scale only.** The Nine Circles are bounded 3D arenas, not planets. No orbital mechanics. No atmospheric layers. No ground-to-orbit. No galaxy hierarchy. The "universe" is Hell — nine arenas connected by a descent narrative.
+- **Arena-scale only.** The Nine Circles are bounded 3D arenas, not planets. No orbital mechanics. No atmospheric layers. No ground-to-orbit. No galaxy hierarchy. The "universe" is Hell — nine arenas connected by a descent narrative. **The Silentium (mirror dimension)** is a special procedural profile layered on Circle IX (Treachery), not an open world.
 - **World-space math uses `f64` for arena-scale positions** where floating-point error would be visible.
 - **Floating origin** fires when the camera travels far within a large arena.
 - **"If it is not near the player, it does not exist."** On-demand streaming of arena chunks. Nothing simulated outside the player's relevance window.
@@ -161,11 +194,12 @@ Files:              .hpp / .cpp      #pragma once in all headers
 
 Binding rules (all enforced at review):
 
-- No exceptions. Use `Result<T, E>` or `std::expected`.
+- No exceptions. Use `Result<T, E>` or `std::expected`. Historical allow-list and burn-down plan in ADR-0086.
+- RAII lifetimes: either usable immediately after construction, or default-constructed-then-`initialize()` with idempotent `shutdown()` called by the destructor. Never `void init()` that fails silently. ADR-0087.
 - No raw `new` / `delete`. Use `std::unique_ptr`, `gw::Ref<T>`, or stack scope.
 - No C-style casts. `static_cast` / `reinterpret_cast` with `// SAFETY:` comments.
 - No `[=]` or `[&]` lambda captures. Explicit capture only.
-- No `std::async`, no raw `std::thread`. All concurrency through `engine/jobs/`.
+- No `std::async`, no raw `std::thread`, no `std::jthread`, no `std::packaged_task` / `std::promise`. OS-thread ownership lives only in `engine/jobs/` (`Scheduler`, `ReservedWorker`) and `engine/platform/`. `std::mutex` / `std::shared_mutex` / `std::atomic` / `std::condition_variable` / `std::latch` are correctness primitives and are allowed anywhere they protect shared state. See ADR-0088.
 - All ECS components are POD structs. No virtual functions in components.
 - All gameplay systems are pure functions over component spans.
 - World-space positions are `f64` where scale demands it.
@@ -236,38 +270,95 @@ greywater/
 │   ├── ai/             BehaviorTree nodes + Navmesh (Recast/Detour)
 │   ├── assets/         Asset database, gw_cook pipeline
 │   ├── scene/          .gwscene codec + .gwseq sequencer
-│   └── world/          Blacklake arena generation stack (Phases 19–23)
-│       ├── universe/   HEC seeding, PCG64, seed manager
-│       ├── sdr/        SDR Noise primitive
-│       ├── streaming/  ChunkStreamer, ChunkCoord, LRU cache
-│       ├── biome/      BiomeClassifier, Circle-specific profiles
-│       ├── gptm/       GptmMeshBuilder, LOD selector, tile renderer
-│       ├── resources/  ResourceDistributor, resource node placement
-│       └── origin/     FloatingOrigin, OriginShiftEvent
-├── bld/                Rust Cargo workspace — BLD AI copilot
+│   ├── world/          Blacklake arena generation stack (Phases 19–23)
+│   │   ├── universe/   HEC seeding, PCG64, seed manager, sdr_noise.*
+│   │   ├── streaming/  ChunkStreamer, ChunkCoord, LRU cache
+│   │   ├── biome/      BiomeClassifier, Circle-specific profiles
+│   │   ├── gptm/       GptmMeshBuilder, LOD selector, tile renderer (moved from planet/)
+│   │   ├── resources/  ResourceDistributor, resource node placement
+│   │   └── origin/     FloatingOrigin, OriginShiftEvent
+│   ├── ai_runtime/     On-device C++ inference (Phase 26, §2.2.2 carve-out)
+│   │   ├── inference_runtime.hpp/.cpp   ggml CPU backend (opt-in Vulkan)
+│   │   ├── model_registry.hpp           versioned pinned weight registry
+│   │   ├── director_policy.hpp          hybrid state machine + bounded RL
+│   │   ├── music_symbolic.hpp           tiny symbolic transformer (≤1M params)
+│   │   ├── material_eval.hpp            neural material evaluator
+│   │   └── ai_cvars.hpp                 budgets, toggles
+│   ├── narrative/      Story-Bible runtime (Phase 21/22)
+│   │   ├── dialogue_graph.hpp           .gwdlg reader
+│   │   ├── act_state.hpp                Acts I-III state machine
+│   │   ├── sin_signature.hpp            player-behaviour fingerprint
+│   │   ├── voice_director.hpp           Malakor vs Niccolò line picker
+│   │   └── grace_meter.hpp              Act III terminal Blasphemy meter
+│   ├── services/       Seven IP-agnostic franchise services (Phase 27)
+│   │   ├── material_forge/              neural PBR + node graph
+│   │   ├── level_architect/             WFC + cook-time RL scorer
+│   │   ├── combat_simulator/            enemy DNA + encounter scorer
+│   │   ├── gore/                        dismemberment + decal propagation
+│   │   ├── audio_weave/                 layered stems + symbolic music
+│   │   ├── director/                    hybrid AI Director
+│   │   └── editor_copilot/              BLD tool surface for authoring
+│   ├── a11y/           Runtime accessibility (Phase 16 + gameplay a11y upgrade)
+│   └── i18n/           Runtime localization (Phase 16)
+├── bld/                Rust Cargo workspace — BLD AI copilot (10 crates)
 │   ├── bld-ffi/        C-ABI boundary
 │   ├── bld-mcp/        MCP wire protocol
 │   ├── bld-tools/      #[bld_tool] proc macro + tool registry
+│   ├── bld-tools-macros/ Macro implementation crate
 │   ├── bld-provider/   LLM provider abstraction
 │   ├── bld-rag/        Retrieval-augmented generation
 │   ├── bld-agent/      Main agent loop
-│   └── bld-governance/ HITL approval
+│   ├── bld-governance/ HITL approval
+│   ├── bld-bridge/     Editor bridge
+│   └── bld-replay/     Deterministic replay (BLD audit + gameplay_replay)
 ├── editor/             Dear ImGui editor — viewport, circle editor, encounter editor
-├── sandbox/            Engine feature test-bed
+├── sandbox/            Author-facing shader sandbox (HLSL authoring harness; not an exe)
+├── apps/               Phase exit-gate executables — one per engineering milestone:
+│   ├── sandbox_playable/          Phase 11 — runtime + input + audio + UI playable loop
+│   ├── sandbox_physics/           Phase 12 — Jolt bridge + character controller
+│   ├── sandbox_netplay/           Phase 14 — ECS replication + rollback
+│   ├── sandbox_persistence/       Phase 15 — SQLite save + DSAR
+│   ├── sandbox_platform_services/ Phase 16 — Steam / EOS / i18n / a11y
+│   ├── sandbox_studio_renderer/   Phase 17 — materials + VFX + post pipeline
+│   ├── sandbox_living_scene/      Phase 18 — mods + gameplay_module host
+│   ├── sandbox_infinite_seed/     Phase 19 — Hell Seed + chunk lattice + HEC determinism
+│   ├── sandbox_director/          Phase 26 — AI Director standalone (headless-CI + interactive)
+│   ├── sandbox_deck_probe/        Steam Deck verified-checklist smoke probe
+│   └── sandbox_studio/            Cross-phase studio exit harness
 ├── runtime/            Shipping executable
 ├── gameplay/           Hot-reloadable C++23 dylib — ALL Sacrilege game logic lives here
-│   ├── martyrdom/      Sin, Mantra, Blasphemies, Rapture/Ruin systems
+│   ├── martyrdom/      Sin, Mantra, Blasphemies, Rapture/Ruin + god_mode, grace_meter, blasphemy_state
 │   ├── player/         Player controller, movement (bunny hop, slide, grapple, surf)
 │   ├── weapons/        All 6 weapons, alt-fires, hit detection
 │   ├── enemies/        Enemy ECS archetypes, behavior tree registrations
 │   ├── circles/        Circle-specific event scripts, encounter sequences
-│   ├── hud/            Diegetic HUD — blood vial, Sin ring, Mantra counter
-│   └── boss/           God Machine — 4-phase fight
-├── tools/cook/         gw_cook content pipeline
+│   ├── hud/            Diegetic HUD — blood vial, Sin ring, Mantra counter, Grace ring (Act III)
+│   ├── characters/
+│   │   └── malakor_niccolo/  Dual-consciousness voice director, mirror-step ability
+│   ├── acts/           Act I/II/III encounter gates (Rite, Blasphemy Circuit, Unmaking)
+│   ├── boss/
+│   │   ├── god_machine/      4-phase fight (existing)
+│   │   └── logos/            Alternate Phase 4 — Silent God defeated by Grace
+│   └── mod_example/    Reference mod using the Mod SDK (manifest + filesystem jail)
+├── tools/
+│   ├── cook/           gw_cook content pipeline (Ed25519 content signing)
+│   ├── cook/ai/        Offline ML training pipelines (Python §2.2.1)
+│   │   ├── vae_weapons/          VAE weapon permutation baker
+│   │   ├── wfc_rl_scorer/        WFC layout RL scorer
+│   │   ├── music_symbolic_train/ Symbolic transformer pre-training (replaces LSTM)
+│   │   ├── neural_material/      Concept/prompt → .gwmat baker
+│   │   └── director_train/       AI Director policy checkpoint producer
+│   └── lint/           CI lints (check_cpm_sha_pins.py, check_single_shader_root.py, …)
 ├── tests/              doctest unit + integration + perf gates
 ├── content/            Source assets (gitignored)
-├── assets/             Cooked runtime assets — .gwmesh, .gwtex, .gwaudio, .gwbt
-├── third_party/        CPM-managed, SHA-pinned
+├── assets/             Cooked runtime assets — .gwmesh, .gwtex, .gwaudio, .gwbt, .gwdlg, .gwenc
+│   ├── ai/             Pinned, Ed25519-signed ML weights (Director, symbolic music, neural material)
+│   └── ui/             Cooked in-game UI — shipping RML/RCSS/strings (see docs/04 §UI roots)
+├── ui/                 Privacy-surface UI that ships in *every* build, including
+│                       demos / free trials (GDPR consent, DSAR dialogs, age gate).
+│                       Quarantined from assets/ui/ because of stricter review —
+│                       ADR-0062, docs/04 §UI roots.
+├── third_party/        CPM-managed, SHA-pinned (incl. vendored tiny_sha3/)
 ├── cmake/              dependencies.cmake, toolchains/
 ├── docs/               This directory
 ├── CMakeLists.txt
@@ -299,6 +390,7 @@ greywater/
 | 22 | Martyrdom Combat & Player Stack | 🔜 Planned | — |
 | 23 | Damned Host, Circles Pipeline & Boss | 🔜 Planned | — |
 | 24 | Hardening & Release | 🔜 Planned | — |
+| 25 | LTS Sustenance | 🔜 Planned | ongoing |
 
 ---
 

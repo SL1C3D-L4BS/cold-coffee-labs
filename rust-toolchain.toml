@@ -1,4 +1,8 @@
 [toolchain]
-channel = "stable"
+# Pin the Rust toolchain to a concrete version so CI, dev machines, and the
+# BLD copilot workspace all compile against identical rustc + stdlib.
+# Rust 2024 edition requires rustc >= 1.85 (stable 2025-02-20).
+# Upgrading this pin is an ADR-worthy change per docs/01_CONSTITUTION_AND_PROGRAM.md §2.2.
+channel = "1.85.0"
 components = ["rustfmt", "clippy", "rust-src"]
 profile = "minimal"

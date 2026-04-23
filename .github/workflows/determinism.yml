@@ -1,0 +1,91 @@
+name: determinism
+
+# Greywater determinism matrix — Part C §25 scaffold (ADR-0117).
+# Replays the same seed set on two hosts (Windows x64, Linux x64) and
+# diffs bit-for-bit per-tick state hashes. Fails if any hash drifts.
+#
+# docs/09_NETCODE_DETERMINISM_PERF.md §§ determinism contract
+# docs/10_APPENDIX_ADRS_AND_REFERENCES.md ADR-0117
+
+on:
+  schedule:
+    - cron: "0 4 * * *"   # 04:00 UTC nightly
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "engine/ai_runtime/**"
+      - "engine/world/**"
+      - "gameplay/**"
+      - "bld/bld-replay/**"
+      - "tests/world/determinism_test.cpp"
+
+concurrency:
+  group: determinism-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  replay-matrix:
+    name: replay (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            preset: dev-linux
+          - os: windows-latest
+            preset: dev-win
+
+    steps:
+      - uses: actions/checkout@v4
+        with: { submodules: recursive }
+
+      - name: Setup Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v5
+
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.7
+
+      - name: Install Vulkan SDK
+        uses: humbletim/install-vulkan-sdk@v1.2
+        with:
+          version: 1.4.341.1
+          cache: true
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }}
+
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }}
+
+      - name: Run determinism seed battery
+        run: ctest --test-dir build/${{ matrix.preset }} -L determinism --output-on-failure
+
+      - name: Upload per-tick hash log
+        uses: actions/upload-artifact@v4
+        with:
+          name: determinism-hashes-${{ matrix.os }}
+          path: build/${{ matrix.preset }}/determinism-hashes.json
+
+  diff-hashes:
+    name: diff hashes across hosts
+    needs: replay-matrix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch Windows hashes
+        uses: actions/download-artifact@v4
+        with:
+          name: determinism-hashes-windows-latest
+          path: hashes/win
+
+      - name: Fetch Linux hashes
+        uses: actions/download-artifact@v4
+        with:
+          name: determinism-hashes-ubuntu-latest
+          path: hashes/lin
+
+      - name: Diff
+        run: python tools/lint/check_determinism_diff.py hashes/win hashes/lin
