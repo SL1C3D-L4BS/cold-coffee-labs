@@ -7,6 +7,8 @@
 // the editor in Wave 9D once the bld-bridge session is ready.
 
 #include "agent_panel.hpp"
+#include "editor/theme/palette_imgui.hpp"
+#include "editor/theme/theme_registry.hpp"
 
 #include <imgui.h>
 #include <algorithm>
@@ -188,7 +190,10 @@ void AgentPanel::render_transcript() {
     for (const Message& m : transcript_) {
         const ImVec4 accent = role_accent(m.role);
 
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4{0.07f, 0.09f, 0.12f, 1.f});
+        ImGui::PushStyleColor(
+            ImGuiCol_ChildBg,
+            gw::editor::theme::imgui_vec4(
+                gw::editor::theme::ThemeRegistry::instance().active().palette.panel));
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, kBubbleRounding);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
                             ImVec2{kBubblePadding, kBubblePadding});

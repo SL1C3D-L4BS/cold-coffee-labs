@@ -3,14 +3,15 @@
 
 #include "engine/vscript/parser.hpp"
 
+#include "editor/theme/graph_theme.hpp"
+#include "editor/theme/theme_registry.hpp"
+
 #include <imgui.h>
 #include <imnodes.h>
 
 #include <charconv>
 #include <cstdio>
-#include <filesystem>
 #include <fstream>
-#include <sstream>
 #include <variant>
 
 namespace gw::editor {
@@ -352,6 +353,8 @@ void VScriptPanel::draw_toolbar() {
 
 void VScriptPanel::draw_graph_canvas() {
     ImNodes::SetCurrentContext(static_cast<ImNodesContext*>(imnodes_ctx_));
+    gw::editor::theme::apply_graph_theme_to_current_imnodes(
+        gw::editor::theme::ThemeRegistry::instance().active().graph);
     ImNodes::BeginNodeEditor();
 
     if (!graph_) {
@@ -365,8 +368,10 @@ void VScriptPanel::draw_graph_canvas() {
     // internally; we only overwrite when the graph was just loaded.
     apply_layout();
 
+    const auto& ggraph = gw::editor::theme::ThemeRegistry::instance().active().graph;
     for (const auto& node : graph_->nodes) {
         const int nid = make_node_id(node.id);
+        gw::editor::theme::push_vscript_node_style(node.kind, ggraph);
         ImNodes::BeginNode(nid);
 
         ImNodes::BeginNodeTitleBar();
@@ -403,6 +408,7 @@ void VScriptPanel::draw_graph_canvas() {
         }
 
         ImNodes::EndNode();
+        gw::editor::theme::pop_vscript_node_style();
     }
 
     for (std::size_t i = 0; i < graph_->edges.size(); ++i) {

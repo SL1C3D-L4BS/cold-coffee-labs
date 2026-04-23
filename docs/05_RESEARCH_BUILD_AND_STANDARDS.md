@@ -5,6 +5,8 @@
 
 **Scope:** Vulkan 1.2-baseline with opportunistic 1.3 features as Greywater's graphics API. Staged learning path, feature commitments, capability gates, and the shader toolchain. **Hardware baseline: AMD Radeon RX 580 8 GB** (Polaris, GCN 4.0, 2016).
 
+**See also:** `13_THIRD_PARTY_ASSETS.md` — AmbientCG CC0 ingest, cook, disk expectations, and fallback downloader.
+
 ---
 
 ## 1. Why Vulkan 1.2-baseline (and not higher)

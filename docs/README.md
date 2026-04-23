@@ -50,7 +50,7 @@
 | 10 | `10_APPENDIX_ADRS_AND_REFERENCES.md` | Glossary, research references, ADR archive (up to ADR-0117) |
 | 11 | `11_NARRATIVE_BIBLE.md` | **Sacrilege Story Bible** — cosmology, cast (Malakor/Niccolò), three Acts, location skins, factions, Grace finale, franchise future |
 
-**Auxiliary (not in the L0–L7 stack):** `COMPOSER_CONTEXT.md` — short Composer session primer; if it disagrees with `01`, `CLAUDE.md`, or this README, **those win**.
+**Auxiliary (not in the L0–L7 stack):** `COMPOSER_CONTEXT.md` — short Composer session primer; if it disagrees with `01`, `CLAUDE.md`, or this README, **those win**. **`13_THIRD_PARTY_ASSETS.md`** — AmbientCG sync, cook, disk policy, and fallback downloader.
 
 ---
 

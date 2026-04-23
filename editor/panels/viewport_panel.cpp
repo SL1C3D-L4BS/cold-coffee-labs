@@ -5,6 +5,7 @@
 #include "editor/viewport/debug_draw.hpp"
 #include "editor/scene/components.hpp"
 #include "editor/undo/commands.hpp"
+#include "engine/ecs/entity.hpp"
 #include "engine/ecs/world.hpp"
 
 #include <imgui.h>
@@ -15,6 +16,7 @@
 
 #include <glm/gtc/type_ptr.hpp>
 #include <algorithm>
+#include <cstring>
 #include <cstdio>
 
 namespace gw::editor {
@@ -209,6 +211,21 @@ void ViewportPanel::on_imgui_render(EditorContext& ctx) {
     debug_draw::grid(20.f, 1.f);
     debug_draw::axis(glm::mat4{1.f}, 1.0f);
     if (ctx.world) {
+        // Wire AABB for every named transform so the default Cube/Sphere show
+        // up without a selection (Vulkan mesh pass is still future Phase 8).
+        ctx.world->for_each<scene::NameComponent, scene::TransformComponent, scene::VisibilityComponent>(
+            [](gw::ecs::Entity /*e*/, const scene::NameComponent& nm,
+               const scene::TransformComponent& tc, const scene::VisibilityComponent&) {
+                const glm::vec3 c{static_cast<float>(tc.position.x),
+                                    static_cast<float>(tc.position.y),
+                                    static_cast<float>(tc.position.z)};
+                const glm::vec3 h = tc.scale * 0.5f;
+                std::uint32_t col = 0xFF5AC8E8; // default wire
+                if (std::strcmp(nm.c_str(), "Cube") == 0) col = 0xFF55CC88;
+                else if (std::strcmp(nm.c_str(), "Sphere") == 0) col = 0xFFCC88EE;
+                else if (std::strcmp(nm.c_str(), "Scene Root") == 0) col = 0xFFAAAAAA;
+                debug_draw::aabb(c - h, c + h, col);
+            });
         for (auto e : ctx.selection.selected()) {
             if (const auto* tc = ctx.world->get_component<scene::TransformComponent>(e)) {
                 // `position` is float64 (floating-origin); debug lines operate in

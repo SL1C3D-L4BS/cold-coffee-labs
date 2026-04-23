@@ -21,6 +21,7 @@ enum class ThemeId : std::uint8_t {
 struct Theme {
     ThemeId        id             = ThemeId::BrewedSlate;
     Palette        palette{};
+    GraphTheme     graph{};
     TypographyPack typography{};
     ThemeEffects   effects{};
 };

@@ -108,6 +108,7 @@ add_executable(gw_editor
     # Part B §12.1 — Theme registry (ADR-0104).
     theme/theme_registry.cpp
     theme/imgui_style_from_palette.cpp
+    theme/graph_theme.cpp
     theme/editor_fonts.cpp
     theme/distressed_draw.cpp
     theme/corruption_pulse.cpp

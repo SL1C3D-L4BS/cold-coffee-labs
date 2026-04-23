@@ -15,17 +15,20 @@ Theme theme_for(ThemeId id) noexcept {
     switch (id) {
     case ThemeId::CorruptedRelic:
         t.palette    = CORRUPTED_RELIC;
+        t.graph      = GRAPH_CORRUPTED_RELIC;
         t.typography = TYPO_CORRUPTED_RELIC;
         t.effects    = EFFECTS_CORRUPTED_RELIC;
         break;
     case ThemeId::FieldTestHC:
         t.palette    = FIELD_TEST_HC;
+        t.graph      = GRAPH_FIELD_TEST_HC;
         t.typography = TYPO_FIELD_TEST_HC;
         t.effects    = EFFECTS_FIELD_TEST;
         break;
     case ThemeId::BrewedSlate:
     default:
         t.palette    = BREWED_SLATE;
+        t.graph      = GRAPH_BREWED_SLATE;
         t.typography = TYPO_BREWED_SLATE;
         t.effects    = EFFECTS_BREWED_SLATE;
         break;

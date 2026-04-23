@@ -1,9 +1,10 @@
 // editor/panels/asset_browser_panel.cpp
 // Spec ref: Phase 7 §11.
 #include "asset_browser_panel.hpp"
+#include "editor/theme/palette_imgui.hpp"
+#include "editor/theme/theme_registry.hpp"
 
 #include <imgui.h>
-#include <cstring>
 #include <filesystem>
 
 namespace gw::editor {
@@ -50,6 +51,10 @@ void AssetBrowserPanel::draw_content_grid() {
     float panel_w = ImGui::GetContentRegionAvail().x;
     int   cols    = std::max(1, static_cast<int>(panel_w / (icon_size_ + 8.f)));
 
+    const auto& pal =
+        gw::editor::theme::ThemeRegistry::instance().active().palette;
+    using gw::editor::theme::color32_to_im_u32;
+
     std::string_view filt{filter_};
     int col = 0;
     for (const auto& de : dir_entries_) {
@@ -63,34 +68,35 @@ void AssetBrowserPanel::draw_content_grid() {
         // Type-aware thumbnail. Phase 7 renders colored badges keyed by
         // extension; a real texture/mesh thumbnail cache lands in Phase 8
         // once the asset database can hand back a sampled image DS.
-        ImU32 icon_col = IM_COL32(80, 160, 240, 200); // default: blue file
+        ImU32 icon_col = color32_to_im_u32(pal.accent, 200.f / 255.f);
         const char* badge = "FILE";
-        if (de.is_dir)                     { icon_col = IM_COL32(240, 190,  80, 210); badge = "DIR"; }
-        else if (de.ext == ".gltf" ||
-                 de.ext == ".glb"  ||
-                 de.ext == ".obj")         { icon_col = IM_COL32(120, 220, 150, 220); badge = "MESH"; }
-        else if (de.ext == ".png"  ||
-                 de.ext == ".jpg"  ||
-                 de.ext == ".jpeg" ||
-                 de.ext == ".tga"  ||
-                 de.ext == ".ktx2" ||
-                 de.ext == ".basis")       { icon_col = IM_COL32(220, 140, 220, 220); badge = "TEX"; }
-        else if (de.ext == ".gwscene" ||
-                 de.ext == ".scene" ||
-                 de.ext == ".json")        { icon_col = IM_COL32(240, 200, 120, 220); badge = "SCENE"; }
-        else if (de.ext == ".lua"  ||
-                 de.ext == ".bld"  ||
-                 de.ext == ".gsl")         { icon_col = IM_COL32(180, 220, 120, 220); badge = "SCRIPT"; }
+        if (de.is_dir) {
+            icon_col = color32_to_im_u32(pal.warning, 215.f / 255.f);
+            badge    = "DIR";
+        } else if (de.ext == ".gltf" || de.ext == ".glb" || de.ext == ".obj") {
+            icon_col = color32_to_im_u32(pal.positive, 220.f / 255.f);
+            badge    = "MESH";
+        } else if (de.ext == ".png" || de.ext == ".jpg" || de.ext == ".jpeg" ||
+                   de.ext == ".tga" || de.ext == ".ktx2" || de.ext == ".basis") {
+            icon_col = color32_to_im_u32(pal.accent_strong, 215.f / 255.f);
+            badge    = "TEX";
+        } else if (de.ext == ".gwscene" || de.ext == ".scene" || de.ext == ".json") {
+            icon_col = color32_to_im_u32(pal.warning, 195.f / 255.f);
+            badge    = "SCENE";
+        } else if (de.ext == ".lua" || de.ext == ".bld" || de.ext == ".gsl") {
+            icon_col = color32_to_im_u32(pal.positive, 200.f / 255.f);
+            badge    = "SCRIPT";
+        }
 
         ImDrawList* dl = ImGui::GetWindowDrawList();
         ImVec2 p = ImGui::GetCursorScreenPos();
         dl->AddRectFilled(p, {p.x + icon_size_, p.y + icon_size_},
                           icon_col, 6.f);
         dl->AddRect(p, {p.x + icon_size_, p.y + icon_size_},
-                    IM_COL32(0, 0, 0, 90), 6.f, 0, 1.f);
+                    color32_to_im_u32(pal.background, 90.f / 255.f), 6.f, 0, 1.f);
         // Type badge in the corner for quick at-a-glance identification.
         ImVec2 badge_pos{p.x + 6.f, p.y + 6.f};
-        dl->AddText(badge_pos, IM_COL32(10, 12, 20, 230), badge);
+        dl->AddText(badge_pos, color32_to_im_u32(pal.text, 230.f / 255.f), badge);
 
         if (ImGui::Selectable("##item", false, 0, item_size)) {
             if (de.is_dir) navigate_to(current_dir_ / de.name);
