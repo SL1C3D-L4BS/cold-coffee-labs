@@ -31,3 +31,6 @@ add_subdirectory(sandbox_director)
 
 # Phase 22 / Part C §22 — Steam Deck Tier A smoke probe (ADR-0113).
 add_subdirectory(sandbox_deck_probe)
+
+# Phase 21 W142 — Hell Frame exit-gate sandbox (ADR-0108).
+add_subdirectory(sandbox_hell_frame)

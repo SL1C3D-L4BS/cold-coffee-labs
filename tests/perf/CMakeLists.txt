@@ -102,3 +102,27 @@ set_tests_properties(director_budgets_perf PROPERTIES
     TIMEOUT    60
     RUN_SERIAL TRUE
 )
+
+# Phase 21 W141 — Hell Frame perf gate (ADR-0108).
+# Horror post + Circle post + reality warp + blood decal ring budgets.
+add_executable(gw_perf_gate_hell_frame
+    hell_frame_budgets_perf_test.cpp
+)
+target_link_libraries(gw_perf_gate_hell_frame
+    PRIVATE
+        greywater::core
+        greywater::render_post
+        greywater::render_decals
+)
+set_target_properties(gw_perf_gate_hell_frame PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
+add_test(NAME hell_frame_budgets_perf
+    COMMAND gw_perf_gate_hell_frame
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+)
+set_tests_properties(hell_frame_budgets_perf PROPERTIES
+    LABELS     "phase21;perf;hell_frame"
+    TIMEOUT    60
+    RUN_SERIAL TRUE
+)
