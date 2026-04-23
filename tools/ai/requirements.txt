@@ -5,4 +5,4 @@
 # graphifyy — code-to-knowledge-graph indexer used by Cursor + Claude agents.
 # Pin to a concrete release tag to keep graph.json reproducible.
 # Latest release at the time of ADR-0118 adoption: see README.
-graphifyy==0.3.1
+graphifyy==0.4.31

@@ -66,3 +66,12 @@ dxdiag*.txt
 telemetry_queue.sqlite
 tele.dsn.key
 dsar_out/
+
+# Graphify (ADR-0118) — commit graph.json + GRAPH_REPORT.md; cache + HTML +
+# cost / manifest files are regenerated on every `graphify update .`.
+graphify-out/cache/
+graphify-out/manifest.json
+graphify-out/cost.json
+graphify-out/graph.html
+graphify-out/memory/
+graphify-out/raw/
