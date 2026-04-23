@@ -134,6 +134,13 @@ struct RenderSettings {
     LightingParams     lighting{};
     DebugToggles       debug{};
     FrameStats         stats{};
+
+    // pre-eng-fsr2-hal-frame-graph: cockpit toggles for the FSR 2 upscale pass
+    // and HDR10 swapchain output. Scaffold calls live in
+    // `engine/render/post/upscale_and_hdr_bridge.cpp`; real frame-graph pass
+    // registration lands with the Phase 21 post-FX wave.
+    bool fsr2_enabled = false;
+    bool hdr_enabled  = false;
 };
 
 }  // namespace gw::editor::render

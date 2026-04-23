@@ -10,6 +10,7 @@
 #include "engine/world/universe/universe_seed_manager.hpp"
 
 #include "engine/world/universe/hec.hpp"
+#include "engine/core/crash_reporter.hpp"
 
 #include <array>
 #include <cstdio>
@@ -53,6 +54,7 @@ namespace {
 } // namespace
 
 int main() {
+    gw::core::crash::install_handlers();
     constexpr const char* kSeedStr = "HELL_SEED_V1";
     const UniverseSeed    world(kSeedStr);
 

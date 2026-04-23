@@ -3,6 +3,8 @@
 // Steam Deck Verified smoke probe. Each check is a scaffold today and
 // lands its real validation logic in Phase 22.
 
+#include "engine/core/crash_reporter.hpp"
+
 #include <cstdio>
 
 namespace {
@@ -40,6 +42,7 @@ ProbeResult check_native_linux_vk() noexcept {
 } // namespace
 
 int main(int argc, char** /*argv*/) {
+    gw::core::crash::install_handlers();
     const ProbeResult probes[] = {
         check_no_launcher(),
         check_controller_glyphs(),

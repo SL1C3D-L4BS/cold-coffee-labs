@@ -2,6 +2,7 @@
 
 #include "runtime/engine.hpp"
 
+#include "engine/core/crash_reporter.hpp"
 #include "engine/a11y/a11y_world.hpp"
 #include "engine/a11y/selfcheck.hpp"
 #include "engine/i18n/i18n_world.hpp"
@@ -50,6 +51,7 @@ std::vector<std::pair<std::string, std::string>> zh_kv() {
 } // namespace
 
 int main() {
+    gw::core::crash::install_handlers();
     gw::runtime::EngineConfig ecfg{};
     ecfg.headless         = true;
     ecfg.deterministic    = true;

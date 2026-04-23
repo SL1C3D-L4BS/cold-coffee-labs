@@ -11,6 +11,7 @@
 //
 // Gameplay logic and a real scene land in Phase 12.
 
+#include "engine/core/crash_reporter.hpp"
 #include "engine/core/version.hpp"
 #include "runtime/engine.hpp"
 
@@ -40,6 +41,7 @@ public:
 } // namespace
 
 int main(int argc, char** argv) {
+    gw::core::crash::install_handlers();
     std::fprintf(stdout, "[sandbox_playable] greywater %s\n", gw::core::version_string());
 
     gw::runtime::EngineConfig cfg{};

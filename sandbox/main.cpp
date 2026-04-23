@@ -14,6 +14,7 @@
 //   volk           — https://github.com/zeux/volk
 //   VMA 3.1        — https://gpuopen.com/vulkan-memory-allocator/
 
+#include "engine/core/crash_reporter.hpp"
 #include "engine/core/version.hpp"
 
 #include <volk.h>
@@ -376,6 +377,7 @@ void transition_image(VkCommandBuffer cmd, VkImage image,
 // -----------------------------------------------------------------------------
 
 int main() {
+    gw::core::crash::install_handlers();
     std::setvbuf(stdout, nullptr, _IONBF, 0);
     std::setvbuf(stderr, nullptr, _IONBF, 0);
     std::fprintf(stdout, "[sandbox] starting %s\n", gw::core::version_string());

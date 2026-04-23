@@ -15,6 +15,7 @@
 // `GW_ENABLE_JOLT=ON` (the `physics-*` preset) it exercises the real Jolt
 // path end-to-end.
 
+#include "engine/core/crash_reporter.hpp"
 #include "engine/core/version.hpp"
 #include "engine/physics/character_controller.hpp"
 #include "engine/physics/collider.hpp"
@@ -72,6 +73,7 @@ RaycastProbeResult probe_floor(PhysicsWorld& w) {
 } // namespace
 
 int main(int argc, char** argv) {
+    gw::core::crash::install_handlers();
     std::fprintf(stdout, "[sandbox_physics] greywater %s\n", gw::core::version_string());
 
     std::uint32_t frames = kDefaultFrames;

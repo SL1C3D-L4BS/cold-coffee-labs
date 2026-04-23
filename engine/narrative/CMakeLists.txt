@@ -11,6 +11,8 @@ target_sources(greywater_core
         sin_signature.cpp
         voice_director.cpp
         grace_meter.cpp
+        # pre-eng-narrative-tick: canonical five-module narrative step.
+        narrative_tick_system.cpp
     PUBLIC
         FILE_SET HEADERS
         BASE_DIRS ${CMAKE_SOURCE_DIR}
@@ -21,4 +23,5 @@ target_sources(greywater_core
             sin_signature.hpp
             voice_director.hpp
             grace_meter.hpp
+            narrative_tick_system.hpp
 )

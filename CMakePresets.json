@@ -224,6 +224,17 @@
                 "GW_ENABLE_DXC":           "ON",
                 "GW_FEATURE_SM69":         "ON"
             }
+        },
+        {
+            "name": "dev-fuzz-clang",
+            "inherits": "dev-linux",
+            "displayName": "Fuzz Linux (Clang + libFuzzer + ASan + UBSan)",
+            "description": "pre-tc-fuzz-preset: libFuzzer harnesses under tests/fuzz, ADR-0117. Clang toolchain required for -fsanitize=fuzzer.",
+            "cacheVariables": {
+                "GW_FUZZ": "ON",
+                "CMAKE_CXX_FLAGS_DEBUG_INIT": "-O1 -g -fsanitize=fuzzer-no-link,address,undefined -fno-omit-frame-pointer",
+                "CMAKE_EXE_LINKER_FLAGS_DEBUG_INIT": "-fsanitize=fuzzer,address,undefined"
+            }
         }
     ],
     "buildPresets": [
@@ -247,7 +258,8 @@
         { "name": "ship-linux",    "configurePreset": "ship-linux" },
         { "name": "ship-win",      "configurePreset": "ship-win" },
         { "name": "studio-linux",  "configurePreset": "studio-linux" },
-        { "name": "studio-win",    "configurePreset": "studio-win" }
+        { "name": "studio-win",    "configurePreset": "studio-win" },
+        { "name": "dev-fuzz-clang","configurePreset": "dev-fuzz-clang" }
     ],
     "testPresets": [
         {

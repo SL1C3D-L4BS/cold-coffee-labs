@@ -28,6 +28,10 @@ struct CookWorkerConfig {
     bool                  force          = false; // ignore cache
     bool                  verbose        = false;
     std::string           filter_glob;           // empty = all
+    // pre-tc-content-signing: path to the Ed25519 signing key. Empty =
+    // skip signing (dev / sandbox builds). Release CI sets this from a
+    // sealed secret. See docs/prompts/preflight/pre-tc-content-signing.md.
+    std::filesystem::path sign_key_path;
 };
 
 // Progress callback invoked after each asset completes.

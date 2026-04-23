@@ -16,6 +16,11 @@ add_executable(gw_tests
     # Phase 7 fullstack Path-A — PIE snapshot/restore (ADR 0006 in docs/10_APPENDIX_ADRS_AND_REFERENCES.md + §12)
     unit/editor_pie/gameplay_host_test.cpp
     "${CMAKE_SOURCE_DIR}/editor/pie/gameplay_host.cpp"
+    # pre-ed-pie-overlays wire-up — gameplay_host.cpp now calls the three
+    # overlay helpers, so the test target must pick up their TUs too.
+    "${CMAKE_SOURCE_DIR}/editor/pie/pie_debug_hud.cpp"
+    "${CMAKE_SOURCE_DIR}/editor/pie/pie_perf_guard.cpp"
+    "${CMAKE_SOURCE_DIR}/editor/pie/rollback_inspector.cpp"
     # Phase 7 week 042 — BLD C-ABI v1 freeze smoke (ADR 0007 in docs/10_APPENDIX_ADRS_AND_REFERENCES.md)
     smoke/bld_abi_v1/bld_abi_smoke_test.cpp
     "${CMAKE_SOURCE_DIR}/editor/bld_api/editor_bld_api.cpp"
@@ -138,6 +143,8 @@ add_executable(gw_tests
     unit/runtime/phase17_runtime_integration_test.cpp
     # Phase 18 — mod host + gameplay_module (ADR-adjacent mod surface)
     mod/mod_loader_test.cpp
+    # pre-eng-narrative-tick wire-up (Phase 21 preflight).
+    unit/narrative/narrative_tick_system_test.cpp
     test_main.cpp
 )
 
@@ -210,6 +217,16 @@ doctest_discover_tests(gw_tests
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
     PROPERTIES LABELS "smoke;assets;core;math;memory;ecs;scene;vscript;audio;input;events;config;console;ui;physics;anim;gameai;net;persist;telemetry;platform_services;i18n;a11y;render;vfx;runtime;mod"
 )
+
+# pre-tc-tests-split (ADR-0117) — opt-in phase-scoped test binaries. Gate
+# behind GW_TESTS_SPLIT=ON so CI can add per-phase splits incrementally
+# without destabilising the monolithic gw_tests target.
+option(GW_TESTS_SPLIT "Emit phase-split test binaries (gw_tests_ai/physics/net)" OFF)
+if(GW_TESTS_SPLIT)
+    include("${CMAKE_SOURCE_DIR}/tests/split/gw_tests_ai.cmake")
+    include("${CMAKE_SOURCE_DIR}/tests/split/gw_tests_physics.cmake")
+    include("${CMAKE_SOURCE_DIR}/tests/split/gw_tests_net.cmake")
+endif()
 
 # Phase 18-A — `.gwseq` codec + sequencer unit tests.
 add_executable(seq_tests

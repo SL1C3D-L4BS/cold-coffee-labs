@@ -19,6 +19,7 @@
 // same demo exercises the production bridges end-to-end.
 
 #include "engine/anim/animation_world.hpp"
+#include "engine/core/crash_reporter.hpp"
 #include "engine/core/version.hpp"
 #include "engine/gameai/gameai_world.hpp"
 
@@ -135,6 +136,7 @@ bool cond_is_arrived(void* user, gw::gameai::BTContext& ctx) {
 } // namespace
 
 int main(int argc, char** argv) {
+    gw::core::crash::install_handlers();
     std::fprintf(stdout, "[sandbox_living_scene] greywater %s\n", gw::core::version_string());
 
     std::uint32_t frames = kDefaultFrames;

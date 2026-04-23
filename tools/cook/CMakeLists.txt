@@ -6,6 +6,8 @@ add_executable(gw_cook
     cook_graph.cpp
     cook_cache.cpp
     cook_worker.cpp
+    # pre-tc-content-signing (ADR-0115) — Ed25519 manifest signing.
+    content_signing.cpp
 )
 
 target_include_directories(gw_cook PRIVATE

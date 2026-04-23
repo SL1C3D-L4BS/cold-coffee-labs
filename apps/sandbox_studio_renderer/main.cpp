@@ -8,6 +8,7 @@
 
 #include "runtime/engine.hpp"
 
+#include "engine/core/crash_reporter.hpp"
 #include "engine/render/material/material_types.hpp"
 #include "engine/render/material/material_world.hpp"
 #include "engine/render/post/post_types.hpp"
@@ -95,6 +96,7 @@ void seed_decals(gw::vfx::particles::ParticleWorld& vfx, std::uint32_t& count_ou
 } // namespace
 
 int main() {
+    gw::core::crash::install_handlers();
     gw::runtime::EngineConfig ecfg{};
     ecfg.headless         = true;
     ecfg.deterministic    = true;

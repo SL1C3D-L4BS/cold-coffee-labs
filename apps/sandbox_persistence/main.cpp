@@ -2,6 +2,7 @@
 
 #include "runtime/engine.hpp"
 
+#include "engine/core/crash_reporter.hpp"
 #include "engine/ecs/serialize.hpp"
 #include "engine/ecs/world.hpp"
 #include "engine/persist/cloud_save.hpp"
@@ -31,6 +32,7 @@ struct Health {
 } // namespace
 
 int main() {
+    gw::core::crash::install_handlers();
     gw::runtime::EngineConfig ecfg{};
     ecfg.headless       = true;
     ecfg.deterministic  = true;

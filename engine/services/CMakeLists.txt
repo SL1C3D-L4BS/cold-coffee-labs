@@ -11,3 +11,16 @@ add_subdirectory(gore)
 add_subdirectory(audio_weave)
 add_subdirectory(director)
 add_subdirectory(editor_copilot)
+
+# pre-eng-franchise-services wire-up: one entry point that references every
+# franchise service so owners can link through a single facade until Phase 27
+# lands per-owner direct dispatch.
+target_sources(greywater_core
+    PRIVATE
+        franchise_services_facade.cpp
+    PUBLIC
+        FILE_SET HEADERS
+        BASE_DIRS ${CMAKE_SOURCE_DIR}
+        FILES
+            franchise_services_facade.hpp
+)

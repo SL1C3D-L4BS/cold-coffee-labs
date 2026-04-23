@@ -29,6 +29,8 @@ target_sources(greywater_input
         scanner.cpp
         adaptive_profile.cpp
         input_service.cpp
+        # pre-eng-steam-input-glue: Steam Input API glue (ADR-0113).
+        steam_input_glue.cpp
     PUBLIC
         FILE_SET HEADERS
         BASE_DIRS ${CMAKE_SOURCE_DIR}
@@ -44,6 +46,7 @@ target_sources(greywater_input
             scanner.hpp
             adaptive_profile.hpp
             input_service.hpp
+            steam_input_glue.hpp
 )
 
 if(DEFINED GW_INPUT_SDL3 AND GW_INPUT_SDL3)

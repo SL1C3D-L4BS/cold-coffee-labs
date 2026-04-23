@@ -14,6 +14,7 @@
 #include "engine/scene/seq/seq_camera.hpp"
 #include "engine/scripting/mod_api.hpp"
 #include "editor/scene/components.hpp"
+#include "engine/core/crash_reporter.hpp"
 
 #include <cstdio>
 #include <cmath>
@@ -52,6 +53,7 @@ void run_command_write_create_block(std::uint8_t* p, std::uint32_t fr, std::uint
 }  // namespace
 
 int main() {
+    gw::core::crash::install_handlers();
     bool    seq_ok    = false;
     bool    mod_ok    = false;
     bool    bld_ok    = false;

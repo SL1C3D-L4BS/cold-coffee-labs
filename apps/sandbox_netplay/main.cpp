@@ -16,6 +16,7 @@
 //   4. Emits a grep-friendly `NETPLAY OK` summary so the CI
 //      `netplay_sandbox` test can gate on it.
 
+#include "engine/core/crash_reporter.hpp"
 #include "engine/core/version.hpp"
 #include "engine/net/network_world.hpp"
 #include "engine/net/replication.hpp"
@@ -51,6 +52,7 @@ net::ReplicatedEntity make_entity(std::uint64_t id, float x, float z) {
 } // namespace
 
 int main(int argc, char** argv) {
+    gw::core::crash::install_handlers();
     std::fprintf(stdout, "[sandbox_netplay] greywater %s\n", gw::core::version_string());
 
     std::uint32_t frames = kDefaultFrames;

@@ -1,4 +1,5 @@
 #include "cook_worker.hpp"
+#include "content_signing.hpp"
 #include "engine/jobs/scheduler.hpp"
 #include "engine/jobs/reserved_worker.hpp"
 #include <algorithm>
@@ -145,6 +146,26 @@ CookStats CookWorker::execute(CookGraph&                            graph,
     const auto wall_end = std::chrono::steady_clock::now();
     const uint32_t wall_ms = static_cast<uint32_t>(
         std::chrono::duration_cast<std::chrono::milliseconds>(wall_end - wall_start).count());
+
+    // pre-tc-content-signing — post-cook finalisation. When a signing key is
+    // configured, sign the emitted manifest and stamp the signature into the
+    // manifest blob for Release-build loader verification. Signing failures
+    // are surfaced as errors so CI fails fast on sealed-secret misconfig.
+    if (!cfg_.sign_key_path.empty() && errors.load() == 0u) {
+        gw::cook::signing::Signature sig{};
+        const auto ok = gw::cook::signing::sign_manifest(
+            cfg_.output_root.string(),
+            cfg_.sign_key_path.string(),
+            sig);
+        if (!ok) {
+            errors.fetch_add(1u, std::memory_order_relaxed);
+            if (cfg_.verbose) {
+                std::fprintf(stderr, "[COOK ERROR] manifest signing failed\n");
+            }
+        } else if (cfg_.verbose) {
+            std::fprintf(stdout, "[COOK] manifest signed (Ed25519)\n");
+        }
+    }
 
     CookStats stats{};
     stats.total   = total;

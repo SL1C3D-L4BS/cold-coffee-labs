@@ -10,6 +10,11 @@ add_library(greywater_render_post STATIC
     grain.cpp
     post_world.cpp
     post_cvars.cpp
+    # pre-eng-fsr2-hal-frame-graph wire-up (Part C §21 scaffolds).
+    fsr2/fsr2_integration.cpp
+    upscale_and_hdr_bridge.cpp
+    ../hal/hdr_output.cpp
+    ../hal/present_timing.cpp
 )
 add_library(greywater::render_post ALIAS greywater_render_post)
 
@@ -40,4 +45,8 @@ target_sources(greywater_render_post
             grain.hpp
             post_world.hpp
             post_cvars.hpp
+            fsr2/fsr2_integration.hpp
+            upscale_and_hdr_bridge.hpp
+            ../hal/hdr_output.hpp
+            ../hal/present_timing.hpp
 )

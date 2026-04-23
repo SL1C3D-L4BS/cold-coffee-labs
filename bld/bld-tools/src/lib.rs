@@ -249,4 +249,15 @@ mod tests {
     fn count_is_nonzero() {
         assert!(registry::count() >= 1);
     }
+
+    #[test]
+    fn sacrilege_tools_registered() {
+        // pre-tc-bld-tool-dispatch — the Sacrilege copilot tool descriptors
+        // must appear in the global inventory. If the module is ever dropped
+        // from lib.rs the registry loses them and the editor Copilot catalogue
+        // regresses; this guard keeps them wired in.
+        assert!(registry::find("sacrilege.concept_to_material").is_some());
+        assert!(registry::find("sacrilege.encounter_suggest").is_some());
+        assert!(registry::find("sacrilege.exploit_detect").is_some());
+    }
 }

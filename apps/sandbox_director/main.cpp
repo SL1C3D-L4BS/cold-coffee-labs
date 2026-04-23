@@ -15,6 +15,8 @@
 //
 // Budget contract: Director policy eval ≤ 0.1 ms per tick on RX 580.
 
+#include "engine/core/crash_reporter.hpp"
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -65,6 +67,7 @@ int run_interactive(const CliOptions& /*opts*/) noexcept {
 } // namespace
 
 int main(int argc, char** argv) {
+    gw::core::crash::install_handlers();
     const auto opts = parse_cli(argc, argv);
     return opts.headless ? run_headless(opts) : run_interactive(opts);
 }

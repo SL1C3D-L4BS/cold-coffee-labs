@@ -1,6 +1,8 @@
 // engine/input/input_service.cpp
 #include "engine/input/input_service.hpp"
 
+#include "engine/input/steam_input_glue.hpp"
+
 #include <utility>
 
 namespace gw::input {
@@ -24,6 +26,12 @@ bool InputService::initialize(const InputConfig& cfg) {
     if (!backend_) return false;
     backend_->initialize(cfg);
     haptics_ = std::make_unique<Haptics>(*backend_);
+
+    // pre-eng-steam-input-glue: best-effort Steam Input startup. Non-fatal if
+    // Steamworks isn't present (dev builds, CI). When available, the per-frame
+    // update loop calls tick_active_scheme() to drive glyph selection.
+    (void)gw::input::steam::startup();
+
     return true;
 }
 
@@ -35,6 +43,10 @@ void InputService::shutdown() {
     haptics_.reset();
     scanner_.reset(0.0f);
     stack_ = ContextStack{};
+
+    // pre-eng-steam-input-glue: tear down Steam Input so the next init()
+    // starts from a clean slate.
+    gw::input::steam::shutdown();
 }
 
 bool InputService::load_action_map(const std::string& toml) noexcept {
@@ -77,6 +89,11 @@ void InputService::update(float now_ms) {
         if (*it) evaluate_set(**it, snapshot_, now_ms);
     }
     if (scanner_enabled_) scanner_.tick(now_ms);
+
+    // pre-eng-steam-input-glue: sample which control scheme Steam last saw so
+    // UI glyph resolution stays in sync with the player's active device.
+    (void)gw::input::steam::tick_active_scheme();
+
     ++stats_.frames_updated;
 }
 

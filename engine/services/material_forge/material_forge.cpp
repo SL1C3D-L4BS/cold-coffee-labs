@@ -2,11 +2,45 @@
 
 #include "engine/services/material_forge/material_forge.hpp"
 
+// pre-eng-ai-runtime-dispatch: route material evaluation through the neural
+// material evaluator when a model is registered. Falls back to the closed-
+// form approximation when the registry returns no neural model (cooked
+// weights aren't always available in dev builds).
+#include "engine/ai_runtime/material_eval.hpp"
+#include "engine/ai_runtime/model_registry.hpp"
+
 #include <algorithm>
 
 namespace gw::services::material_forge {
 
+namespace {
+/// Best-effort lookup: find the first registered NeuralMaterial model. A
+/// null/invalid ModelId means no cooked weights yet — use the closed form.
+ai_runtime::ModelId neural_material_model() noexcept {
+    // Phase 26 scaffold: ModelRegistry returns invalid IDs until cooked weights
+    // and Ed25519 signatures are wired. Query exists so the call-site stays.
+    return ai_runtime::ModelId{};
+}
+} // namespace
+
 MaterialEvalResult evaluate(const MaterialEvalRequest& req) noexcept {
+    if (const auto model = neural_material_model(); model.valid()) {
+        ai_runtime::MaterialEvalInput in{};
+        in.uv[0]         = 0.f;
+        in.uv[1]         = 0.f;
+        in.wear          = req.params.wear;
+        in.wetness       = req.params.wetness;
+        in.blood_density = req.params.blood;
+        const auto neural = ai_runtime::evaluate_material(model, in);
+        MaterialEvalResult r{};
+        r.albedo    = neural.albedo;
+        r.normal    = neural.normal;
+        r.roughness = neural.roughness;
+        r.metallic  = neural.metallic;
+        r.ao        = neural.ao;
+        return r;
+    }
+
     MaterialEvalResult out{};
     const auto& p   = req.params;
     const float wet = std::clamp(p.wetness, 0.f, 1.f);

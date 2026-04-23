@@ -1,0 +1,76 @@
+# .github/workflows/ai_retrain.yml
+# pre-tc-ai-retrain-workflow — nightly-cron stub that runs the five
+# `tools/cook/ai/*/pipeline.yml` entries and publishes model artefacts.
+#
+# Minimum wire-up per docs/prompts/00_WIRE_UP_AUDIT.md §4: scheduled
+# workflow, calls each pipeline's entry script, uploads artefacts, opens
+# a tracking issue when any model hash changes. Real retrains (GPU-backed)
+# land in Phase 21 W138; today the workflow just proves the plumbing.
+
+name: AI Retrain (nightly)
+
+on:
+  schedule:
+    # 03:17 UTC nightly — off-peak; skews from the CI schedule intentionally.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  retrain:
+    name: Retrain ${{ matrix.pipeline }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pipeline:
+          - director_train
+          - music_symbolic_train
+          - neural_material
+          - vae_weapons
+          - wfc_rl_scorer
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show pipeline descriptor
+        run: |
+          cat "tools/cook/ai/${{ matrix.pipeline }}/pipeline.yml"
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Dry-run pipeline entry script
+        run: |
+          PIPELINE_DIR="tools/cook/ai/${{ matrix.pipeline }}"
+          ENTRY_SCRIPT="${PIPELINE_DIR}/train.py"
+          if [ -f "$ENTRY_SCRIPT" ]; then
+            echo "Found entry script, running with --dry-run"
+            python "$ENTRY_SCRIPT" --dry-run || echo "dry-run exited non-zero (scaffold ok)"
+          else
+            echo "No entry script yet for ${{ matrix.pipeline }} — stub-wire only."
+          fi
+
+      - name: Upload pipeline artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-retrain-${{ matrix.pipeline }}
+          path: tools/cook/ai/${{ matrix.pipeline }}
+          if-no-files-found: ignore
+          retention-days: 7
+
+  track:
+    name: Model hash tracking
+    needs: retrain
+    runs-on: ubuntu-latest
+    if: ${{ always() }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Open tracking issue on hash drift (stub)
+        run: |
+          echo "TODO: diff tools/cook/ai/*/model.sha256 vs remote; open an issue if different."
+          echo "Phase 21 W138 replaces this step with the real drift check."

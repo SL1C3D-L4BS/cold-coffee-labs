@@ -33,6 +33,15 @@ use serde_json::Value as JsonValue;
 // ReplayHost trait and crate-level no-wall-time / no-network invariants.
 pub mod gameplay_schema;
 
+// pre-tc-bld-replay — re-export the gameplay schema types so downstream
+// recorders and the P22 W148 determinism test import them from the crate
+// root. Keeps the schema module from being an orphan while the recorder
+// binary lands in Phase 22.
+pub use gameplay_schema::{
+    GameplayReplay, GameplayReplayFrame, GameplayReplayHeader,
+    GAMEPLAY_REPLAY_VERSION,
+};
+
 /// Replay errors.
 #[derive(Debug, thiserror::Error)]
 pub enum ReplayError {
