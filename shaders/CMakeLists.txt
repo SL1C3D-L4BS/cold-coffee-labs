@@ -76,6 +76,13 @@ set(POST_SHADER_SOURCES
     post/taa.comp.hlsl
     post/bloom_downsample.comp.hlsl
     post/bloom_upsample.comp.hlsl
+    # Phase 21 W135 / W136 — horror post stack + Circle-specific stages (ADR-0108).
+    post/horror_post.comp.hlsl
+    post/sin_tendril.frag.hlsl
+    post/ruin_desat.frag.hlsl
+    post/rapture_whiteout.frag.hlsl
+    # Phase 22 W147 — God Mode / Blasphemy State reality warp.
+    post/reality_warp.comp.hlsl
 )
 
 add_shader_library(post_shaders
@@ -102,6 +109,9 @@ add_shader_library(material_shaders
 set(DECAL_SHADER_SOURCES
     decals/decal_project.vert.hlsl
     decals/decal_project.frag.hlsl
+    # Phase 21 W137 — blood decal ring stamp + drip (ADR-0108).
+    decals/blood_decal_stamp.comp.hlsl
+    decals/blood_decal_drip.comp.hlsl
 )
 
 add_shader_library(decal_shaders

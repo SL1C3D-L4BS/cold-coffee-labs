@@ -60,5 +60,8 @@ add_subdirectory(validation)
 add_subdirectory(material)
 add_subdirectory(post)
 
+# Phase 21 W137 — GPU-driven blood decal ring (ADR-0108).
+add_subdirectory(decals)
+
 # Add render target to main engine target
 target_link_libraries(greywater_core PRIVATE engine_render)

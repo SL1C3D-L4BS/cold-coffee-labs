@@ -153,6 +153,10 @@ target_link_libraries(gw_editor PRIVATE
     greywater::core
     greywater::assets
     engine_render
+    greywater::world
+    greywater::audio
+    greywater::render_post
+    greywater::render_decals
     gw_seq
     bld_ffi
 )

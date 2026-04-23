@@ -145,6 +145,25 @@ add_executable(gw_tests
     mod/mod_loader_test.cpp
     # pre-eng-narrative-tick wire-up (Phase 21 preflight).
     unit/narrative/narrative_tick_system_test.cpp
+    # Phase 21 W135 — horror_post scalar oracle.
+    unit/render/post/horror_post_test.cpp
+    # Phase 21 W136 — Circle post stages (sin tendril / ruin desat / rapture whiteout).
+    unit/render/post/circle_post_stages_test.cpp
+    # Phase 22 W147 — reality-warp scalar oracle.
+    unit/render/post/reality_warp_test.cpp
+    # Phase 21 W137 — BloodDecalSystem ring buffer.
+    unit/render/decals/blood_decal_ring_test.cpp
+    # Phase 21 W138 — CircleProfile / location skins.
+    unit/world/circle_profile_test.cpp
+    # Phase 21 W139 — Martyrdom audio controller.
+    unit/audio/martyrdom_audio_test.cpp
+    # Phase 21 W140 — Diegetic HUD model.
+    unit/gameplay/diegetic_hud_test.cpp
+    # Phase 21 W140 — Sacrilege editor panels (data model only).
+    unit/editor/sacrilege_panels_test.cpp
+    "${CMAKE_SOURCE_DIR}/editor/panels/sacrilege/circle_editor_panel.cpp"
+    "${CMAKE_SOURCE_DIR}/editor/panels/sacrilege/encounter_editor_panel.cpp"
+    "${CMAKE_SOURCE_DIR}/gameplay/hud/diegetic_hud.cpp"
     test_main.cpp
 )
 
@@ -166,6 +185,10 @@ target_link_libraries(gw_tests
         greywater::platform_services
         greywater::i18n
         greywater::a11y
+        # Phase 21/22 post stack + decals + world (Location Skins).
+        greywater::render_post
+        greywater::render_decals
+        greywater::world
         doctest::doctest
         volk
         xxhash

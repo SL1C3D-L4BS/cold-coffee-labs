@@ -15,6 +15,8 @@ add_library(greywater_gameplay SHARED
     boss/logos/phase4_selector.cpp
     # Part C §24 — Gameplay a11y WCAG 2.2 AA (ADR-0116).
     a11y/gameplay_a11y.cpp
+    # Phase 21 W140 — Diegetic HUD model (ADR-0108).
+    hud/diegetic_hud.cpp
 )
 target_link_libraries(greywater_gameplay PRIVATE greywater::core)
 

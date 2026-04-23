@@ -13,6 +13,8 @@ add_library(gw_world STATIC
     gptm/gptm_layout_check.cpp
     gptm/gptm_lod_selector.cpp
     gptm/gptm_tile_renderer.cpp
+    # Phase 21 W138 — Circle profile + 9 Location Skins (ADR-0108).
+    location_skins.cpp
 )
 add_library(greywater::world ALIAS gw_world)
 

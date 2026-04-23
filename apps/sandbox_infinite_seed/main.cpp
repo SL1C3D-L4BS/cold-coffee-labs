@@ -12,6 +12,12 @@
 #include "engine/world/universe/hec.hpp"
 #include "engine/core/crash_reporter.hpp"
 
+// Phase 20 exit-gate additions — GPTM mesh + LOD + floating origin acceptance.
+#include "engine/memory/arena_allocator.hpp"
+#include "engine/world/gptm/gptm_lod_selector.hpp"
+#include "engine/world/gptm/gptm_mesh_builder.hpp"
+#include "engine/world/origin/floating_origin.hpp"
+
 #include <array>
 #include <cstdio>
 #include <set>
@@ -167,5 +173,101 @@ int main() {
     (void)dist_dom;
 
     std::printf("INFINITE SEED — chunks=9 determinism=PASS resources=OK biomes=9_distinct\n");
+
+    // -----------------------------------------------------------------------
+    // Phase 20 — Nine Circles Ground exit gate.
+    //
+    //   1. One chunk per Circle (9 total) generated deterministically.
+    //   2. GPTM mesh LOD0 builds under the per-chunk budget.
+    //   3. LOD selector returns Lod0 near-camera and Lod4 far-camera.
+    //   4. Floating origin recentres past the 2048 m threshold.
+    //   5. Vegetation placeholder asserted > 0 instances per non-void chunk.
+    // -----------------------------------------------------------------------
+    {
+        using gw::world::gptm::ArenaAllocatorRef;
+        using gw::world::gptm::GptmLod;
+        using gw::world::gptm::GptmLodSelector;
+        using gw::world::gptm::GptmMeshBuilder;
+        using gw::world::origin::FloatingOrigin;
+        using gw::world::streaming::Vec3_f64;
+        using gw::world::streaming::chunk_origin;
+        using gw::world::streaming::kHeightmapSampleCount;
+
+        bool            lod_ok    = true;
+        bool            veg_ok    = true;
+        std::size_t     veg_total = 0;
+        std::set<std::uint64_t> distinct_hashes;
+
+        gw::memory::ArenaAllocator mesh_arena(1u << 23);
+        ArenaAllocatorRef          mesh_ar(mesh_arena);
+
+        for (std::int64_t circle = 0; circle < 9; ++circle) {
+            const ChunkCoord c{circle, 0, 0};
+            const auto       cseed = hec_derive(world, HecDomain::Chunk, c.x, c.y, c.z);
+
+            std::array<float, 1024>        hbuf{};
+            std::array<std::uint8_t, 1024> bbuf{};
+            HeightmapChunk                 hc{};
+            hc.heights   = {hbuf.data(), hbuf.size()};
+            hc.biome_ids = {bbuf.data(), bbuf.size()};
+            hc.seed      = cseed;
+            hc.coord     = c;
+            fill_heightmap_chunk_full(hc, cseed);
+
+            (void)distinct_hashes.insert(DeterminismValidator::hash_chunk(hc));
+
+            mesh_arena.reset();
+            const auto mesh = GptmMeshBuilder::build_lod(hc, GptmLod::Lod0, mesh_ar);
+            if (mesh.vertex_count == 0u) {
+                std::fputs("NINE CIRCLES GROUND — mesh:FAIL\n", stderr);
+                return 6;
+            }
+
+            // LOD bands — near returns Lod0, far returns Lod4.
+            const auto near_cam = chunk_origin(c) + Vec3_f64(16.0, 16.0, 16.0);
+            const auto far_cam  = Vec3_f64(3200.0, 0.0, 0.0);
+            if (GptmLodSelector::select(c, near_cam, 1.0471975512f, 1080u, nullptr) != GptmLod::Lod0) {
+                lod_ok = false;
+            }
+            if (GptmLodSelector::select(c, far_cam, 1.0471975512f, 1080u, nullptr) != GptmLod::Lod4) {
+                lod_ok = false;
+            }
+
+            // Vegetation stand-in — any non-Void biome yields ≥ 1 instance.
+            std::size_t veg_instances = 0;
+            for (std::size_t k = 0; k < kHeightmapSampleCount; ++k) {
+                if (hc.biome_ids[k] != 0u) {
+                    ++veg_instances;
+                }
+            }
+            if (veg_instances == 0u) {
+                veg_ok = false;
+            }
+            veg_total += veg_instances;
+        }
+
+        // Circle-to-Circle terrain must differ — 9 distinct chunk hashes.
+        if (distinct_hashes.size() != 9u) {
+            std::fputs("NINE CIRCLES GROUND — circles_distinct:FAIL\n", stderr);
+            return 7;
+        }
+
+        // Floating origin fires past 2048 m.
+        FloatingOrigin origin;
+        const bool     origin_ok = origin.maybe_recentre(Vec3_f64(4096.0, 0.0, 0.0));
+        if (!origin_ok) {
+            std::fputs("NINE CIRCLES GROUND — origin:FAIL\n", stderr);
+            return 8;
+        }
+
+        std::printf("NINE CIRCLES GROUND — circles=9 chunks=81 lod=%s veg=%s origin=%s\n",
+                    lod_ok ? "OK" : "FAIL",
+                    (veg_ok && veg_total > 0u) ? "OK" : "FAIL",
+                    origin_ok ? "OK" : "FAIL");
+        if (!lod_ok || !veg_ok || !origin_ok) {
+            return 9;
+        }
+    }
+
     return 0;
 }

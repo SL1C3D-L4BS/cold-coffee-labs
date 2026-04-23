@@ -31,6 +31,8 @@ target_sources(greywater_audio
         audio_service.cpp
         audio_backend_null.cpp
         audio_mixer_system.cpp
+        # Phase 21 W139 — Martyrdom audio stems + dialogue trigger events (ADR-0108).
+        martyrdom_audio_controller.cpp
     PUBLIC
         FILE_SET HEADERS
         BASE_DIRS ${CMAKE_SOURCE_DIR}
@@ -49,7 +51,11 @@ target_sources(greywater_audio
             audio_mixer_system.hpp
             voice_capture.hpp
             voice_playback.hpp
+            martyrdom_audio_controller.hpp
 )
+
+# martyrdom_audio_controller consumes narrative types; the narrative headers
+# are appended to greywater_core, so greywater::core already provides them.
 
 # Optional: miniaudio production backend
 if(DEFINED GW_AUDIO_MINIAUDIO AND GW_AUDIO_MINIAUDIO)
