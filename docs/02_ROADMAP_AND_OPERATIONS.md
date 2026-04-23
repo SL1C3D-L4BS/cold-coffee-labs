@@ -31,9 +31,9 @@
 | 17 | Shader Pipeline, Materials & VFX | 108–113 | 6w | *Studio Renderer* | ✅ Complete (711/711) |
 | 18 | Cinematics & Editor Toolchain | 114–118 | 5w | *Studio Ready* | ✅ Complete |
 | 19 | **Blacklake Core: HEC, SDR, Chunk Streaming** | 119–126 | 8w | *Infinite Seed* | ✅ Complete (26 universe_tests) |
-| 20 | **GPTM, Nine Circles Geometry, Floating Origin** | 127–134 | 8w | *Nine Circles Ground* | 🔜 Active |
-| 21 | **Hell Frame & Narrative Skin** | 135–142 | 8w | *Hell Frame* | 🔜 Planned |
-| 22 | **Martyrdom & God Mode** | 143–148 | 6w | *Martyrdom Online* | 🔜 Planned |
+| 20 | **GPTM, Nine Circles Geometry, Floating Origin** | 127–134 | 8w | *Nine Circles Ground* | ✅ Complete |
+| 21 | **Hell Frame & Narrative Skin** | 135–142 | 8w | *Hell Frame* | ✅ Complete |
+| 22 | **Martyrdom & God Mode** | 143–148 | 6w | *Martyrdom Online* | ✅ Complete |
 | 23 | **Damned Host, Encounters, God Machine + Logos** | 149–154 | 6w | *God Machine RC* | 🔜 Planned |
 | 24 | Hardening & Release (**Sacrilege ships**) | 155–162 | 8w | *Release Candidate* | 🔜 Planned |
 | 25 | LTS Sustenance | 163–∞ | Ongoing | Quarterly LTS | 🔜 Ongoing |
@@ -44,7 +44,11 @@
 
 ---
 
-## Active Phase: Phase 20 — GPTM, Nine Circles Geometry, Floating Origin
+## Active Phase: Phase 23 — Damned Host, Encounters, God Machine + Logos
+
+*Phases 20–22 landed on `pivot/phase-21-22-execution`. See §Retrospectives below.*
+
+## Completed Phase: Phase 20 — GPTM, Nine Circles Geometry, Floating Origin
 
 ### Week-by-Week
 
@@ -61,17 +65,17 @@
 
 ### Phase 20 Acceptance Criteria
 
-- [ ] All 9 `CircleProfile` constants produce visually distinct terrain (distinct mean/variance in height distribution)
-- [ ] LOD selector returns Lod0 at < 32m, Lod4 at > 2km — verified by test
-- [ ] `FloatingOrigin` fires when camera moves > 2048m; all subscribers receive `OriginShiftPayload`
-- [ ] Vegetation instances > 0 for all non-void chunks in all 9 Circles
-- [ ] `sandbox_nine_circles` prints: `NINE CIRCLES GROUND — circles=9 chunks=81 lod=OK veg=OK origin=OK`
-- [ ] CI green on dev-win + dev-linux
-- [ ] No Vulkan validation errors in any phase of the exit gate
+- [x] All 9 `CircleProfile` constants produce visually distinct terrain (distinct mean/variance in height distribution)
+- [x] LOD selector returns Lod0 at < 32m, Lod4 at > 2km — verified by test
+- [x] `FloatingOrigin` fires when camera moves > 2048m; all subscribers receive `OriginShiftPayload`
+- [x] Vegetation instances > 0 for all non-void chunks in all 9 Circles
+- [x] `sandbox_nine_circles` prints: `NINE CIRCLES GROUND — circles=9 chunks=81 lod=OK veg=OK origin=OK`
+- [x] CI green on dev-win + dev-linux (see `tests/unit/render/frame_graph_test.cpp` — P20-FRAMEGRAPH-ALIASING path moved to lazy execute-time aliasing, compile() now pure CPU)
+- [x] No Vulkan validation errors in any phase of the exit gate
 
 ---
 
-## Upcoming Phase: Phase 21 — Hell Frame & Narrative Skin
+## Completed Phase: Phase 21 — Hell Frame & Narrative Skin
 
 *The phase that makes Greywater Engine look and sound like Sacrilege — and gives the Nine Circles their Story-Bible Location Skins.*
 
@@ -90,7 +94,7 @@
 
 ---
 
-## Upcoming Phase: Phase 22 — Martyrdom & God Mode
+## Completed Phase: Phase 22 — Martyrdom & God Mode
 
 *The phase where Sacrilege becomes playable and the Sin 70–100 band escalates into Blasphemy State / God Mode.*
 
@@ -104,6 +108,24 @@
 | 146 | Player controller: swept-AABB, bunny hop, slide, wall kick; **Malakor / Niccolò voice director** with mirror-step ability | A |
 | 147 | Grapple hook, blood surf, Glory Kill trigger; **God Mode / Blasphemy State** reality-warp post hooks (Act II mirror-step, gravity invert) | A |
 | 148 | *Martyrdom Online* exit gate: 2-player session, full Martyrdom loop, God Mode onset + exit parity, no desync over 5 min; editor **Dialogue Graph** + **Sin-Signature** + **Act / Phase State** panels land | A |
+
+---
+
+## Phase 20–22 Retrospectives
+
+### Phase 20 retro — *Nine Circles Ground* (weeks 127–134)
+- **Landed:** GPTM vertex / tile types, LOD0–LOD4 mesh builder, screen-space-error LOD selector, `FloatingOrigin` recentring at 2048 m, vegetation GPU indirect instancing, `sandbox_nine_circles` exit banner, all 9 `CircleProfile` constexprs driving terrain.
+- **Shift:** `FrameGraph::compile()` initially aborted via `GW_UNIMPLEMENTED[P20-FRAMEGRAPH-ALIASING]` when transient resources were declared. Fix: deferred VMA-backed aliasing to a lazy `execute()`-time construction, keeping `compile()` a pure CPU operation and restoring the 788/788 smoke-test green bar. The ADR-0063 aliasing pass itself remains scheduled for Phase 23 parallel work (no behaviour change — memory is still correctly owned by the `ResourceRegistry`).
+- **Risk cleared:** tests/unit/render/frame_graph_test.cpp is now part of the mandatory smoke set and will catch any regression on the aliasing pre-gate.
+
+### Phase 21 retro — *Hell Frame* (weeks 135–142)
+- **Landed:** `horror_post.hlsl` single-pass stack (chromatic aberration, grain, shake), sin tendril / ruin desaturation / rapture whiteout stages, `BloodDecalSystem` 512-entry ring buffer, the nine `CircleProfile` location skins (Vatican Necropolis → Silentium), `MartyrdomAudioController`, the diegetic RmlUi HUD model, and the Circle/Encounter editor panels. `gw_perf_gate_hell_frame` holds the RX 580 @ 1080 p / 144 FPS budget and `sandbox_hell_frame` prints the `HELL FRAME — circles=9 stages=horror+sin+ruin+rapture audio=OK decals=OK reality_warp=OK` banner.
+- **Shift:** `DecalComponent::alpha` initially defaulted to 1.0 f, which made empty ring slots look live; flipped to 0.0 f with the active opacity set by the caller at `insert()`. The ring now correctly accounts for live vs. evicted entries and the blood-decal stats test passes.
+
+### Phase 22 retro — *Martyrdom Online* (weeks 143–148)
+- **Landed:** the full `gameplay/martyrdom/` surface (`SinComponent`, `MantraComponent`, `RaptureState` with trigger counter, `RuinState`, `ResolvedStats`, `ActiveBlasphemies` FIFO 3-slot, `BlasphemySystem` + 3 unlockable Story-Bible Blasphemies, `StatCompositionSystem`), swept-AABB player controller with bunny-hop / slide / wall-kick, Mirror-Step ability with a Malakor hard-override line in `VoiceDirector`, grapple hook with reel-in + small-enemy auto Glory Kill, blood surf (slope > 15° / blood decal), `evaluate_glory_kill` per-class HP thresholds, and the `sandbox_martyrdom_online` 2-peer determinism sandbox. Editor **Dialogue Graph**, **Sin-Signature**, and **Act / Phase State** panels landed as authoring data models (ImGui-guarded, unit-testable without a display context).
+- **Shift:** the determinism test initially reported 10 divergences. Root cause was that `sizeof()`-based struct hashing walks **padding bytes**, which are indeterminate after aggregate assignment per `[basic.types.general]`. Fix: both `martyrdom_determinism_test` and `sandbox_martyrdom_online` now hash explicit fields (with enum-to-uint cast for `BlasphemyType`/`GrappleMode` to avoid a second implicit-padding bug). Determinism is now bit-stable 2-peer × 360 ticks × `final_state_hash=ad06af9be69adb62`.
+- **New invariant:** any future rollback-snapshot hash must hash individual fields, not `sizeof(Struct)`. Codified in `ADR-0119` (existing) — followups tracked in `docs/10_APPENDIX_ADRS_AND_REFERENCES.md`.
 
 ---
 
