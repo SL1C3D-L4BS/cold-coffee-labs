@@ -42,6 +42,10 @@ compile_commands.json
 # Franchise game content/ mirrors the same rule: local pulls (e.g. AmbientCG) live under content/textures/.
 franchises/**/content/textures/
 
+# Python bytecode caches (local tooling).
+__pycache__/
+*.py[cod]
+
 # Ephemeral.
 *.log
 .env
