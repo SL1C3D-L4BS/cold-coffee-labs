@@ -14,6 +14,13 @@ namespace gw::editor::theme {
                   (c.a / 255.f) * alpha_scale};
 }
 
+/// `ImU32` for `ImDrawList` paths — same result as `IM_COL32(r,g,b,a)` for the
+/// active channel scaling.
+[[nodiscard]] inline ImU32 color32_to_im_u32(const Color32& c,
+                                             float alpha_scale = 1.f) noexcept {
+    return ImGui::GetColorU32(imgui_vec4(c, alpha_scale));
+}
+
 [[nodiscard]] inline ImVec4 active_positive_imgui() noexcept {
     return imgui_vec4(ThemeRegistry::instance().active().palette.positive);
 }

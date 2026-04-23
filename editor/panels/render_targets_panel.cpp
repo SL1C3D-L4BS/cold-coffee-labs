@@ -20,26 +20,31 @@ void RenderTargetsPanel::on_imgui_render(EditorContext& /*ctx*/) {
     const float thumb_h  = thumb_w * 9.f / 16.f;
     const ImVec2 thumb{thumb_w, thumb_h};
 
+    const ImVec4     img_border = ImGui::GetStyleColorVec4(ImGuiCol_Border);
+    const ImVec4     tint       = {1.f, 1.f, 1.f, 1.f};
+    using gw::editor::theme::color32_to_im_u32;
+
     for (int i = 0; i < kSlotCount; ++i) {
         ImGui::BeginGroup();
         ImGui::PushID(i);
 
         if (slots_[i].live && slots_[i].tex != 0) {
-            ImGui::Image(slots_[i].tex, thumb);
+            ImGui::Image(slots_[i].tex, thumb, ImVec2{0.f, 0.f}, ImVec2{1.f, 1.f},
+                         tint, img_border);
         } else {
-            // Placeholder — translucent blue card with the slot label.
+            // Placeholder — panel fill + accent frame until the G-buffer slot exists.
             const ImVec2 pos = ImGui::GetCursorScreenPos();
             ImDrawList* dl   = ImGui::GetWindowDrawList();
             const auto& pal =
                 gw::editor::theme::ThemeRegistry::instance().active().palette;
             dl->AddRectFilled(pos,
-                               ImVec2{pos.x + thumb.x, pos.y + thumb.y},
-                               IM_COL32(pal.panel.r, pal.panel.g, pal.panel.b, 255),
-                               4.f);
+                              ImVec2{pos.x + thumb.x, pos.y + thumb.y},
+                              color32_to_im_u32(pal.panel),
+                              4.f);
             dl->AddRect      (pos,
-                               ImVec2{pos.x + thumb.x, pos.y + thumb.y},
-                               IM_COL32(pal.accent.r, pal.accent.g, pal.accent.b, 200),
-                               4.f);
+                              ImVec2{pos.x + thumb.x, pos.y + thumb.y},
+                              color32_to_im_u32(pal.accent, 200.f / 255.f),
+                              4.f);
             ImGui::Dummy(thumb);
         }
 

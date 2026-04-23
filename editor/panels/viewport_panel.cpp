@@ -1,6 +1,7 @@
 // editor/panels/viewport_panel.cpp
 // Spec ref: Phase 7 §6 — offscreen render target, camera, gizmos, debug draw.
 #include "viewport_panel.hpp"
+#include "editor/theme/palette_imgui.hpp"
 #include "editor/viewport/debug_draw.hpp"
 #include "editor/scene/components.hpp"
 #include "editor/undo/commands.hpp"
@@ -14,7 +15,7 @@
 
 #include <glm/gtc/type_ptr.hpp>
 #include <algorithm>
-#include <cstring>
+#include <cstdio>
 
 namespace gw::editor {
 
@@ -76,15 +77,17 @@ void ViewportPanel::draw_overlay(EditorContext& ctx) {
     case CameraMode::Ortho: mode_str = "Ortho"; break;
     }
     ImDrawList* dl = ImGui::GetWindowDrawList();
+    const auto& pal = gw::editor::theme::ThemeRegistry::instance().active().palette;
+    using gw::editor::theme::color32_to_im_u32;
     ImVec2 pos{vp_x_ + 8.f, vp_y_ + 8.f};
-    dl->AddText(pos, IM_COL32(200, 200, 200, 180), mode_str);
+    dl->AddText(pos, color32_to_im_u32(pal.text, 180.f / 255.f), mode_str);
 
-    // FPS counter.
+    // FPS counter (matches stats panel — positive / live metric).
     char fps_buf[32];
     std::snprintf(fps_buf, sizeof(fps_buf), "%.0f FPS",
                   1.f / std::max(ctx.delta_time_s, 0.0001f));
     ImVec2 fps_pos{vp_x_ + vp_w_ - 80.f, vp_y_ + 8.f};
-    dl->AddText(fps_pos, IM_COL32(160, 220, 160, 200), fps_buf);
+    dl->AddText(fps_pos, color32_to_im_u32(pal.positive, 200.f / 255.f), fps_buf);
 }
 
 // ---------------------------------------------------------------------------
@@ -121,13 +124,17 @@ void ViewportPanel::on_imgui_render(EditorContext& ctx) {
 
     // Display scene image (or checkerboard if not yet allocated).
     if (scene_ds_) {
-        ImGui::Image(reinterpret_cast<ImTextureID>(scene_ds_),
-                     {vp_w_, vp_h_});
+        const ImVec4 border = ImGui::GetStyleColorVec4(ImGuiCol_Border);
+        ImGui::Image(reinterpret_cast<ImTextureID>(scene_ds_), {vp_w_, vp_h_},
+                     ImVec2{0.f, 0.f}, ImVec2{1.f, 1.f},
+                     ImVec4{1.f, 1.f, 1.f, 1.f}, border);
     } else {
+        const auto& pal = gw::editor::theme::ThemeRegistry::instance().active().palette;
+        using gw::editor::theme::color32_to_im_u32;
         ImDrawList* dl = ImGui::GetWindowDrawList();
         dl->AddRectFilled({vp_x_, vp_y_},
                           {vp_x_ + vp_w_, vp_y_ + vp_h_},
-                          IM_COL32(20, 22, 30, 255));
+                          color32_to_im_u32(pal.panel));
         ImGui::Dummy({vp_w_, vp_h_});
     }
 
