@@ -1,0 +1,25 @@
+{
+  "$schema": "https://github.com/affaan-m/everything-claude-code/schemas/agentshield.schema.json",
+  "policy_version": "1.0",
+  "description": "AgentShield config for Greywater / Sacrilege (ADR-0119).",
+  "blocked_paths": [
+    "assets/ai/**/*.bin",
+    "bld/bld-governance/policy/**",
+    "engine/core/crypto/**",
+    ".github/workflows/determinism.yml",
+    ".github/workflows/fuzz.yml"
+  ],
+  "require_adr_reference_for": [
+    "docs/01_CONSTITUTION_AND_PROGRAM.md",
+    "docs/02_PIPELINE_AND_ROADMAP.md",
+    "docs/10_APPENDIX_ADRS_AND_REFERENCES.md"
+  ],
+  "max_files_per_session": 200,
+  "max_lines_per_session": 15000,
+  "enforce_commit_trailer": true,
+  "commit_trailer_key": "Agent-Session",
+  "hook_budget_ms": 250,
+  "graphify_required": true,
+  "graphify_graph_path": "graphify-out/graph.json",
+  "deny_on_missing_graph": false
+}

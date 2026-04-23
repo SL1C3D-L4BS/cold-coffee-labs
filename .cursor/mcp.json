@@ -1,0 +1,34 @@
+{
+  "$schema": "https://cursor.com/schemas/mcp.schema.json",
+  "mcpServers": {
+    "graphify": {
+      "command": "graphify",
+      "args": ["mcp"],
+      "description": "Graphify knowledge-graph MCP (ADR-0118). Exposes tools to query graph.json: find_callers, find_callees, find_similar_nodes, neighborhood.",
+      "env": {
+        "GRAPHIFY_GRAPH_PATH": "${workspaceFolder}/graphify-out/graph.json"
+      }
+    },
+    "ecc-workflow": {
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/third_party/everything-claude-code/packages/ccg-workflow/bin/mcp.js"
+      ],
+      "description": "ECC ccg-workflow MCP (ADR-0119). Cross-harness multi-* commands (multi-review, multi-implement, multi-test).",
+      "env": {
+        "ECC_ROOT": "${workspaceFolder}/third_party/everything-claude-code"
+      }
+    },
+    "ecc-agentshield": {
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/third_party/everything-claude-code/packages/agentshield/bin/mcp.js"
+      ],
+      "description": "ECC AgentShield MCP (ADR-0119). Generated-code policy enforcement and session-manifest checks.",
+      "env": {
+        "ECC_ROOT": "${workspaceFolder}/third_party/everything-claude-code",
+        "AGENTSHIELD_CONFIG": "${workspaceFolder}/.cursor/agentshield.json"
+      }
+    }
+  }
+}

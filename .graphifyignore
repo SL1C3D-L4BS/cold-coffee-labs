@@ -1,0 +1,28 @@
+# .graphifyignore — graphify scan exclusions (ADR-0118).
+# Matches gitignore semantics. Keep the graph focused on first-party code.
+
+build/
+out/
+target/
+**/node_modules/
+third_party/
+docs/translations/
+graphify-out/
+**/*.spv
+**/*.wav
+**/*.ogg
+**/*.png
+**/*.jpg
+**/*.jpeg
+**/*.bin
+**/*.pdb
+**/*.dll
+**/*.exe
+**/*.lib
+**/*.a
+**/*.so
+**/*.dylib
+**/CMakeFiles/
+.git/
+.cache/
+.vs/

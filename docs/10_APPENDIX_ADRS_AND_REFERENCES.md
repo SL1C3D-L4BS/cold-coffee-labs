@@ -10626,3 +10626,109 @@ Audit found branch-floating `GIT_TAG` values for imgui docking, ImGuizmo master,
 
 ---
 
+## ADR file: `adr/0118-graphify-knowledge-graph.md`
+
+## ADR-0118 — AI Knowledge Graph (graphify adoption)
+
+**Status:** Accepted  **Date:** 2026-04-22
+
+### Context
+The Greywater / Sacrilege repository has grown past the point where a
+flat `Grep` / `SemanticSearch` pass is sufficient for agents to reason
+about cross-module change impact. Coding sessions routinely span the
+BLD / engine / editor / gameplay / tools trees, and agents have shown a
+measurable improvement in output quality when fed a precomputed
+code-knowledge-graph (CKG) before searching.
+
+### Decision
+Adopt `graphifyy` (https://github.com/safishamsi/graphify) as the
+canonical local CKG indexer:
+
+- Installed via `pipx` and pinned in `tools/ai/requirements.txt`.
+- Regenerated on every commit + checkout by hooks under
+  `tools/ai/hooks/` (`git config core.hooksPath tools/ai/hooks`).
+- Output committed to `graphify-out/` (`graph.json` +
+  `GRAPH_REPORT.md`) so every clone starts hot.
+- Registered as an MCP server in `.cursor/mcp.json` under the name
+  `graphify` so Cursor agents can call `find_callers`, `find_callees`,
+  `neighborhood`, and `find_similar_nodes` programmatically.
+- `.cursor/rules/graphify.mdc` instructs every agent (Cursor / Claude /
+  Codex) to consult `GRAPH_REPORT.md` first before running `Grep` or
+  `SemanticSearch`.
+- Exclusions live in `.graphifyignore` (matches gitignore semantics).
+
+### Consequences
++ Agents gain a structured entry point into the codebase and stop
+  re-discovering the same subsystems across sessions.
++ `graphify-out/graph.json` doubles as a machine-readable inventory
+  that CI can diff between PRs to spot cross-module regressions.
+-  Repo gains a new Python tool-chain dependency (graphify + pipx).
+-  `graphify-out/` is committed, so every "real" code commit grows by
+   a few kilobytes of JSON.
+
+### Alternatives rejected
+- *Penpax* (SaaS CKG): on the waitlist as of 2026-04-22; we will layer
+  it on top of graphify once access opens. Penpax is *not* a
+  replacement because it is hosted and cannot be used in air-gapped
+  build environments.
+- *Hand-maintained index*: rejected as unbounded maintenance cost.
+
+### References
+- `tools/ai/README.md` — install + maintenance flow.
+- `docs/prompts/pack.yml` (ids `ai-graphify-*`).
+
+---
+
+## ADR file: `adr/0119-ecc-adoption.md`
+
+## ADR-0119 — Everything Claude Code (ECC) adoption
+
+**Status:** Accepted  **Date:** 2026-04-22
+
+### Context
+Cold Coffee Labs runs agents across Cursor (primary), Claude Code CLI,
+Codex CLI, Gemini CLI, and periodically Copilot / Trae / Antigravity.
+Each harness ships its own skill / hook / rule format, and maintaining
+the same conventions by hand across them produces drift and output
+regressions.
+
+### Decision
+Adopt the `affaan-m/everything-claude-code` (ECC) toolkit as the
+canonical cross-harness skill / hook / rule bundle:
+
+- Vendored read-only under `third_party/everything-claude-code/`.
+- Globally installed for the user (`node install.js --scope user`) and
+  project-scoped on top (`--scope project`).
+- Installs ECC rule packs into `.cursor/rules/` for every supported
+  language surface (C++, Rust, Python, TypeScript, shader HLSL).
+- Installs the 15-event Cursor hook chain into `.cursor/hooks/` so
+  deterministic-critical events (pre-commit, pre-edit-shader,
+  pre-test) run guards (graphify freshness check, shader register
+  lint, clang-tidy sniff).
+- Merges ECC's MCP server definitions into `.cursor/mcp.json`
+  alongside `graphify`.
+- Installs `multi-*` cross-harness commands via `ccg-workflow` so a
+  single prompt fans out to Cursor + Codex + Claude when needed.
+- Ships the **AgentShield** CI gate as
+  `.github/workflows/agentshield.yml`, blocking PRs that violate
+  generated-code policies.
+- Ships an ECC dashboard helper (status line + metrics).
+
+### Consequences
++ Uniform agent behaviour across harnesses; one edit to the rule pack
+  rolls out to Cursor / Codex / Claude simultaneously.
++ AgentShield catches prompt-injection and malicious-change patterns
+  in CI before they land on `main`.
+-  Adds a Node.js 20+ dependency for contributors who want the full
+   ECC surface (not needed for runtime builds).
+-  Introduces new `.cursor/hooks/` wall-clock overhead; hooks must
+   stay under the ECC-documented 250 ms budget to avoid friction.
+
+### References
+- `tools/ai/README.md` — install flow.
+- `docs/prompts/pack.yml` (ids `ai-ecc-*`).
+- `docs/10_APPENDIX_ADRS_AND_REFERENCES.md` ADR-0118 (graphify — ECC
+  hooks depend on graphify output).
+
+---
+

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# tools/ai/hooks/post-checkout — rebuild graphify graph when branches
+# diverge enough to require a full re-index (any file-change-based
+# checkout). ADR-0118 §Maintenance.
+
+set -euo pipefail
+
+# Only run for branch/tree-changing checkouts (third arg = 1).
+if [ "${3:-0}" != "1" ]; then
+  exit 0
+fi
+
+if ! command -v graphify >/dev/null 2>&1; then
+  exit 0
+fi
+
+graphify build --out graphify-out --format markdown,json >/dev/null 2>&1 || true

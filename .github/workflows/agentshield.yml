@@ -1,0 +1,67 @@
+# .github/workflows/agentshield.yml
+# ADR-0119: AgentShield CI gate for Greywater / Sacrilege.
+#
+# Blocks PRs that:
+#   1. Modify paths under `blocked_paths` in `.cursor/agentshield.json`
+#      without an accompanying ADR reference.
+#   2. Touch docs in `require_adr_reference_for` without a `docs/10`
+#      ADR update in the same PR.
+#   3. Exceed per-PR volume caps (`max_files_per_session`,
+#      `max_lines_per_session`).
+#   4. Lack the `Agent-Session: <id>` commit trailer when the PR is
+#      authored by an AI-assisted commit.
+#
+# The real AgentShield binary ships with ECC and is installed by
+# `node install.js --scope project` (see `tools/ai/README.md`). This
+# workflow is the CI-side counterpart that runs it on every PR.
+
+name: AgentShield
+
+on:
+  pull_request:
+    branches: [main, "pivot/*"]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  agentshield:
+    name: AgentShield policy gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Verify config present
+        run: |
+          test -f .cursor/agentshield.json || {
+            echo "AgentShield config missing — ADR-0119 install incomplete." >&2
+            exit 1
+          }
+          cat .cursor/agentshield.json
+
+      - name: Run AgentShield (when vendored)
+        run: |
+          AGENTSHIELD_BIN=third_party/everything-claude-code/packages/agentshield/bin/cli.js
+          if [ -f "$AGENTSHIELD_BIN" ]; then
+            node "$AGENTSHIELD_BIN" \
+              --config .cursor/agentshield.json \
+              --base "origin/${{ github.base_ref }}" \
+              --head "HEAD"
+          else
+            echo "::warning title=AgentShield::ECC not vendored yet; running advisory-only fallback."
+            echo "Follow tools/ai/README.md §ECC to vendor third_party/everything-claude-code."
+            # Fallback: basic path-block check via shell.
+            BLOCKED=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD | grep -E '^(assets/ai/.*\.bin|bld/bld-governance/policy/|engine/core/crypto/)' || true)
+            if [ -n "$BLOCKED" ]; then
+              echo "::error title=AgentShield::Blocked paths modified without ECC vendoring: $BLOCKED"
+              exit 1
+            fi
+          fi

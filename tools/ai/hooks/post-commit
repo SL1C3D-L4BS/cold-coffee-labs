@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# tools/ai/hooks/post-commit — re-run graphify build after every commit.
+# Install with: `git config core.hooksPath tools/ai/hooks`.
+#
+# ADR-0118 §Maintenance: the graph must never be more than one commit
+# stale or agents will follow out-of-date edges.
+
+set -euo pipefail
+
+if ! command -v graphify >/dev/null 2>&1; then
+  echo "[graphify hook] graphify not on PATH; skipping. See tools/ai/README.md." >&2
+  exit 0
+fi
+
+graphify build --out graphify-out --format markdown,json >/dev/null 2>&1 || {
+  echo "[graphify hook] build failed; graph.json may be stale." >&2
+  exit 0
+}
+
+# Stage regenerated artefacts if the user wants them committed.
+if [ -n "$(git status --porcelain graphify-out 2>/dev/null)" ]; then
+  git add graphify-out/graph.json graphify-out/GRAPH_REPORT.md || true
+  echo "[graphify hook] graphify-out/ staged; amend or commit to include."
+fi
