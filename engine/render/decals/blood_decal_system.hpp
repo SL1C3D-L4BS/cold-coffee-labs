@@ -21,7 +21,9 @@ struct DecalComponent {
     float        radius_m{0.25f};
     float        drip_gravity[3]{0.0f, -9.81f, 0.0f};
     float        age_sec{0.0f};
-    float        alpha{1.0f};
+    /// 0.0f is the "empty slot" sentinel in the ring. Inserts set alpha to
+    /// the caller's desired starting opacity (typically 1.0).
+    float        alpha{0.0f};
     std::uint64_t entity_id{0};
     std::uint32_t stamp_seed{0u};
 };
