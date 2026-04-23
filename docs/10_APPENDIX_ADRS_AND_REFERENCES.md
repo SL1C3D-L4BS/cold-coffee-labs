@@ -10684,6 +10684,12 @@ canonical local CKG indexer:
 ## ADR-0119 — Everything Claude Code (ECC) adoption
 
 **Status:** Accepted  **Date:** 2026-04-22
+**Pinned upstream:** `affaan-m/everything-claude-code` tag `v1.10.0` =
+`846ffb75da9a5f4e677d927af1ad4a1951652267`, vendored under
+`third_party/everything-claude-code/` (55 MB, inner `.git` removed).
+At-vendor inventory: 38 agents, 156 skills, 72 commands, 89 rules,
+adapter scaffolds for 8 harnesses (Cursor, Claude, Codex, OpenCode,
+Gemini, Kiro, Trae, Antigravity).
 
 ### Context
 Cold Coffee Labs runs agents across Cursor (primary), Claude Code CLI,
