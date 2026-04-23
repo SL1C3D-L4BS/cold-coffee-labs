@@ -8,6 +8,9 @@
 
 #include "gameplay_host.hpp"
 
+#include "editor/pie/pie_debug_hud.hpp"
+#include "editor/pie/pie_perf_guard.hpp"
+#include "editor/pie/rollback_inspector.hpp"
 #include "engine/ecs/serialize.hpp"
 #include "engine/ecs/world.hpp"
 #include "engine/platform/dll.hpp"
@@ -152,11 +155,24 @@ void GameplayHost::stop(GameplayContext& ctx) {
         (void)restore_snapshot(*world);
     }
     world_snapshot_.clear();
+
+    // pre-ed-pie-overlays: capture the final deterministic frame so the
+    // Rollback Inspector has a step-back target the instant we leave PIE.
+    // Scaffold draw is a no-op today; state persistence lands in Phase 22.
+    gw::editor::pie::draw_rollback_inspector(rollback_inspector_);
 }
 
 void GameplayHost::tick(GameplayContext& ctx, float dt) {
     if (state_ == PIEState::Playing && gameplay_update_)
         gameplay_update_(&ctx, dt);
+
+    // pre-ed-pie-overlays: draw the editor-only PIE HUD and sample the perf
+    // guard every tick regardless of Playing/Paused — the Paused state still
+    // pays an ImGui cost, so we need the guard active. `dt` is in seconds.
+    if (state_ != PIEState::Editor) {
+        gw::editor::pie::draw_pie_debug_hud(pie_debug_hud_);
+        gw::editor::pie::tick_perf_guard(pie_perf_guard_, dt * 1000.0f);
+    }
 }
 
 void GameplayHost::reload_if_changed() {

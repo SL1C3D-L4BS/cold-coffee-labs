@@ -9,6 +9,7 @@
 // (b) the HAL instance does not take surface extensions — both required by
 // the editor. Swapping the editor onto the HAL is a Phase C audit task.
 
+#include "editor/a11y/editor_a11y.hpp"
 #include "editor/panels/panel_registry.hpp"
 #include "editor/render/render_settings.hpp"
 #include "editor/selection/selection_context.hpp"
@@ -112,6 +113,11 @@ private:
     // panels and, once Phase 8 lands, with the frame-graph. Panels borrow a
     // non-owning pointer into this instance.
     gw::editor::render::RenderSettings render_settings_{};
+
+    // Part B wire-up (pre-ed-a11y-init): accessibility config consumed by
+    // apply_theme() and the Window → Accessibility modal.
+    gw::editor::a11y::EditorA11yConfig a11y_config_{};
+    bool a11y_modal_open_ = false;
 
     // Layout built flag — persisted via ImGui ini.
     bool layout_built_ = false;

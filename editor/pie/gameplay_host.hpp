@@ -5,6 +5,9 @@
 //
 // Platform-specific LoadLibrary/dlopen lives in gameplay_host_platform.cpp.
 
+#include "editor/pie/pie_debug_hud.hpp"
+#include "editor/pie/pie_perf_guard.hpp"
+#include "editor/pie/rollback_inspector.hpp"
 #include "engine/platform/dll.hpp"
 
 #include <cstddef>
@@ -127,6 +130,13 @@ private:
     // ECS world snapshot taken at enter_play — restored at stop.
     // Phase 7 stores a raw byte snapshot; Phase 8 uses the real serializer.
     std::vector<uint8_t> world_snapshot_;
+
+    // pre-ed-pie-overlays (Part B §12.5 wire-up): editor-only overlays that
+    // observe but never mutate the simulation. Scaffold-level today — real
+    // render bodies land in Phase 22.
+    gw::editor::pie::PieDebugHudState       pie_debug_hud_{};
+    gw::editor::pie::PiePerfGuardState      pie_perf_guard_{};
+    gw::editor::pie::RollbackInspectorState rollback_inspector_{};
 };
 
 }  // namespace gw::editor

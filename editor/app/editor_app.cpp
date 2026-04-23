@@ -38,6 +38,33 @@
 #include "engine/scene/seq/seq_cut.hpp"
 #include "engine/scene/seq/sequencer_world.hpp"
 
+// Phase 21 wire-up: Sacrilege-specific authoring panels (pack.yml: pre-ed-sacrilege-panels).
+#include "editor/panels/sacrilege/act_state_panel.hpp"
+#include "editor/panels/sacrilege/ai_director_sandbox_panel.hpp"
+#include "editor/panels/sacrilege/circle_editor_panel.hpp"
+#include "editor/panels/sacrilege/dialogue_graph_panel.hpp"
+#include "editor/panels/sacrilege/editor_copilot_panel.hpp"
+#include "editor/panels/sacrilege/encounter_editor_panel.hpp"
+#include "editor/panels/sacrilege/material_forge_panel.hpp"
+#include "editor/panels/sacrilege/pcg_node_graph_panel.hpp"
+#include "editor/panels/sacrilege/shader_forge_panel.hpp"
+#include "editor/panels/sacrilege/sin_signature_panel.hpp"
+
+// Part C §23 wire-up: audit/tooling panels (pack.yml: pre-ed-audit-panels).
+#include "editor/panels/audit/asset_deps_panel.hpp"
+#include "editor/panels/audit/bake_panel.hpp"
+#include "editor/panels/audit/heatmap_panel.hpp"
+#include "editor/panels/audit/localization_panel.hpp"
+#include "editor/panels/audit/profiler_panel.hpp"
+#include "editor/panels/audit/shader_hotreload_panel.hpp"
+#include "editor/panels/audit/shader_permutations_panel.hpp"
+
+// Part B wire-up: module manifest, theme registry, a11y (pack.yml:
+// pre-ed-module-manifest, pre-ed-theme-menu, pre-ed-a11y-init).
+#include "editor/modules/modules_builtin.hpp"
+#include "editor/theme/theme_registry.hpp"
+#include "editor/a11y/editor_a11y.hpp"
+
 // volk must precede every Vulkan include in this TU so that imgui_impl_vulkan
 // picks up volk's dispatch tables (IMGUI_IMPL_VULKAN_USE_VOLK is set by the
 // editor CMakeLists).
@@ -208,10 +235,26 @@ struct EditorVulkanBackend {
 // ---------------------------------------------------------------------------
 EditorApplication::EditorApplication()
     : vk_(std::make_unique<EditorVulkanBackend>()) {
+    // pre-ed-module-manifest: register twelve built-in editor modules at
+    // startup. Panel/tool factories are still empty stubs (Phase 21+) but the
+    // registry is now live so later waves can attach panels declaratively.
+    gw::editor::modules::register_builtin_modules();
+
+    // pre-ed-theme-menu: load persisted theme id (default: BrewedSlate) and
+    // apply to the registry before init_imgui() so the first ImGui style
+    // reflects the user's choice.
+    gw::editor::theme::ThemeRegistry::instance().set_active(
+        gw::editor::theme::ThemeId::BrewedSlate);
+
     init_window();
     init_vulkan();
     init_imgui();
     apply_theme();
+
+    // pre-ed-a11y-init: load accessibility config and apply (theme overrides
+    // + effect flags). Safe to call before any panels exist.
+    a11y_config_ = gw::editor::a11y::load_from_config();
+    gw::editor::a11y::apply(a11y_config_);
 
     // Panels — no raw new; unique_ptr owned by the registry. (Non-negotiable #5)
     auto vp = std::make_unique<ViewportPanel>();
@@ -231,6 +274,30 @@ EditorApplication::EditorApplication()
     panels_.add(std::make_unique<gw::editor::agent::AgentPanel>());
     // Phase 18-B — Sequencer timeline + camera preview.
     panels_.add(std::make_unique<gw::editor::seq::SeqPanel>());
+
+    // Phase 21 wire-up (pre-ed-sacrilege-panels): ten Sacrilege authoring
+    // surfaces. Panels construct default; runtime state lands in Phase 21+.
+    using namespace gw::editor::panels::sacrilege;
+    panels_.add(std::make_unique<ActStatePanel>());
+    panels_.add(std::make_unique<AiDirectorSandboxPanel>());
+    panels_.add(std::make_unique<CircleEditorPanel>());
+    panels_.add(std::make_unique<DialogueGraphPanel>());
+    panels_.add(std::make_unique<EditorCopilotPanel>());
+    panels_.add(std::make_unique<EncounterEditorPanel>());
+    panels_.add(std::make_unique<MaterialForgePanel>());
+    panels_.add(std::make_unique<PcgNodeGraphPanel>());
+    panels_.add(std::make_unique<ShaderForgePanel>());
+    panels_.add(std::make_unique<SinSignaturePanel>());
+
+    // Part C §23 wire-up (pre-ed-audit-panels): seven tooling surfaces.
+    using namespace gw::editor::panels::audit;
+    panels_.add(std::make_unique<AssetDepsPanel>());
+    panels_.add(std::make_unique<BakePanel>());
+    panels_.add(std::make_unique<HeatmapPanel>());
+    panels_.add(std::make_unique<LocalizationPanel>());
+    panels_.add(std::make_unique<ProfilerPanel>());
+    panels_.add(std::make_unique<ShaderHotReloadPanel>());
+    panels_.add(std::make_unique<ShaderPermutationsPanel>());
 
     // Wire BLD API globals.
     gw::editor::bld_api::g_globals.selection = &selection_;
@@ -1103,6 +1170,33 @@ void EditorApplication::build_ui() {
                 cmd_stack_.redo();
             ImGui::EndMenu();
         }
+        // pre-ed-theme-menu: View → Theme submenu swaps the registry live and
+        // re-runs apply_theme() so ImGui's style reflects the new palette on
+        // the next frame.
+        if (ImGui::BeginMenu("View")) {
+            if (ImGui::BeginMenu("Theme")) {
+                using gw::editor::theme::ThemeId;
+                auto& registry = gw::editor::theme::ThemeRegistry::instance();
+                const ThemeId active = registry.active_id();
+                if (ImGui::MenuItem("Brewed Slate",    nullptr, active == ThemeId::BrewedSlate)) {
+                    registry.set_active(ThemeId::BrewedSlate);
+                    apply_theme();
+                }
+                if (ImGui::MenuItem("Corrupted Relic", nullptr, active == ThemeId::CorruptedRelic)) {
+                    registry.set_active(ThemeId::CorruptedRelic);
+                    apply_theme();
+                }
+                if (ImGui::MenuItem("Field Test HC",   nullptr, active == ThemeId::FieldTestHC)) {
+                    registry.set_active(ThemeId::FieldTestHC);
+                    apply_theme();
+                }
+                ImGui::EndMenu();
+            }
+            if (ImGui::MenuItem("Accessibility...")) {
+                a11y_modal_open_ = true;
+            }
+            ImGui::EndMenu();
+        }
         if (ImGui::BeginMenu("Play")) {
             const bool in_play    = pie_.in_play();
             const bool is_paused  = pie_.state() == GameplayHost::PIEState::Paused;
@@ -1151,6 +1245,42 @@ void EditorApplication::build_ui() {
     }
 
     ImGui::End();
+
+    // pre-ed-a11y-init: modal toggle panel for accessibility flags. Changes
+    // are applied immediately via gw::editor::a11y::apply() so the effect is
+    // visible before the user closes the modal.
+    if (a11y_modal_open_) {
+        ImGui::OpenPopup("Accessibility");
+        a11y_modal_open_ = false;
+    }
+    if (ImGui::BeginPopupModal("Accessibility", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        bool dirty = false;
+        dirty |= ImGui::Checkbox("Reduce corruption (disable glitch/jitter)",
+                                 &a11y_config_.reduce_corruption);
+        dirty |= ImGui::Checkbox("Disable vignette",
+                                 &a11y_config_.disable_vignette);
+        dirty |= ImGui::Checkbox("Force high-contrast theme",
+                                 &a11y_config_.force_high_contrast);
+        dirty |= ImGui::Checkbox("Force mono font",
+                                 &a11y_config_.force_mono_font);
+        dirty |= ImGui::Checkbox("Keyboard-only navigation",
+                                 &a11y_config_.keyboard_only_nav);
+        dirty |= ImGui::Checkbox("Colour-blind (Wong) palette overlay",
+                                 &a11y_config_.colour_blind_wong);
+        if (dirty) {
+            gw::editor::a11y::apply(a11y_config_);
+            apply_theme();
+        }
+        ImGui::Separator();
+        if (ImGui::Button("Save & Close")) {
+            gw::editor::a11y::save_to_config(a11y_config_);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
 }
 
 void EditorApplication::build_docking_layout() {
@@ -1415,6 +1545,38 @@ void EditorApplication::apply_theme() {
     if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
         style.WindowRounding = 0.f;
         col[ImGuiCol_WindowBg].w = 1.f;
+    }
+
+    // pre-ed-theme-menu: overlay the active Palette onto the key semantic
+    // colours so the View → Theme submenu changes something visible.
+    // The hand-tuned Brewed Slate palette above is preserved for BrewedSlate;
+    // CorruptedRelic / FieldTestHC swap primary colours from theme_registry.
+    const auto& theme = gw::editor::theme::ThemeRegistry::instance().active();
+    if (theme.id != gw::editor::theme::ThemeId::BrewedSlate) {
+        auto to_vec = [](const gw::editor::theme::Color32& c) {
+            return ImVec4{c.r / 255.f, c.g / 255.f, c.b / 255.f, c.a / 255.f};
+        };
+        col[ImGuiCol_WindowBg]        = to_vec(theme.palette.background);
+        col[ImGuiCol_ChildBg]         = to_vec(theme.palette.panel);
+        col[ImGuiCol_PopupBg]         = to_vec(theme.palette.panel);
+        col[ImGuiCol_MenuBarBg]       = to_vec(theme.palette.panel);
+        col[ImGuiCol_Text]            = to_vec(theme.palette.text);
+        col[ImGuiCol_TextDisabled]    = to_vec(theme.palette.text_muted);
+        col[ImGuiCol_Separator]       = to_vec(theme.palette.separator);
+        col[ImGuiCol_Border]          = to_vec(theme.palette.separator);
+        col[ImGuiCol_CheckMark]       = to_vec(theme.palette.accent);
+        col[ImGuiCol_SliderGrab]      = to_vec(theme.palette.accent);
+        col[ImGuiCol_SliderGrabActive]= to_vec(theme.palette.accent_strong);
+        col[ImGuiCol_Button]          = to_vec(theme.palette.panel);
+        col[ImGuiCol_ButtonHovered]   = to_vec(theme.palette.accent);
+        col[ImGuiCol_ButtonActive]    = to_vec(theme.palette.accent_strong);
+        col[ImGuiCol_Header]          = to_vec(theme.palette.accent);
+        col[ImGuiCol_HeaderHovered]   = to_vec(theme.palette.accent_strong);
+        col[ImGuiCol_HeaderActive]    = to_vec(theme.palette.accent_strong);
+        col[ImGuiCol_TextSelectedBg]  = to_vec(theme.palette.selection);
+        col[ImGuiCol_Tab]             = to_vec(theme.palette.panel);
+        col[ImGuiCol_TabActive]       = to_vec(theme.palette.accent);
+        col[ImGuiCol_TabHovered]      = to_vec(theme.palette.accent_strong);
     }
 }
 

@@ -125,6 +125,8 @@ target_sources(greywater_core
         core/assert.cpp
         core/error.cpp
         core/string.cpp
+        # Part C §22 wire-up (pre-eng-crash-reporter-init).
+        core/crash_reporter.cpp
         platform/window.cpp
         platform/input.cpp
         platform/time.cpp
@@ -143,6 +145,7 @@ target_sources(greywater_core
             core/log.hpp
             core/assert.hpp
             core/error.hpp
+            core/crash_reporter.hpp
             core/result.hpp
             core/span.hpp
             core/array.hpp

@@ -22,6 +22,7 @@
 #include "cook_worker.hpp"
 #include "engine/assets/cook/cook_registry.hpp"
 #include "engine/assets/cook/cook_manifest.hpp"
+#include "engine/core/crash_reporter.hpp"
 #include "engine/core/version.hpp"
 #include <chrono>
 #include <cstdio>
@@ -73,6 +74,10 @@ static const char* next_arg(int argc, char** argv, int& i) {
 // main
 // ---------------------------------------------------------------------------
 int main(int argc, char** argv) {
+    // pre-eng-crash-reporter-init: install before discovery so crashes in the
+    // cook graph are captured with build-SHA context.
+    gw::core::crash::install_handlers();
+
     if (argc <= 1) { print_usage(); return 0; }
 
     // Defaults
