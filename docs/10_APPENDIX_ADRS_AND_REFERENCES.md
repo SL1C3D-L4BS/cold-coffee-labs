@@ -10732,3 +10732,69 @@ canonical cross-harness skill / hook / rule bundle:
 
 ---
 
+## ADR file: `adr/0120-agentshield-ci-gate.md`
+
+## ADR-0120 — AgentShield CI policy gate
+
+**Status:** Accepted  **Date:** 2026-04-23
+
+### Context
+ADR-0119 adopts ECC (everything-claude-code) as the canonical
+cross-harness skill / hook / rule bundle. ECC ships **AgentShield**
+(`ecc-agentshield` on npm, mirrored in
+`third_party/everything-claude-code/packages/agentshield/`), a
+policy-enforcement scanner for AI-assisted commits.
+
+Without a mechanical enforcement point, nothing stops an agent session
+from silently modifying paths that affect build determinism, crypto
+material, or the mod governance policy — the exact drift the Brew
+Doctrine forbids.
+
+### Decision
+Promote AgentShield to a required quality gate:
+
+1. **CI workflow.** `.github/workflows/agentshield.yml` runs
+   `ecc-agentshield scan` on every PR targeting `main` or
+   `pivot/*`. Config lives in `.cursor/agentshield.json`.
+2. **Blocked paths** (fail PR when touched without an `Agent-Session:`
+   trailer AND a matching ADR reference): `assets/ai/*.bin`,
+   `bld/bld-governance/policy/`, `engine/core/crypto/`,
+   `.cursor/agentshield.json` itself, and `.github/workflows/`.
+3. **Require-ADR paths** (fail PR without a same-PR ADR edit):
+   `docs/01_CONSTITUTION_AND_PROGRAM.md`, `docs/10`, and
+   `CMakePresets.json`.
+4. **Volume caps.** `max_files_per_session = 200`,
+   `max_lines_per_session = 8000`. Sessions exceeding either cap
+   need a `waiver:` footer referencing a planning doc.
+5. **Graceful fallback.** Until ECC is vendored at
+   `third_party/everything-claude-code/`, the workflow runs an
+   inline shell approximation (see workflow YAML) and emits a
+   GitHub warning, not a hard failure.
+6. **MCP integration.** `.cursor/mcp.json` registers
+   `ecc-agentshield` as an MCP server so agents can preflight-scan
+   their own diff before committing.
+
+### Consequences
++ Hostile/absent-minded agent runs cannot land crypto or policy
+  changes without an explicit human trailer + ADR.
++ The `Agent-Session:` trailer makes PR blame trivial across
+  multi-harness orchestration.
+-  Adds a mandatory Node.js 20+ CI step (~15 s per PR).
+-  False positives are possible when a legitimate refactor touches a
+   blocked path; the waiver footer is the escape hatch.
+
+### Alternatives rejected
+- *Hand-rolled git hook* — already drifts between contributors.
+- *GitHub CODEOWNERS only* — CODEOWNERS cannot enforce trailers or
+  volume caps.
+- *Relying on ECC's user-global install* — leaves CI unguarded for
+  contributors without the local install.
+
+### References
+- `.cursor/agentshield.json` — policy config.
+- `.github/workflows/agentshield.yml` — CI gate.
+- `tools/ai/install_ecc.{ps1,sh}` — installs AgentShield locally.
+- ADR-0118 (graphify), ADR-0119 (ECC).
+
+---
+
