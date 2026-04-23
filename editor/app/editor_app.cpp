@@ -442,6 +442,9 @@ void EditorApplication::run() {
             .sequencer    = &sequencer_world_,
             .cinematic    = &cinematic_camera_,
             .scene_color_descriptor = reinterpret_cast<void*>(vk_->scene_imgui_ds),
+            .project_root = (shell_phase_ == EditorShellPhase::MainEditor)
+                ? &project_root_
+                : nullptr,
         };
 
         build_ui();
@@ -1443,6 +1446,7 @@ void EditorApplication::build_docking_layout() {
     ImGui::DockBuilderDockWindow("Render Targets",  bottom_top);
     ImGui::DockBuilderDockWindow("Asset Browser",   bottom_main);
     ImGui::DockBuilderDockWindow("Console",         bottom_main);
+    ImGui::DockBuilderDockWindow("Material Forge",  bottom_main);
     // VScript docks as a tab over the viewport so users can toggle between
     // authoring the graph and seeing the scene without losing side panels.
     ImGui::DockBuilderDockWindow("VScript",         centre);

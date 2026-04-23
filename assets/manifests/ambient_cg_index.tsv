@@ -1,0 +1,5 @@
+# Greywater — bundled sample rows so Material Forge shows entries before you run a full sync.
+# For the complete CC0 material set: python tools/ambientcg_sync/sync.py
+Rock064	content/textures/ambient_cg/Rock064
+Wood095	content/textures/ambient_cg/Wood095
+Metal020	content/textures/ambient_cg/Metal020

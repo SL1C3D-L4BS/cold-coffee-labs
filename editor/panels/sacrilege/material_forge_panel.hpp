@@ -3,6 +3,8 @@
 
 #include "editor/panels/panel.hpp"
 
+#include <filesystem>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -14,7 +16,7 @@ public:
     [[nodiscard]] const char* name() const override { return "Material Forge"; }
 
 private:
-    void try_load_index();
+    void try_load_index(const std::filesystem::path* project_root);
     void draw_library_grid();
 
     std::vector<std::pair<std::string, std::string>> entries_;  // id, relative_dir
@@ -22,6 +24,8 @@ private:
     bool         index_tried_  = false;
     char         filter_[128]{};
     std::string  load_error_;
+    std::string  last_project_root_str_;   // reload index when project changes
+    std::optional<std::filesystem::path> resolved_index_path_;
 };
 
 } // namespace gw::editor::panels::sacrilege

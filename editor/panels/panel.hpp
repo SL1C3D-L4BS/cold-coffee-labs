@@ -3,6 +3,8 @@
 // IPanel — the base interface for every docked editor panel.
 // Spec ref: Phase 7 §2 — panel.hpp
 
+#include <filesystem>
+
 // Forward declarations to keep this header lightweight.
 namespace gw::editor {
     struct EditorContext;
@@ -34,6 +36,8 @@ struct EditorContext {
     gw::seq::CinematicCameraSystem*   cinematic          = nullptr;
     /// ImGui::Image handle for the main scene color target (viewport offscreen).
     void*                             scene_color_descriptor = nullptr;
+    /// Opened project root (content/, assets/ live under here). nullptr in tests / launcher.
+    const std::filesystem::path*      project_root         = nullptr;
 };
 
 // ---------------------------------------------------------------------------

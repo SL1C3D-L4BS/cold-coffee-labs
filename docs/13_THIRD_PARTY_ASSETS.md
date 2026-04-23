@@ -40,7 +40,13 @@ That rebuilds `ambient_cg_index.tsv` from folders on disk. Pin a git commit of t
 
 ## Editor
 
-**Material Forge** searches upward from the process current directory for `content/manifests/ambient_cg_index.tsv`. Run the editor with the working directory at the **project/repo root** (or use a build layout that still contains `content/manifests/` after walking parents).
+**Material Forge** (bottom dock, tab with **Asset Browser** / **Console**) resolves the index in this order:
+
+1. `<project_root>/content/manifests/ambient_cg_index.tsv` (output of `sync.py` after a full download).
+2. `<project_root>/assets/manifests/ambient_cg_index.tsv` (small **bundled** sample list in git so the panel is never empty before your first sync).
+3. Walk upward from the process **current working directory** (same file names) so launching from `build/.../bin` still finds the repo.
+
+`project_root` is the folder you open in the project picker; use the **repository root** so `assets/` resolves correctly.
 
 ## Disk expectations
 
