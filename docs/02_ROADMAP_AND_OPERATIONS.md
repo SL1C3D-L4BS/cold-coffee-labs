@@ -114,7 +114,7 @@
 ## Phase 20–22 Retrospectives
 
 ### Phase 20 retro — *Nine Circles Ground* (weeks 127–134)
-- **Landed:** GPTM vertex / tile types, LOD0–LOD4 mesh builder, screen-space-error LOD selector, `FloatingOrigin` recentring at 2048 m, vegetation GPU indirect instancing, `sandbox_nine_circles` exit banner, all 9 `CircleProfile` constexprs driving terrain.
+- **Landed:** GPTM vertex / tile types, LOD0–LOD4 mesh builder, screen-space-error LOD selector, `FloatingOrigin` recentering at 2048 m, vegetation GPU indirect instancing, `sandbox_nine_circles` exit banner, all 9 `CircleProfile` constexprs driving terrain.
 - **Shift:** `FrameGraph::compile()` initially aborted via `GW_UNIMPLEMENTED[P20-FRAMEGRAPH-ALIASING]` when transient resources were declared. Fix: deferred VMA-backed aliasing to a lazy `execute()`-time construction, keeping `compile()` a pure CPU operation and restoring the 788/788 smoke-test green bar. The ADR-0063 aliasing pass itself remains scheduled for Phase 23 parallel work (no behaviour change — memory is still correctly owned by the `ResourceRegistry`).
 - **Risk cleared:** tests/unit/render/frame_graph_test.cpp is now part of the mandatory smoke set and will catch any regression on the aliasing pre-gate.
 
