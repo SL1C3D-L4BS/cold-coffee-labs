@@ -4,6 +4,8 @@
 // "coming in Phase 8" placeholder so the cockpit row still feels populated.
 #include "render_targets_panel.hpp"
 
+#include "editor/theme/palette_imgui.hpp"
+
 #include <imgui.h>
 #include <algorithm>
 
@@ -28,19 +30,23 @@ void RenderTargetsPanel::on_imgui_render(EditorContext& /*ctx*/) {
             // Placeholder — translucent blue card with the slot label.
             const ImVec2 pos = ImGui::GetCursorScreenPos();
             ImDrawList* dl   = ImGui::GetWindowDrawList();
+            const auto& pal =
+                gw::editor::theme::ThemeRegistry::instance().active().palette;
             dl->AddRectFilled(pos,
                                ImVec2{pos.x + thumb.x, pos.y + thumb.y},
-                               IM_COL32(18, 26, 42, 255), 4.f);
+                               IM_COL32(pal.panel.r, pal.panel.g, pal.panel.b, 255),
+                               4.f);
             dl->AddRect      (pos,
                                ImVec2{pos.x + thumb.x, pos.y + thumb.y},
-                               IM_COL32(58, 130, 190, 200), 4.f);
+                               IM_COL32(pal.accent.r, pal.accent.g, pal.accent.b, 200),
+                               4.f);
             ImGui::Dummy(thumb);
         }
 
-        ImGui::TextColored(
-            slots_[i].live ? ImVec4{0.46f, 0.79f, 0.65f, 1.f}
-                             : ImVec4{0.40f, 0.45f, 0.55f, 1.f},
-            "%s", slots_[i].label);
+        ImGui::TextColored(slots_[i].live
+                               ? gw::editor::theme::active_positive_imgui()
+                               : gw::editor::theme::active_muted_imgui(),
+                           "%s", slots_[i].label);
 
         ImGui::PopID();
         ImGui::EndGroup();

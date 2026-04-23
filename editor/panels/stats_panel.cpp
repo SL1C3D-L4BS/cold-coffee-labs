@@ -3,6 +3,7 @@
 // plus the debug-draw toggle grid the renderer queries each frame.
 #include "stats_panel.hpp"
 #include "editor/render/render_settings.hpp"
+#include "editor/theme/palette_imgui.hpp"
 #include "engine/ecs/world.hpp"
 
 #include <imgui.h>
@@ -46,7 +47,7 @@ void StatsPanel::on_imgui_render(EditorContext& ctx) {
             settings_->stats.push_sample(fps, cpu_ms);
         }
 
-        ImGui::TextColored(ImVec4{0.46f, 0.79f, 0.65f, 1.f},
+        ImGui::TextColored(gw::editor::theme::active_positive_imgui(),
                            "FPS  %6.1f", s.fps);
         ImGui::SameLine();
         ImGui::TextDisabled(" |  %.2f ms", s.cpu_ms);

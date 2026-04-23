@@ -61,8 +61,15 @@
 
 // Part B wire-up: module manifest, theme registry, a11y (pack.yml:
 // pre-ed-module-manifest, pre-ed-theme-menu, pre-ed-a11y-init).
+#include "editor/config/editor_config.hpp"
 #include "editor/modules/modules_builtin.hpp"
+#include "editor/shell/file_dialog.hpp"
+#include "editor/shell/private_gate.hpp"
+#include "editor/shell/recent_projects.hpp"
+#include "editor/theme/editor_fonts.hpp"
+#include "editor/theme/imgui_style_from_palette.hpp"
 #include "editor/theme/theme_registry.hpp"
+#include "editor/theme/palette_imgui.hpp"
 #include "editor/a11y/editor_a11y.hpp"
 
 // volk must precede every Vulkan include in this TU so that imgui_impl_vulkan
@@ -90,6 +97,7 @@
 #include <fstream>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace gw::editor {
@@ -240,21 +248,20 @@ EditorApplication::EditorApplication()
     // registry is now live so later waves can attach panels declaratively.
     gw::editor::modules::register_builtin_modules();
 
-    // pre-ed-theme-menu: load persisted theme id (default: BrewedSlate) and
-    // apply to the registry before init_imgui() so the first ImGui style
-    // reflects the user's choice.
+    // pre-ed-theme-menu: load persisted theme (default: Corrupted Relic).
     gw::editor::theme::ThemeRegistry::instance().set_active(
-        gw::editor::theme::ThemeId::BrewedSlate);
+        gw::editor::config::load_saved_theme(
+            gw::editor::theme::ThemeId::CorruptedRelic));
 
     init_window();
     init_vulkan();
     init_imgui();
-    apply_theme();
 
     // pre-ed-a11y-init: load accessibility config and apply (theme overrides
     // + effect flags). Safe to call before any panels exist.
     a11y_config_ = gw::editor::a11y::load_from_config();
     gw::editor::a11y::apply(a11y_config_);
+    apply_theme();
 
     // Panels — no raw new; unique_ptr owned by the registry. (Non-negotiable #5)
     auto vp = std::make_unique<ViewportPanel>();
@@ -341,6 +348,14 @@ EditorApplication::EditorApplication()
     seq_player_entity_ = scene_world_.create_entity();
     scene_world_.add_component(seq_player_entity_, gw::seq::SeqPlayerComponent{});
     gw::editor::bld_api::g_globals.seq_player_entity_bits = seq_player_entity_.raw_bits();
+
+    recent_projects_ = gw::editor::shell::load_recent_projects();
+    if (gw::editor::shell::env_skip_private_gate() ||
+        !gw::editor::shell::private_gate_file_exists()) {
+        shell_phase_ = EditorShellPhase::ChooseProject;
+    } else {
+        shell_phase_ = EditorShellPhase::Authenticate;
+    }
 }
 
 EditorApplication::~EditorApplication() {
@@ -408,6 +423,8 @@ void EditorApplication::run() {
             pie_time_.dt_s = 0.f;
         }
 
+        gw::editor::theme::tick_pulse(pulse_, dt);
+
         gw::seq::SequencerSystem::tick(sequencer_world_, scene_world_, nullptr, dt);
         double play_head = 0.0;
         scene_world_.for_each<gw::seq::SeqPlayerComponent>(
@@ -428,7 +445,9 @@ void EditorApplication::run() {
         };
 
         build_ui();
-        panels_.render_all(ctx);
+        if (shell_phase_ == EditorShellPhase::MainEditor)
+            panels_.render_all(ctx);
+        gw::editor::theme::draw_pulse_overlay(pulse_);
 
         end_frame();
 
@@ -840,6 +859,9 @@ void EditorApplication::init_imgui() {
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
+    gw::editor::theme::load_editor_fonts(
+        io, gw::editor::theme::ThemeRegistry::instance().active().typography);
+
     // Disable auto-save — we manage ini explicitly.
     io.IniFilename = nullptr;
 
@@ -1100,7 +1122,8 @@ bool EditorApplication::begin_frame() {
         scene_att.imageLayout      = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         scene_att.loadOp           = VK_ATTACHMENT_LOAD_OP_CLEAR;
         scene_att.storeOp          = VK_ATTACHMENT_STORE_OP_STORE;
-        scene_att.clearValue.color = {{0.10f, 0.13f, 0.18f, 1.0f}};
+        scene_att.clearValue.color = {
+            {scene_clear_[0], scene_clear_[1], scene_clear_[2], scene_clear_[3]}};
 
         VkRenderingInfo rinfo{};
         rinfo.sType                = VK_STRUCTURE_TYPE_RENDERING_INFO;
@@ -1134,7 +1157,98 @@ bool EditorApplication::begin_frame() {
     return true;
 }
 
+void EditorApplication::build_launcher_ui() {
+    ImGuiViewport* vp = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(vp->WorkPos);
+    ImGui::SetNextWindowSize(vp->WorkSize);
+    ImGui::SetNextWindowViewport(vp->ID);
+
+    constexpr ImGuiWindowFlags kLaunchFlags =
+        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus |
+        ImGuiWindowFlags_NoNavFocus;
+
+    ImGui::Begin("##GreywaterLauncher", nullptr, kLaunchFlags);
+
+    if (shell_phase_ == EditorShellPhase::Authenticate) {
+        ImGui::TextUnformatted("Greywater Editor");
+        ImGui::TextDisabled("Private gate — local credentials only.");
+        ImGui::Spacing();
+        ImGui::InputText("User", shell_user_,
+                         sizeof(shell_user_), ImGuiInputTextFlags_None);
+        ImGui::InputText("Passphrase", shell_pass_, sizeof(shell_pass_),
+                         ImGuiInputTextFlags_Password);
+        if (ImGui::Button("Unlock", ImVec2{160.f, 0.f})) {
+            shell_gate_err_[0] = '\0';
+            auto bounded_len = [](const char* s, std::size_t cap) -> std::size_t {
+                for (std::size_t i = 0; i < cap; ++i)
+                    if (s[i] == '\0') return i;
+                return cap;
+            };
+            const std::string_view u{shell_user_,
+                                     bounded_len(shell_user_, sizeof(shell_user_))};
+            const std::string_view pw{shell_pass_,
+                                      bounded_len(shell_pass_, sizeof(shell_pass_))};
+            if (gw::editor::shell::try_private_gate(u, pw, shell_gate_err_,
+                                                     sizeof(shell_gate_err_))) {
+                shell_pass_[0] = '\0';
+                shell_phase_   = EditorShellPhase::ChooseProject;
+            }
+        }
+        if (shell_gate_err_[0] != '\0')
+            ImGui::TextColored(gw::editor::theme::active_accent_imgui(), "%s",
+                               shell_gate_err_);
+    } else if (shell_phase_ == EditorShellPhase::ChooseProject) {
+        ImGui::TextUnformatted("Open project");
+        ImGui::TextDisabled(
+            "Pick a project root (folder with content/ or your Greywater tree).");
+        ImGui::Spacing();
+        if (ImGui::Button("Browse…", ImVec2{160.f, 0.f})) {
+            if (auto picked = gw::editor::shell::pick_folder()) {
+                project_root_ = *picked;
+                gw::editor::shell::touch_recent_project(recent_projects_,
+                                                        project_root_);
+                shell_phase_ = EditorShellPhase::MainEditor;
+            }
+        }
+        ImGui::Spacing();
+        ImGui::TextDisabled("Recent");
+        for (std::size_t i = 0; i < recent_projects_.size(); ++i) {
+            const auto& r = recent_projects_[i];
+            const std::string row =
+                r.display_name + "###recent_proj_" + std::to_string(i);
+            if (ImGui::Selectable(row.c_str())) {
+                project_root_ = r.root;
+                gw::editor::shell::touch_recent_project(recent_projects_,
+                                                        project_root_);
+                shell_phase_ = EditorShellPhase::MainEditor;
+            }
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
+                ImGui::SetTooltip("%s", r.root.string().c_str());
+        }
+        ImGui::Spacing();
+        ImGui::InputText("Path", shell_path_manual_, sizeof(shell_path_manual_));
+        if (ImGui::Button("Open typed path", ImVec2{160.f, 0.f})) {
+            namespace fs = std::filesystem;
+            project_root_ = fs::path{shell_path_manual_};
+            std::error_code ec;
+            if (fs::exists(project_root_, ec)) {
+                gw::editor::shell::touch_recent_project(recent_projects_,
+                                                        project_root_);
+                shell_phase_ = EditorShellPhase::MainEditor;
+            }
+        }
+    }
+
+    ImGui::End();
+}
+
 void EditorApplication::build_ui() {
+    if (shell_phase_ != EditorShellPhase::MainEditor) {
+        build_launcher_ui();
+        return;
+    }
+
     ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->WorkPos);
     ImGui::SetNextWindowSize(viewport->WorkSize);
@@ -1181,14 +1295,17 @@ void EditorApplication::build_ui() {
                 if (ImGui::MenuItem("Brewed Slate",    nullptr, active == ThemeId::BrewedSlate)) {
                     registry.set_active(ThemeId::BrewedSlate);
                     apply_theme();
+                    gw::editor::config::save_theme(ThemeId::BrewedSlate);
                 }
                 if (ImGui::MenuItem("Corrupted Relic", nullptr, active == ThemeId::CorruptedRelic)) {
                     registry.set_active(ThemeId::CorruptedRelic);
                     apply_theme();
+                    gw::editor::config::save_theme(ThemeId::CorruptedRelic);
                 }
                 if (ImGui::MenuItem("Field Test HC",   nullptr, active == ThemeId::FieldTestHC)) {
                     registry.set_active(ThemeId::FieldTestHC);
                     apply_theme();
+                    gw::editor::config::save_theme(ThemeId::FieldTestHC);
                 }
                 ImGui::EndMenu();
             }
@@ -1230,7 +1347,7 @@ void EditorApplication::build_ui() {
 
         if (cmd_stack_.is_dirty()) {
             ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
-            ImGui::TextColored({0.9f, 0.6f, 0.2f, 1.f}, "*");
+            ImGui::TextColored(gw::editor::theme::active_warning_imgui(), "*");
         }
 
         ImGui::EndMenuBar();
@@ -1271,6 +1388,8 @@ void EditorApplication::build_ui() {
         if (dirty) {
             gw::editor::a11y::apply(a11y_config_);
             apply_theme();
+            gw::editor::config::save_theme(
+                gw::editor::theme::ThemeRegistry::instance().active_id());
         }
         ImGui::Separator();
         if (ImGui::Button("Save & Close")) {
@@ -1371,7 +1490,8 @@ void EditorApplication::end_frame() {
     color_att.imageLayout      = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     color_att.loadOp           = VK_ATTACHMENT_LOAD_OP_CLEAR;
     color_att.storeOp          = VK_ATTACHMENT_STORE_OP_STORE;
-    color_att.clearValue.color = {{0.051f, 0.059f, 0.078f, 1.0f}};  // editor bg
+    color_att.clearValue.color = {{swapchain_clear_[0], swapchain_clear_[1],
+                                   swapchain_clear_[2], swapchain_clear_[3]}};
 
     VkRenderingInfo rinfo{};
     rinfo.sType                = VK_STRUCTURE_TYPE_RENDERING_INFO;
@@ -1459,125 +1579,35 @@ void EditorApplication::end_frame() {
 }
 
 // ---------------------------------------------------------------------------
-// Theme — dark sci-fi / Cold Coffee Labs aesthetic.
+// Theme — full palette → ImGuiStyle (ADR-0104).
 // ---------------------------------------------------------------------------
+void EditorApplication::update_clear_colors_from_theme() {
+    using gw::editor::theme::Color32;
+    using gw::editor::theme::ThemeRegistry;
+    const auto& p = ThemeRegistry::instance().active().palette;
+    auto set = [](std::array<float, 4>& dst, const Color32& c) {
+        dst = {c.r / 255.f, c.g / 255.f, c.b / 255.f, c.a / 255.f};
+    };
+    set(swapchain_clear_, p.background);
+    swapchain_clear_[3] = 1.f;
+
+    Color32 mid{};
+    mid.r = static_cast<std::uint8_t>((int{p.background.r} + int{p.panel.r}) / 2);
+    mid.g = static_cast<std::uint8_t>((int{p.background.g} + int{p.panel.g}) / 2);
+    mid.b = static_cast<std::uint8_t>((int{p.background.b} + int{p.panel.b}) / 2);
+    mid.a = 255;
+    set(scene_clear_, mid);
+    scene_clear_[3] = 1.f;
+}
+
 void EditorApplication::apply_theme() {
     ImGuiStyle& style = ImGui::GetStyle();
-
-    style.WindowRounding    = 4.f;
-    style.ChildRounding     = 3.f;
-    style.FrameRounding     = 3.f;
-    style.GrabRounding      = 3.f;
-    style.PopupRounding     = 4.f;
-    style.ScrollbarRounding = 3.f;
-    style.TabRounding       = 4.f;
-
-    style.WindowPadding     = {8.f,  8.f};
-    style.FramePadding      = {5.f,  3.f};
-    style.ItemSpacing       = {6.f,  4.f};
-    style.ScrollbarSize     = 12.f;
-    style.GrabMinSize       = 8.f;
-    style.WindowBorderSize  = 1.f;
-    style.FrameBorderSize   = 0.f;
-    style.TabBarBorderSize  = 1.f;
-
-    auto C = [](uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255) {
-        return ImVec4{r / 255.f, g / 255.f, b / 255.f, a / 255.f};
-    };
-
-    ImVec4* col = style.Colors;
-    col[ImGuiCol_Text]                  = C(200, 208, 224);
-    col[ImGuiCol_TextDisabled]          = C(100, 108, 120);
-    col[ImGuiCol_WindowBg]              = C( 13,  15,  20);
-    col[ImGuiCol_ChildBg]               = C( 16,  18,  24);
-    col[ImGuiCol_PopupBg]               = C( 20,  22,  30, 250);
-    col[ImGuiCol_Border]                = C( 35,  40,  55);
-    col[ImGuiCol_BorderShadow]          = C(  0,   0,   0,   0);
-    col[ImGuiCol_FrameBg]               = C( 22,  26,  36);
-    col[ImGuiCol_FrameBgHovered]        = C( 30,  36,  52);
-    col[ImGuiCol_FrameBgActive]         = C( 40,  48,  68);
-    col[ImGuiCol_TitleBg]               = C( 10,  12,  18);
-    col[ImGuiCol_TitleBgActive]         = C( 16,  20,  32);
-    col[ImGuiCol_TitleBgCollapsed]      = C( 10,  12,  18, 180);
-    col[ImGuiCol_MenuBarBg]             = C( 14,  17,  24);
-    col[ImGuiCol_ScrollbarBg]           = C( 12,  14,  20);
-    col[ImGuiCol_ScrollbarGrab]         = C( 40,  50,  70);
-    col[ImGuiCol_ScrollbarGrabHovered]  = C( 55,  68,  95);
-    col[ImGuiCol_ScrollbarGrabActive]   = C( 76, 201, 165);
-    col[ImGuiCol_CheckMark]             = C( 76, 201, 165);
-    col[ImGuiCol_SliderGrab]            = C( 76, 201, 165);
-    col[ImGuiCol_SliderGrabActive]      = C(120, 230, 200);
-    col[ImGuiCol_Button]                = C( 30,  36,  52);
-    col[ImGuiCol_ButtonHovered]         = C( 76, 201, 165,  60);
-    col[ImGuiCol_ButtonActive]          = C( 76, 201, 165, 180);
-    col[ImGuiCol_Header]                = C( 76, 201, 165,  50);
-    col[ImGuiCol_HeaderHovered]         = C( 76, 201, 165,  80);
-    col[ImGuiCol_HeaderActive]          = C( 76, 201, 165, 180);
-    col[ImGuiCol_Separator]             = C( 35,  40,  55);
-    col[ImGuiCol_SeparatorHovered]      = C( 76, 201, 165,  80);
-    col[ImGuiCol_SeparatorActive]       = C( 76, 201, 165);
-    col[ImGuiCol_ResizeGrip]            = C( 76, 201, 165,  30);
-    col[ImGuiCol_ResizeGripHovered]     = C( 76, 201, 165,  90);
-    col[ImGuiCol_ResizeGripActive]      = C( 76, 201, 165, 220);
-    col[ImGuiCol_Tab]                   = C( 20,  24,  34);
-    col[ImGuiCol_TabHovered]            = C( 76, 201, 165,  90);
-    col[ImGuiCol_TabActive]             = C( 30,  40,  60);
-    col[ImGuiCol_TabUnfocused]          = C( 14,  17,  24);
-    col[ImGuiCol_TabUnfocusedActive]    = C( 22,  28,  42);
-    col[ImGuiCol_DockingPreview]        = C( 76, 201, 165, 100);
-    col[ImGuiCol_DockingEmptyBg]        = C( 10,  12,  18);
-    col[ImGuiCol_PlotLines]             = C( 76, 201, 165);
-    col[ImGuiCol_PlotLinesHovered]      = C(245, 166,  35);
-    col[ImGuiCol_PlotHistogram]         = C( 76, 201, 165);
-    col[ImGuiCol_PlotHistogramHovered]  = C(245, 166,  35);
-    col[ImGuiCol_TableHeaderBg]         = C( 20,  26,  38);
-    col[ImGuiCol_TableBorderStrong]     = C( 40,  46,  62);
-    col[ImGuiCol_TableBorderLight]      = C( 28,  34,  48);
-    col[ImGuiCol_TableRowBg]            = C(  0,   0,   0,   0);
-    col[ImGuiCol_TableRowBgAlt]         = C(255, 255, 255,   8);
-    col[ImGuiCol_TextSelectedBg]        = C( 76, 201, 165,  60);
-    col[ImGuiCol_DragDropTarget]        = C(245, 166,  35, 200);
-    col[ImGuiCol_NavHighlight]          = C( 76, 201, 165);
-    col[ImGuiCol_NavWindowingHighlight] = C(245, 166,  35, 200);
-    col[ImGuiCol_NavWindowingDimBg]     = C(  0,   0,   0, 100);
-    col[ImGuiCol_ModalWindowDimBg]      = C(  0,   0,   0, 140);
-
-    if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-        style.WindowRounding = 0.f;
-        col[ImGuiCol_WindowBg].w = 1.f;
-    }
-
-    // pre-ed-theme-menu: overlay the active Palette onto the key semantic
-    // colours so the View → Theme submenu changes something visible.
-    // The hand-tuned Brewed Slate palette above is preserved for BrewedSlate;
-    // CorruptedRelic / FieldTestHC swap primary colours from theme_registry.
-    const auto& theme = gw::editor::theme::ThemeRegistry::instance().active();
-    if (theme.id != gw::editor::theme::ThemeId::BrewedSlate) {
-        auto to_vec = [](const gw::editor::theme::Color32& c) {
-            return ImVec4{c.r / 255.f, c.g / 255.f, c.b / 255.f, c.a / 255.f};
-        };
-        col[ImGuiCol_WindowBg]        = to_vec(theme.palette.background);
-        col[ImGuiCol_ChildBg]         = to_vec(theme.palette.panel);
-        col[ImGuiCol_PopupBg]         = to_vec(theme.palette.panel);
-        col[ImGuiCol_MenuBarBg]       = to_vec(theme.palette.panel);
-        col[ImGuiCol_Text]            = to_vec(theme.palette.text);
-        col[ImGuiCol_TextDisabled]    = to_vec(theme.palette.text_muted);
-        col[ImGuiCol_Separator]       = to_vec(theme.palette.separator);
-        col[ImGuiCol_Border]          = to_vec(theme.palette.separator);
-        col[ImGuiCol_CheckMark]       = to_vec(theme.palette.accent);
-        col[ImGuiCol_SliderGrab]      = to_vec(theme.palette.accent);
-        col[ImGuiCol_SliderGrabActive]= to_vec(theme.palette.accent_strong);
-        col[ImGuiCol_Button]          = to_vec(theme.palette.panel);
-        col[ImGuiCol_ButtonHovered]   = to_vec(theme.palette.accent);
-        col[ImGuiCol_ButtonActive]    = to_vec(theme.palette.accent_strong);
-        col[ImGuiCol_Header]          = to_vec(theme.palette.accent);
-        col[ImGuiCol_HeaderHovered]   = to_vec(theme.palette.accent_strong);
-        col[ImGuiCol_HeaderActive]    = to_vec(theme.palette.accent_strong);
-        col[ImGuiCol_TextSelectedBg]  = to_vec(theme.palette.selection);
-        col[ImGuiCol_Tab]             = to_vec(theme.palette.panel);
-        col[ImGuiCol_TabActive]       = to_vec(theme.palette.accent);
-        col[ImGuiCol_TabHovered]      = to_vec(theme.palette.accent_strong);
-    }
+    const bool vp =
+        (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) != 0;
+    const auto& pal =
+        gw::editor::theme::ThemeRegistry::instance().active().palette;
+    gw::editor::theme::apply_palette_to_imgui_style(pal, style, vp);
+    update_clear_colors_from_theme();
 }
 
 // ---------------------------------------------------------------------------
@@ -1595,7 +1625,11 @@ void EditorApplication::on_key_callback(GLFWwindow* w, int key,
             return;
         }
         if (key == GLFW_KEY_Y) { app->cmd_stack_.redo(); return; }
-        if (key == GLFW_KEY_S) { gw_editor_save_scene("content/untitled.gwscene"); return; }
+        if (key == GLFW_KEY_S) {
+            if (app->shell_phase_ == EditorShellPhase::MainEditor)
+                gw_editor_save_scene("content/untitled.gwscene");
+            return;
+        }
     }
 
     if (action == GLFW_PRESS) {

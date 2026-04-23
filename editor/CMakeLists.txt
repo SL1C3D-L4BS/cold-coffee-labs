@@ -107,6 +107,8 @@ add_executable(gw_editor
 
     # Part B §12.1 — Theme registry (ADR-0104).
     theme/theme_registry.cpp
+    theme/imgui_style_from_palette.cpp
+    theme/editor_fonts.cpp
     theme/distressed_draw.cpp
     theme/corruption_pulse.cpp
     theme/default_layout.cpp
@@ -133,6 +135,12 @@ add_executable(gw_editor
     pie/pie_perf_guard.cpp
     # Part B §14 — Editor a11y toggles (ADR-0108).
     a11y/editor_a11y.cpp
+    config/editor_paths.cpp
+    config/editor_config.cpp
+    shell/sha256.cpp
+    shell/private_gate.cpp
+    shell/recent_projects.cpp
+    shell/file_dialog.cpp
     # Part C §23 — Audit panels (docs/05 deep research).
     panels/audit/shader_hotreload_panel.cpp
     panels/audit/profiler_panel.cpp
@@ -182,6 +190,7 @@ if(WIN32)
         ws2_32 userenv ntdll bcrypt
         # ImGui multi-viewport on Windows uses dwmapi.
         dwmapi
+        ole32
     )
 elseif(UNIX AND NOT APPLE)
     target_link_libraries(gw_editor PRIVATE pthread dl m)

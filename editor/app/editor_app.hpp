@@ -14,6 +14,8 @@
 #include "editor/render/render_settings.hpp"
 #include "editor/selection/selection_context.hpp"
 #include "editor/pie/gameplay_host.hpp"
+#include "editor/shell/recent_projects.hpp"
+#include "editor/theme/corruption_pulse.hpp"
 #include "editor/undo/command_stack.hpp"
 #include "engine/core/time.hpp"
 #include "engine/ecs/entity.hpp"
@@ -21,7 +23,11 @@
 #include "engine/scene/seq/seq_camera.hpp"
 #include "engine/scene/seq/sequencer_world.hpp"
 
+#include <array>
+#include <cstdint>
+#include <filesystem>
 #include <memory>
+#include <vector>
 
 struct GLFWwindow;
 
@@ -30,6 +36,12 @@ namespace gw::editor {
 // Opaque backend — all raw Vulkan state lives behind this pimpl so the header
 // stays clean of <volk.h> and keeps editor_app.hpp cheap to include.
 struct EditorVulkanBackend;
+
+enum class EditorShellPhase : std::uint8_t {
+    Authenticate,
+    ChooseProject,
+    MainEditor,
+};
 
 class EditorApplication {
 public:
@@ -74,6 +86,8 @@ private:
     // -----------------------------------------------------------------------
     void build_docking_layout();
     void apply_theme();
+    void update_clear_colors_from_theme();
+    void build_launcher_ui();
 
     // -----------------------------------------------------------------------
     // Callbacks (GLFW)
@@ -124,6 +138,19 @@ private:
 
     // Swapchain resize deferred flag.
     bool swapchain_resize_pending_ = false;
+
+    // Bootstrap shell (private gate + project picker).
+    EditorShellPhase shell_phase_{EditorShellPhase::MainEditor};
+    gw::editor::theme::CorruptionPulseState pulse_{};
+    std::array<float, 4> swapchain_clear_{0.05f, 0.05f, 0.06f, 1.f};
+    std::array<float, 4> scene_clear_{0.08f, 0.09f, 0.11f, 1.f};
+
+    char shell_user_[128]{};
+    char shell_pass_[256]{};
+    char shell_gate_err_[256]{};
+    char shell_path_manual_[1024]{};
+    std::vector<gw::editor::shell::RecentProject> recent_projects_;
+    std::filesystem::path project_root_;
 };
 
 }  // namespace gw::editor

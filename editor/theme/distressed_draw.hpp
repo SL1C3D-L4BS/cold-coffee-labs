@@ -9,10 +9,11 @@
 namespace gw::editor::theme {
 
 struct DistressedParams {
-    float        jitter_amplitude_px = 1.5f;
-    float        crack_thickness_px  = 1.0f;
-    std::uint8_t notch_count         = 3;
-    std::uint32_t accent_abgr        = 0xFF3B'A6C9u;
+    float         jitter_amplitude_px = 1.5f;
+    float         crack_thickness_px  = 1.0f;
+    std::uint8_t  notch_count         = 3;
+    /// `ImU32` colour in the same packing as `IM_COL32(r,g,b,a)`.
+    std::uint32_t accent_col          = 0xFFC9A63Bu;
 };
 
 /// Draw a jagged rectangular border with irregular notches. Called from

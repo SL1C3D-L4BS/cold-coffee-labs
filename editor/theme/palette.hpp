@@ -24,27 +24,27 @@ struct Palette {
     Color32 accent;           // primary interactive
     Color32 accent_strong;    // hover / active
     Color32 destructive;      // delete / kill actions
-    Color32 positive;         // save / commit / success
+    Color32 positive;         // save / commit / success / “live” indicators
+    Color32 warning;          // plots, drag-drop, caution emphasis
     Color32 separator;        // rules between sections
     Color32 selection;        // selection highlight
 };
 
 // ------------------------------------------------------------------
-//  Corrupted Relic — the full horror aesthetic (opt-in).
-//  #111214 Infected Veins   / #2A2522 Burnt Bone / #E0D7C6 Forgotten Scripture
-//  #C9A63B Yellow Paint     / #4A1515 Dried Gules / #7A5C2E Blasphemous Gold
+//  Corrupted Relic — Sacrilege horror default (black / blood / sulfur / toxic).
 // ------------------------------------------------------------------
 constexpr Palette CORRUPTED_RELIC{
-    /*background   */ {0x11, 0x12, 0x14},
-    /*panel        */ {0x2A, 0x25, 0x22},
-    /*text         */ {0xE0, 0xD7, 0xC6},
-    /*text_muted   */ {0x7A, 0x6E, 0x5C},
-    /*accent       */ {0xC9, 0xA6, 0x3B},
-    /*accent_strong*/ {0xE8, 0xC4, 0x4E},
-    /*destructive  */ {0x4A, 0x15, 0x15},
-    /*positive     */ {0x7A, 0x5C, 0x2E},
-    /*separator    */ {0x3A, 0x32, 0x2C},
-    /*selection    */ {0x6F, 0x4F, 0x22, 0xB0},
+    /*background   */ {0x0A, 0x08, 0x08},
+    /*panel        */ {0x1A, 0x14, 0x14},
+    /*text         */ {0xE8, 0xDC, 0xD0},
+    /*text_muted   */ {0x78, 0x6C, 0x62},
+    /*accent       */ {0xC4, 0x2A, 0x2A},   // blood red
+    /*accent_strong*/ {0xF0, 0x50, 0x50},   // ember
+    /*destructive  */ {0x6E, 0x0A, 0x0A},   // dried gules
+    /*positive     */ {0x4F, 0x9D, 0x4A},   // sick green
+    /*warning      */ {0xD4, 0xA0, 0x17},   // sulfur yellow
+    /*separator    */ {0x3A, 0x28, 0x28},
+    /*selection    */ {0xC4, 0x2A, 0x2A, 0x90},
 };
 
 // ------------------------------------------------------------------
@@ -59,6 +59,7 @@ constexpr Palette BREWED_SLATE{
     /*accent_strong*/ {0x90, 0xBE, 0xE8},
     /*destructive  */ {0xC7, 0x54, 0x3E},
     /*positive     */ {0x85, 0xB3, 0x58},
+    /*warning      */ {0xF5, 0xA6, 0x23},
     /*separator    */ {0x35, 0x3B, 0x42},
     /*selection    */ {0x4A, 0x70, 0x95, 0xA0},
 };
@@ -75,6 +76,7 @@ constexpr Palette FIELD_TEST_HC{
     /*accent_strong*/ {0xFF, 0xD0, 0x40},
     /*destructive  */ {0xD5, 0x5E, 0x00},   // Wong vermillion
     /*positive     */ {0x00, 0x9E, 0x73},   // Wong green
+    /*warning      */ {0xFF, 0xB0, 0x00},
     /*separator    */ {0x50, 0x50, 0x50},
     /*selection    */ {0xFF, 0xB0, 0x00, 0x80},
 };
