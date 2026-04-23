@@ -15,6 +15,10 @@ struct VoiceDirectorContext {
     bool                 rapture_active  = false;
     bool                 ruin_active     = false;
     bool                 grace_window    = false;
+    /// P22 W146 — mirror-step Act II ability is a Malakor-only,
+    /// Sin-signature-ignorant line pick. Overrides everything except
+    /// `grace_window`.
+    bool                 mirror_step     = false;
     SinSignature         signature{};
     std::uint64_t        seed            = 0;
 };

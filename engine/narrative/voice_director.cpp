@@ -46,7 +46,10 @@ VoicePick pick_voice_line(const VoiceDirectorContext& ctx) noexcept {
         }
     }
 
-    const Speaker forced = ctx.rapture_active ? Speaker::Malakor
+    // P22 W146 — mirror-step is Malakor-only, Act-II-gated, and ignores
+    // Sin-signature range so the line always fires on cast.
+    const Speaker forced = ctx.mirror_step   ? Speaker::Malakor
+                         : ctx.rapture_active ? Speaker::Malakor
                          : ctx.ruin_active    ? Speaker::Niccolo
                                               : Speaker::None;
 
@@ -57,7 +60,8 @@ VoicePick pick_voice_line(const VoiceDirectorContext& ctx) noexcept {
         if (ln.act_gate != Act::None && ln.act_gate != ctx.act) continue;
         if (!circle_gate_allows(ln.circle_gate_mask, ctx.circle_index)) continue;
         if (forced != Speaker::None && ln.speaker != forced) continue;
-        if (!sig_in_bounds(ctx.signature, ln)) continue;
+        // Mirror-step bypasses Sin-signature bounds so the line always fires.
+        if (!ctx.mirror_step && !sig_in_bounds(ctx.signature, ln)) continue;
 
         // Sin-signature bias: lines matching dominant channel get a hash bonus.
         std::uint64_t h = splitmix64(ctx.seed ^ static_cast<std::uint64_t>(ln.id.value));

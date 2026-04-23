@@ -17,6 +17,12 @@ add_library(greywater_gameplay SHARED
     a11y/gameplay_a11y.cpp
     # Phase 21 W140 — Diegetic HUD model (ADR-0108).
     hud/diegetic_hud.cpp
+    # Phase 22 W146 — swept-AABB player controller (docs/07 §3).
+    movement/player_controller.cpp
+    # Phase 22 W147 — grapple / blood surf / glory kill.
+    movement/grapple.cpp
+    movement/blood_surf.cpp
+    combat/glory_kill.cpp
 )
 target_link_libraries(greywater_gameplay PRIVATE greywater::core)
 

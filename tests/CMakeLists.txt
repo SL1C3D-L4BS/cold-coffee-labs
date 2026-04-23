@@ -163,7 +163,33 @@ add_executable(gw_tests
     unit/editor/sacrilege_panels_test.cpp
     "${CMAKE_SOURCE_DIR}/editor/panels/sacrilege/circle_editor_panel.cpp"
     "${CMAKE_SOURCE_DIR}/editor/panels/sacrilege/encounter_editor_panel.cpp"
+    # Phase 22 W148 — Dialogue / Sin-signature / Act-state panel models.
+    unit/editor/sacrilege_p22_panels_test.cpp
+    "${CMAKE_SOURCE_DIR}/editor/panels/sacrilege/dialogue_graph_panel.cpp"
+    "${CMAKE_SOURCE_DIR}/editor/panels/sacrilege/sin_signature_panel.cpp"
+    "${CMAKE_SOURCE_DIR}/editor/panels/sacrilege/act_state_panel.cpp"
     "${CMAKE_SOURCE_DIR}/gameplay/hud/diegetic_hud.cpp"
+    # Phase 22 W143 — Martyrdom ECS components + bootstrapper.
+    unit/gameplay/martyrdom_components_test.cpp
+    # Phase 22 W144 — accrual + Rapture/Ruin tick systems.
+    unit/gameplay/martyrdom_systems_test.cpp
+    # Phase 22 W145 — BlasphemySystem + StatCompositionSystem.
+    unit/gameplay/blasphemy_system_test.cpp
+    # Phase 22 W146 — player controller (swept AABB + bhop + slide + wall kick)
+    # + voice_director mirror-step line selection.
+    unit/gameplay/player_controller_test.cpp
+    "${CMAKE_SOURCE_DIR}/gameplay/movement/player_controller.cpp"
+    # voice_director.cpp is already compiled into greywater::core.
+    unit/narrative/mirror_step_test.cpp
+    # Phase 22 W147 — grapple + blood surf + glory kill.
+    unit/gameplay/grapple_test.cpp
+    unit/gameplay/blood_surf_test.cpp
+    unit/gameplay/glory_kill_test.cpp
+    "${CMAKE_SOURCE_DIR}/gameplay/movement/grapple.cpp"
+    "${CMAKE_SOURCE_DIR}/gameplay/movement/blood_surf.cpp"
+    "${CMAKE_SOURCE_DIR}/gameplay/combat/glory_kill.cpp"
+    # Phase 22 W148 — cross-peer Martyrdom determinism hash test.
+    unit/gameplay/martyrdom_determinism_test.cpp
     test_main.cpp
 )
 

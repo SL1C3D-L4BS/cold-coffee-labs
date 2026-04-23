@@ -16,6 +16,10 @@
 #include "gameplay/martyrdom/blasphemy_state.hpp"
 #include "gameplay/martyrdom/god_mode.hpp"
 #include "gameplay/martyrdom/grace_meter.hpp"
+// P22 W143 — canonical Martyrdom ECS components. Imported here so the
+// gameplay DLL links every component the ECS registrar references.
+#include "gameplay/martyrdom/martyrdom_components.hpp"
+#include "gameplay/martyrdom/stats.hpp"
 #include "gameplay/characters/malakor_niccolo/character_state.hpp"
 #include "engine/narrative/grace_meter.hpp"
 
@@ -59,6 +63,23 @@ GW_GAMEPLAY_API void gameplay_init() noexcept {
     (void)blasphemy.active();
     gw::narrative::GraceTransaction tx{};
     gw::gameplay::martyrdom::try_apply_grace(grace, grace_book, tx);
+
+    // P22 W143 — canonical component instantiation keeps the registrar types
+    // linked until the gameplay world ECS takes ownership in P22 W148.
+    static gw::gameplay::martyrdom::SinComponent           sin_c{};
+    static gw::gameplay::martyrdom::MantraComponent        mantra_c{};
+    static gw::gameplay::martyrdom::RaptureState           rapture_c{};
+    static gw::gameplay::martyrdom::RuinState              ruin_c{};
+    static gw::gameplay::martyrdom::ResolvedStats          resolved_c{};
+    static gw::gameplay::martyrdom::ActiveBlasphemies      active_b{};
+    static gw::gameplay::martyrdom::RaptureTriggerCounter  trigger_counter{};
+    (void)sin_c;
+    (void)mantra_c;
+    (void)rapture_c;
+    (void)ruin_c;
+    (void)resolved_c;
+    (void)active_b;
+    (void)trigger_counter;
 
     // pre-gp-logos-phase4 stub-wire — exercise the selector free function.
     (void)gw::gameplay::boss::logos::select_phase4_branch(grace);
