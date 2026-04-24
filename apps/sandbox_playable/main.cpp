@@ -1,23 +1,17 @@
 // apps/sandbox_playable/main.cpp — Phase 11 Wave 11F demo (ADR-0029).
 //
-// This app is the exit-demo referenced in docs/05 *Playable Runtime*.
-// It boots the full runtime (CVars, events, UI, console, audio, input) in
-// headless/deterministic mode and ticks a pre-canned script:
-//   frame 1: publish a WindowResized to force the UI viewport update
-//   frame 2: execute `echo sandbox_playable online` on the console
-//   frame 3: set `ui.contrast.boost = true` through the settings binder
-//   frame 4..N: idle ticks
-// The app prints a trailing summary line so CI can grep for "PLAYABLE OK".
-//
-// Gameplay logic and a real scene land in Phase 12.
+// Boots runtime::Engine headless/deterministic and drives a short script.
+// Optional: --scene=path.gwscene (+ GW_PLAY_SCENE), --seed=, --cvars-toml=.
+// After load, syncs blockout box primitives into PhysicsWorld (Phase 24).
 
 #include "engine/core/crash_reporter.hpp"
 #include "engine/core/version.hpp"
 #include "runtime/engine.hpp"
+#include "runtime/playable_bootstrap.hpp"
+#include "runtime/playable_scene_host.hpp"
 
 #include <cstdarg>
 #include <cstdio>
-#include <cstdlib>
 #include <string>
 
 namespace {
@@ -44,6 +38,9 @@ int main(int argc, char** argv) {
     gw::core::crash::install_handlers();
     std::fprintf(stdout, "[sandbox_playable] greywater %s\n", gw::core::version_string());
 
+    gw::runtime::PlayableCliOptions cli{};
+    gw::runtime::parse_playable_cli(argc, argv, cli);
+
     gw::runtime::EngineConfig cfg{};
     cfg.headless         = true;
     cfg.deterministic    = true;
@@ -52,7 +49,6 @@ int main(int argc, char** argv) {
     cfg.height_px        = 720;
     cfg.locale           = "en-US";
 
-    // --frames=N override for CI tuning.
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
         if (a.rfind("--frames=", 0) == 0) {
@@ -62,7 +58,25 @@ int main(int argc, char** argv) {
     }
 
     gw::runtime::Engine engine{cfg};
+    gw::runtime::apply_playable_bootstrap(engine, cli);
+
     StdoutWriter out;
+
+    std::uint32_t scene_entities = 0;
+    if (!cli.scene_path.empty()) {
+        gw::runtime::PlayableSceneLoadSummary sum{};
+        if (!gw::runtime::load_authoring_scene_into_physics(engine, cli.scene_path, sum)) {
+            std::fprintf(stderr, "[sandbox_playable] SCENE LOAD FAILED path=%s\n",
+                         cli.scene_path.c_str());
+            return 3;
+        }
+        scene_entities = sum.entities;
+        std::fprintf(stdout,
+                     "[sandbox_playable] SCENE LOAD OK path=%s entities=%u blockout_bodies=%u\n",
+                     cli.scene_path.c_str(),
+                     static_cast<unsigned>(sum.entities),
+                     static_cast<unsigned>(sum.blockout_bodies));
+    }
 
     // Frame 1 — viewport resize
     engine.ui().set_viewport(cfg.width_px, cfg.height_px, 1.0f);
@@ -76,17 +90,18 @@ int main(int argc, char** argv) {
     (void)engine.settings_binder().push_from_ui("settings-contrast-boost", "true");
     engine.tick(1.0 / 60.0);
 
-    // Frame 4..N — idle
     if (cfg.self_test_frames > 3) {
         engine.run_frames(cfg.self_test_frames - 3);
     }
 
     std::fprintf(stdout,
-        "[sandbox_playable] PLAYABLE OK — frames=%llu contrast=%d cheats=%d cvars=%zu\n",
-        static_cast<unsigned long long>(engine.frame_index()),
-        engine.ui().contrast_boost() ? 1 : 0,
-        engine.console().cheats_banner_visible() ? 1 : 0,
-        engine.cvars().count());
+                 "[sandbox_playable] PLAYABLE OK — frames=%llu contrast=%d cheats=%d cvars=%zu "
+                 "scene_entities=%u\n",
+                 static_cast<unsigned long long>(engine.frame_index()),
+                 engine.ui().contrast_boost() ? 1 : 0,
+                 engine.console().cheats_banner_visible() ? 1 : 0,
+                 engine.cvars().count(),
+                 static_cast<unsigned>(scene_entities));
 
     return 0;
 }

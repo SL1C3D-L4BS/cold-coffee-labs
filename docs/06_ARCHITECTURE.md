@@ -1045,7 +1045,7 @@ Phases 19–23 build engine-side capabilities for **Blacklake** procedural genes
 
 **Exit Criteria (*Martyrdom Online*)** — sandbox proves full resource loop and weapon swaps under net + determinism bars for combat.
 
-### Phase 23 — Damned Host, Circles Pipeline & Boss · 6 weeks · Gameplay + Content Tools Lead
+### Phase 23 — Damned Host, Encounters, God Machine + Logos · 6 weeks · Gameplay + Content Tools Lead
 
 **Deliverables**
 1. Enemy archetypes v1 — data-driven roster + AI wiring.
@@ -1054,7 +1054,7 @@ Phases 19–23 build engine-side capabilities for **Blacklake** procedural genes
 4. Boss framework — phases, weak points, cinematic hooks.
 5. Seed-sharing / demo packaging.
 
-**Exit Criteria (*God Machine RC*)** — boss + two circles + full Martyrdom loop in nightly build.
+**Exit Criteria (*God Machine RC*)** — Circle IX (**Silentium / Throne of the Logos**) end-to-end in the RC sandbox: full enemy roster + weapon loop + hybrid Director + gore hooks; God Machine defeatable by damage and Logos defeatable on the Grace path (`forgive`); Martyrdom economy consistent with Phase 22; editor **AI Director Sandbox** and **Editor Copilot** panels present. Authoritative week rows: `docs/02_ROADMAP_AND_OPERATIONS.md`.
 
 ---
 
@@ -1708,7 +1708,7 @@ With this architecture signed off:
 - **Phase 20 — GPTM, Nine Circles Geometry, Floating Origin (8w).** Large arena GPTM slice, GPU mesh, tessellation/LOD, floating origin, circle-themed materials → *Nine Circles Ground*.
 - **Phase 21 — Sacrilege Frame — Rendering, Atmosphere, Audio (8w).** Horror-forward rendering, volumetrics, decals, dynamic score → *Hell Frame*.
 - **Phase 22 — Martyrdom Combat & Player Stack (6w).** Sin/Mantra/Rapture/Ruin, Blasphemies, weapons, locomotion → *Martyrdom Online*.
-- **Phase 23 — Damned Host, Circles Pipeline & Boss (6w).** Roster, encounters, authoring pipeline, boss phases → *God Machine RC*.
+- **Phase 23 — Damned Host, Encounters, God Machine + Logos (6w).** Eight-enemy roster, weapons, gore + Director bridge, God Machine + Logos Grace path, RC sandbox + editor panels → *God Machine RC* (Circle IX Silentium end-to-end per `docs/02_ROADMAP_AND_OPERATIONS.md`).
 
 **Release phases (24–25)**
 

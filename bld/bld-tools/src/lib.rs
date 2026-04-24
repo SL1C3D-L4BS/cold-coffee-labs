@@ -161,7 +161,8 @@ pub use bld_tools_macros::{bld_component_tools, bld_tool};
 #[cfg(feature = "seq-tools")]
 pub mod tools;
 
-// The Phase 9 tool taxonomy — 78 additional stubs bring the registry to 79.
+// The Phase 9 tool taxonomy — 78 stubs here + `project.list_scenes` + seven
+// `sacrilege.*` in `sacrilege_tools.rs` => 86 descriptors (91 with `seq-tools`).
 pub mod taxonomy;
 
 // Sacrilege copilot tools (Part B §12.6, ADR-0109). Seven descriptor-only

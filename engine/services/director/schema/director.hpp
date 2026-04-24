@@ -13,6 +13,8 @@ enum class IntensityState : std::uint8_t {
 
 struct DirectorRequest {
     std::uint64_t  seed                 = 0;
+    /// Monotonic simulation tick — shared with replay, rollback, and MP snapshots (plan Track D2).
+    std::uint64_t  logical_tick         = 0;
     float          player_health_ratio  = 1.f;
     float          recent_damage_taken  = 0.f;
     float          recent_kps           = 0.f;

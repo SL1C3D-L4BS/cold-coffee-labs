@@ -18,6 +18,7 @@
 #include "editor/shell/recent_projects.hpp"
 #include "editor/theme/corruption_pulse.hpp"
 #include "editor/undo/command_stack.hpp"
+#include "engine/core/config/cvar_registry.hpp"
 #include "engine/core/time.hpp"
 #include "engine/ecs/entity.hpp"
 #include "engine/ecs/world.hpp"
@@ -56,6 +57,10 @@ public:
     // Run the main loop until the window is closed.
     void run();
 
+    /// BLD Surface P — same entry as Play menu when `pie_host_context` is wired.
+    [[nodiscard]] bool bld_pie_enter();
+    void               bld_pie_stop();
+
 private:
     // -----------------------------------------------------------------------
     // Init / shutdown
@@ -92,6 +97,12 @@ private:
     void build_launcher_ui();
     /// Set project root, chdir for relative content/ paths, recent list, main editor.
     void open_project(const std::filesystem::path& root);
+    /// Export current `.gwscene` and spawn `sandbox_playable` from the same bin dir (Phase 24 loop).
+    void launch_detached_headless_runtime();
+
+    /// Align PIE bootstrap (seed + `.play_cvars.toml`) with detached `sandbox_playable`.
+    void sync_pie_play_bootstrap_with_scene();
+    void clear_pie_play_bootstrap_paths();
 
     // -----------------------------------------------------------------------
     // Callbacks (GLFW)
@@ -137,6 +148,8 @@ private:
     // apply_theme() and the Window → Accessibility modal.
     gw::editor::a11y::EditorA11yConfig a11y_config_{};
     bool a11y_modal_open_ = false;
+    /// Phase 24 week 157 — one-shot photosensitivity acknowledgement (WCAG-style pre-warning).
+    bool photosensitivity_warn_ack_ = false;
 
     // Layout built flag — persisted via ImGui ini.
     bool layout_built_ = false;
@@ -162,6 +175,13 @@ private:
     std::optional<std::filesystem::path> pending_folder_drop_;
     std::unique_ptr<gw::editor::render::ImGuiTextureCache> imgui_tex_cache_;
     float last_dt_sec_ = 1.f / 60.f;
+
+    /// Stable storage for `GameplayContext::play_cvars_toml_abs_utf8` while PIE runs.
+    std::string pie_play_cvars_abs_storage_;
+
+    /// Editor-only registry: mirrors `apply_playable_bootstrap` merge for PIE (Phase 24 follow-through).
+    /// `optional` so each PIE sync can `emplace()` a fresh registry (`CVarRegistry` is move-only).
+    std::optional<gw::config::CVarRegistry> pie_bootstrap_cvars_{};
 };
 
 }  // namespace gw::editor

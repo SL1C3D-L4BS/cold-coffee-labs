@@ -48,7 +48,22 @@ ctest --preset dev-linux
 cmake --preset dev-win
 cmake --build --preset dev-win
 .\build\dev-win\bin\gw_sandbox.exe
+.\build\dev-win\bin\gw_editor.exe
+.\build\dev-win\bin\gw_tests.exe
+ctest --preset dev-win
 ```
+
+### IDE / `compile_commands.json` (clangd, clang-tidy)
+
+After configure, CMake copies `compile_commands.json` from the build directory to the **repo root** (gitignored). Use the same preset for local work and CI so paths stay aligned:
+
+- Configure: `cmake --preset dev-win` or `cmake --preset dev-linux`
+- Build common targets: `gw_editor`, `gw_tests`, `sandbox_playable` (outputs under `build/<preset>/bin/`)
+- **Release Windows:** `cmake --preset release-win` — same toolchain as `dev-win`; ensure `clang-cl` is on `PATH` (e.g. **x64 Native Tools** / **Developer PowerShell** with LLVM). CI `windows-latest` runs `clang-cl --version` before configure.
+
+**Detached play / PIE env (`GW_*`):** `sandbox_playable` and `gw::runtime::parse_playable_cli` read these when CLI flags are omitted: `GW_PLAY_SCENE` (scene path), `GW_UNIVERSE_SEED` (integer seed), `GW_CVARS_TOML` (companion `.play_cvars.toml`). Editor PIE sync merges the same TOML + seed into an editor-owned registry via `gw::play::apply_play_bootstrap_to_registry`.
+
+Linux CI runs `run-clang-tidy` against `build/dev-linux/compile_commands.json` (see `.github/workflows/ci.yml`).
 
 ---
 

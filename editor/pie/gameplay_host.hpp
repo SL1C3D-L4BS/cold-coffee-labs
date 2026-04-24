@@ -8,11 +8,11 @@
 #include "editor/pie/pie_debug_hud.hpp"
 #include "editor/pie/pie_perf_guard.hpp"
 #include "editor/pie/rollback_inspector.hpp"
+#include "engine/play/gameplay_context_abi.hpp"
 #include "engine/platform/dll.hpp"
 
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -21,30 +21,15 @@ namespace gw::ecs { class World; }
 
 namespace gw::editor {
 
-// Minimal context passed to gameplay — a narrow POD struct. Lives on the
-// editor side; we pass `&ctx` across the C-ABI boundary so the `void*` fields
-// carry stable ABI regardless of gameplay-side header drift. The concrete
-// types behind those pointers are:
-//
-//   world       -> gw::ecs::World*          (ADR-0004; live authoring world)
-//   time        -> gw::TimeState*           (engine/core/time.hpp)
-//   asset_db    -> gw::assets::AssetDatabase*
-//   input_state -> gw::input::InputState*   (Phase 10 stub; nullptr today)
-//
-// Every pointer is owned by the engine; gameplay never frees them.
-// Field order is frozen — append new entries at the tail, never reorder.
-struct GameplayContext {
-    uint32_t version       = 1;   // bumped on breaking changes
-    void*    world         = nullptr;
-    void*    asset_db      = nullptr;
-    void*    input_state   = nullptr;
-    void*    time          = nullptr;  // gw::TimeState* (Phase 7 week 040)
-};
+// Shared ABI: `engine/play/gameplay_context_abi.hpp` (append-only; versioned).
+using GameplayContext = gw::play::GameplayContext;
 
 // C-ABI contract — gameplay module must export these three symbols.
 using GwGameplayInitFn     = void (*)(GameplayContext*);
 using GwGameplayUpdateFn   = void (*)(GameplayContext*, float dt);
 using GwGameplayShutdownFn = void (*)();
+/// Optional — binds `gw::ecs::World*` for PIE (exported as `gameplay_bind_ecs_world`).
+using GwGameplayBindWorldFn = void (*)(void* world);
 
 // ---------------------------------------------------------------------------
 class GameplayHost {
@@ -120,6 +105,7 @@ private:
     GwGameplayInitFn     gameplay_init_     = nullptr;
     GwGameplayUpdateFn   gameplay_update_   = nullptr;
     GwGameplayShutdownFn gameplay_shutdown_ = nullptr;
+    GwGameplayBindWorldFn gameplay_bind_world_ = nullptr;
 
     // Cached pointer to the last GameplayContext handed to enter_play().
     // Used by reload_if_changed() so hot-reloaded code can be re-initialised

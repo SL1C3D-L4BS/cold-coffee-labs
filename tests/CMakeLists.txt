@@ -1,15 +1,32 @@
 # tests/ — doctest-driven unit and smoke tests.
 # docs/02 §19 Testing & QA: Tier A coverage on core, math, memory, jobs, ECS.
 # Phase 1 seeds the framework with a smoke test against greywater_core.
+#
+# Phase 24 weeks 155–162 (CI matrix): primary suite is this monolith — run:
+#   ctest --preset dev-win --output-on-failure
+# Focused doctest filters (examples):
+#   ctest -R "play_cvars_rel_for_scene_path"
+#   ctest -R "cook_trust"
+#   ctest -R "gameplay_replay"
+#   ctest -R "play_bootstrap"
+#   ctest -R "encounter_director"
+#   ctest -R "simulation_step"
+#   ctest -R "gameplay_host"
+# Also run `gw_runtime --self-test`, `sandbox_playable`, determinism.yml, and
+# sandboxes (director_budgets, living_sandbox, god_machine_rc) per CI jobs.
 
 add_executable(gw_tests
     smoke_test.cpp
     platform_test.cpp
+    unit/play/playable_paths_test.cpp
+    unit/play/pie_bootstrap_parity_test.cpp
     memory_test.cpp
     core_test.cpp
     containers_test.cpp
     string_test.cpp
     unit/render/frame_graph_test.cpp
+    unit/render/authoring_lighting_blob_test.cpp
+    unit/render/render_visibility_policy_test.cpp
     # Phase 7 fullstack Path-A — Editor CommandStack (ADR 0005 in docs/10_APPENDIX_ADRS_AND_REFERENCES.md)
     unit/editor_undo/command_stack_test.cpp
     "${CMAKE_SOURCE_DIR}/editor/undo/command_stack.cpp"
@@ -40,11 +57,13 @@ add_executable(gw_tests
     unit/vscript/vscript_vm_test.cpp
     # Phase 6 — Asset Pipeline
     unit/assets/cook_cache_test.cpp
+    unit/assets/cook_trust_test.cpp
     unit/assets/mesh_cooker_test.cpp
     unit/assets/asset_db_test.cpp
     unit/assets/vfs_test.cpp
     # Phase 6 — Integration
     integration/cook_pipeline_test.cpp
+    unit/services/franchise_phase_stub_test.cpp
     # Phase 7 — Editor Foundation
     unit/editor/reflect_macro_test.cpp
     unit/editor/franchise_roots_test.cpp
@@ -84,6 +103,8 @@ add_executable(gw_tests
     unit/ui/ui_service_test.cpp
     # Phase 11 Wave 11F — Engine boot integration (ADR-0029)
     integration/engine_boot_test.cpp
+    integration/runtime_scene_boot_test.cpp
+    unit/runtime/playable_scene_host_test.cpp
     # Phase 12 — Physics (ADR-0031..0038)
     unit/physics/world_lifecycle_test.cpp
     unit/physics/rigid_body_test.cpp
@@ -106,6 +127,7 @@ add_executable(gw_tests
     unit/net/transport_null_test.cpp
     unit/net/link_sim_test.cpp
     unit/net/snapshot_test.cpp
+    unit/net/gameplay_replay_test.cpp
     unit/net/replication_test.cpp
     unit/net/reliability_test.cpp
     unit/net/lag_comp_test.cpp
@@ -200,6 +222,18 @@ add_executable(gw_tests
     unit/gameplay/grapple_test.cpp
     unit/gameplay/blood_surf_test.cpp
     unit/gameplay/glory_kill_test.cpp
+    unit/gameplay/enemies_archetype_test.cpp
+    unit/gameplay/gore_system_test.cpp
+    unit/gameplay/weapon_system_test.cpp
+    unit/gameplay/boss_phase23_test.cpp
+    unit/gameplay/simulation_tick_test.cpp
+    "${CMAKE_SOURCE_DIR}/gameplay/simulation_tick.cpp"
+    "${CMAKE_SOURCE_DIR}/gameplay/boss/god_machine/god_machine.cpp"
+    "${CMAKE_SOURCE_DIR}/gameplay/boss/logos/phase4_selector.cpp"
+    "${CMAKE_SOURCE_DIR}/gameplay/weapons/weapon_system.cpp"
+    "${CMAKE_SOURCE_DIR}/gameplay/combat/gore_system.cpp"
+    "${CMAKE_SOURCE_DIR}/gameplay/combat/encounter_director_bridge.cpp"
+    "${CMAKE_SOURCE_DIR}/gameplay/enemies/enemy_bt.cpp"
     "${CMAKE_SOURCE_DIR}/gameplay/movement/grapple.cpp"
     "${CMAKE_SOURCE_DIR}/gameplay/movement/blood_surf.cpp"
     "${CMAKE_SOURCE_DIR}/gameplay/combat/glory_kill.cpp"

@@ -128,10 +128,10 @@ These systems generate the Nine Inverted Circles. They are **arena-scale** — n
 | Wall kick | `gameplay/player/` | 22 | A |
 | Grapple hook | `gameplay/player/` | 22 | A |
 | Blood surf | `gameplay/player/` | 22 | A |
-| Weapon system (6 weapons + alt-fires) | `gameplay/weapons/` | 22 | A |
-| Hitscan hit detection | `gameplay/weapons/` | 22 | A |
-| Projectile system | `gameplay/weapons/` | 22 | A |
-| Melee hit detection | `gameplay/weapons/` | 22 | A |
+| Weapon system (6 weapons + alt-fires) | `gameplay/weapons/` | 23 | A |
+| Hitscan hit detection | `gameplay/weapons/` | 23 | A |
+| Projectile system | `gameplay/weapons/` | 23 | A |
+| Melee hit detection | `gameplay/weapons/` | 23 | A |
 | Gore & dismemberment | `gameplay/gore/` | 23 | A |
 | Limb entities (nav obstacles) | `gameplay/gore/` | 23 | A |
 | Blood decal placement | `gameplay/gore/` | 23 | A |

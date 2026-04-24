@@ -10,6 +10,10 @@
 # owner of all subsystems.
 add_library(greywater_runtime STATIC
     engine.cpp
+    playable_bootstrap.cpp
+    playable_scene_host.cpp
+    "${CMAKE_SOURCE_DIR}/editor/scene/authoring_scene_load.cpp"
+    "${CMAKE_SOURCE_DIR}/editor/scene/blockout_physics_sync.cpp"
 )
 
 target_include_directories(greywater_runtime PUBLIC

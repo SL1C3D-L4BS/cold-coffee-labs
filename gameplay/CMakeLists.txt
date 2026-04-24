@@ -5,6 +5,9 @@
 
 add_library(greywater_gameplay SHARED
     gameplay.cpp
+    simulation_tick.cpp
+    # Phase 23 — Sacrilege enemy archetypes (BT + combat sim).
+    enemies/enemy_bt.cpp
     # Phase 22 — Martyrdom skin: God Mode / Grace / Blasphemy-state side channels.
     martyrdom/grace_meter.cpp
     # Phase 21/22/23 — three-Act ticks (Story Bible — docs/11).
@@ -13,6 +16,7 @@ add_library(greywater_gameplay SHARED
     acts/iii/act_iii_unmaking.cpp
     # Phase 23 — Logos dual-ending selector (docs/07 §7b, ADR-0101).
     boss/logos/phase4_selector.cpp
+    boss/god_machine/god_machine.cpp
     # Part C §24 — Gameplay a11y WCAG 2.2 AA (ADR-0116).
     a11y/gameplay_a11y.cpp
     # Phase 21 W140 — Diegetic HUD model (ADR-0108).
@@ -23,8 +27,14 @@ add_library(greywater_gameplay SHARED
     movement/grapple.cpp
     movement/blood_surf.cpp
     combat/glory_kill.cpp
+    combat/gore_system.cpp
+    combat/encounter_director_bridge.cpp
+    weapons/weapon_system.cpp
 )
-target_link_libraries(greywater_gameplay PRIVATE greywater::core)
+target_link_libraries(greywater_gameplay PRIVATE
+    greywater::core
+    greywater::gameai
+)
 
 # Export symbols for the loader on Windows without a .def file.
 set_target_properties(greywater_gameplay PROPERTIES

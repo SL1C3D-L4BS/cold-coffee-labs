@@ -136,3 +136,12 @@ TEST_CASE("mod_loader: hot-reload calls on_load again after dylib mtime change")
     clear_load_stamp_env();
     std::filesystem::remove(stamp_path, ec);
 }
+
+TEST_CASE("mod_sdk: mods_dir lives under GW_MOD_BUILD (week 161 LTS manifest host)") {
+    const auto d = mods_dir();
+    CHECK(d.filename() == "mods");
+    std::error_code ec;
+    if (std::filesystem::exists(d, ec)) {
+        CHECK(std::filesystem::is_directory(d, ec));
+    }
+}

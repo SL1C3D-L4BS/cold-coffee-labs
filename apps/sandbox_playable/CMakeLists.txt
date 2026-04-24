@@ -5,7 +5,9 @@
 # settings binder write, and idle ticks. Emits a grep-friendly summary so
 # CI (`playable-sandbox` test) can gate on it.
 
-add_executable(sandbox_playable main.cpp)
+add_executable(sandbox_playable
+    main.cpp
+)
 
 target_link_libraries(sandbox_playable
     PRIVATE
@@ -15,6 +17,12 @@ target_link_libraries(sandbox_playable
 target_include_directories(sandbox_playable PRIVATE
     "${CMAKE_SOURCE_DIR}"
 )
+
+if(TARGET glm::glm)
+    target_link_libraries(sandbox_playable PRIVATE glm::glm)
+elseif(TARGET glm)
+    target_link_libraries(sandbox_playable PRIVATE glm)
+endif()
 
 set_target_properties(sandbox_playable PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"

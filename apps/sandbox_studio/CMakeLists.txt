@@ -22,6 +22,7 @@ target_sources(sandbox_studio PRIVATE
     "${CMAKE_SOURCE_DIR}/editor/seq/seq_gwseq_rebuild.cpp"
     "${CMAKE_SOURCE_DIR}/editor/undo/command_stack.cpp"
     "${CMAKE_SOURCE_DIR}/editor/selection/selection_context.cpp"
+    "${CMAKE_SOURCE_DIR}/editor/scene/authoring_scene_load.cpp"
 )
 target_include_directories(sandbox_studio PRIVATE
     ${CMAKE_SOURCE_DIR}

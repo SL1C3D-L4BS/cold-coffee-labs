@@ -96,6 +96,8 @@ add_executable(gw_editor
     viewport/debug_draw.cpp
     viewport/gizmo_system.cpp
     scene/transform_system.cpp
+    scene/authoring_scene_load.cpp
+    scene/blockout_physics_sync.cpp
     vscript/vscript_panel.cpp
     selection/selection_context.cpp
     reflect/widget_drawer.cpp
@@ -170,6 +172,7 @@ target_link_libraries(gw_editor PRIVATE
     greywater::material
     engine_render
     greywater::world
+    greywater::physics
     greywater::audio
     greywater::render_post
     greywater::render_decals

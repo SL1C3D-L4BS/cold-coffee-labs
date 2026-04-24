@@ -63,6 +63,8 @@ bool GameplayHost::load_dll() {
         lib->find_symbol("gw_gameplay_update"));
     gameplay_shutdown_ = reinterpret_cast<GwGameplayShutdownFn>(
         lib->find_symbol("gw_gameplay_shutdown"));
+    gameplay_bind_world_ = reinterpret_cast<GwGameplayBindWorldFn>(
+        lib->find_symbol("gameplay_bind_ecs_world"));
 
     if (!(gameplay_init_ && gameplay_update_ && gameplay_shutdown_)) {
         return false;  // unique_ptr destructor closes the library cleanly
@@ -75,9 +77,10 @@ bool GameplayHost::load_dll() {
 void GameplayHost::unload_dll() {
     if (lib_handle_) {
         lib_handle_.reset();  // DynamicLibrary dtor closes the OS handle
-        gameplay_init_     = nullptr;
-        gameplay_update_   = nullptr;
-        gameplay_shutdown_ = nullptr;
+        gameplay_init_       = nullptr;
+        gameplay_update_     = nullptr;
+        gameplay_shutdown_   = nullptr;
+        gameplay_bind_world_ = nullptr;
     }
 }
 
@@ -127,6 +130,7 @@ bool GameplayHost::enter_play(GameplayContext& ctx) {
 
     live_ctx_ = &ctx;
     if (gameplay_init_) gameplay_init_(&ctx);
+    if (gameplay_bind_world_) gameplay_bind_world_(world);
     state_ = PIEState::Playing;
     return true;
 }
@@ -142,6 +146,7 @@ void GameplayHost::resume() {
 void GameplayHost::stop(GameplayContext& ctx) {
     if (state_ == PIEState::Editor) return;
 
+    if (gameplay_bind_world_) gameplay_bind_world_(nullptr);
     if (gameplay_shutdown_) gameplay_shutdown_();
     unload_dll();
     state_     = PIEState::Editor;
@@ -196,6 +201,9 @@ void GameplayHost::reload_if_changed() {
     }
     if (live_ctx_ && gameplay_init_) {
         gameplay_init_(live_ctx_);
+        if (gameplay_bind_world_ && live_ctx_->world) {
+            gameplay_bind_world_(live_ctx_->world);
+        }
     }
 }
 

@@ -1,4 +1,8 @@
 // tools/cook/content_signing.cpp — Part C §22 scaffold.
+//
+// Release runtime verification lives in `engine/assets/cook_trust.cpp`
+// (`verify_cooked_manifest_ed25519`). When signing is implemented, sign the
+// exact serialized manifest bytes the runtime will verify (same domain as ADR-0096).
 
 #include "tools/cook/content_signing.hpp"
 

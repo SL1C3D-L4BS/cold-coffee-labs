@@ -5,6 +5,7 @@ add_library(gw_assets STATIC)
 
 target_sources(gw_assets
     PRIVATE
+        cook_trust.cpp
         image_decode_rgba8.cpp
         asset_db.cpp
         asset_loader.cpp
@@ -28,6 +29,7 @@ target_include_directories(gw_assets
 # Private includes: third-party headers not part of the public ABI.
 target_include_directories(gw_assets
     PRIVATE
+        "${orlp_ed25519_SOURCE_DIR}/src"
         "${CMAKE_BINARY_DIR}/_deps/volk-src"
         "${CMAKE_BINARY_DIR}/_deps/VulkanMemoryAllocator-src/include"
         "${CMAKE_BINARY_DIR}/_deps/basisu-src"
@@ -39,6 +41,7 @@ target_link_libraries(gw_assets
     PUBLIC
         greywater::core
     PRIVATE
+        gw_orlp_ed25519
         volk
         VulkanMemoryAllocator
         fastgltf

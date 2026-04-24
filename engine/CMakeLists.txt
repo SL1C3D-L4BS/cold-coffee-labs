@@ -120,6 +120,8 @@ target_include_directories(greywater_core PUBLIC
 
 target_sources(greywater_core
     PRIVATE
+        play/playable_paths.cpp
+        play/play_bootstrap_cvars.cpp
         core/version.cpp
         core/log.cpp
         core/assert.cpp
@@ -133,6 +135,7 @@ target_sources(greywater_core
         platform/fs.cpp
         platform/dll.cpp
         platform/file_watch.cpp
+        platform/process.cpp
         memory/frame_allocator.cpp
         memory/arena_allocator.cpp
         memory/pool_allocator.cpp
@@ -159,6 +162,7 @@ target_sources(greywater_core
             platform/fs.hpp
             platform/dll.hpp
             platform/file_watch.hpp
+            platform/process.hpp
             memory/frame_allocator.hpp
             memory/arena_allocator.hpp
             memory/pool_allocator.hpp

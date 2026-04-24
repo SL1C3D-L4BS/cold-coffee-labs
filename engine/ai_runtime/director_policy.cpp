@@ -36,6 +36,7 @@ DirectorState step_state_machine(const DirectorPolicyInput& in) noexcept {
 
 DirectorPolicyOutput evaluate_director(const DirectorPolicyInput& input,
                                        std::uint64_t /*seed*/) noexcept {
+    (void)input.logical_tick; // wired for replay / MP hash stability; policy is rule-based today.
     DirectorPolicyOutput out{};
     out.next_state = step_state_machine(input);
 

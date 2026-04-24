@@ -1,18 +1,15 @@
 // runtime/main.cpp — Phase 11 Wave 11F (ADR-0029).
 //
-// Minimal CLI: recognises --self-test (bounded headless run, exits with 0
-// on full boot + tick loop), --deterministic (force null backends + pinned
-// seed), --frames=N, --width=N, --height=N, --locale=TAG.
-//
-// Everything gameplay-side (scenes, levels, networking) arrives in later
-// phases; Phase 11 proves the runtime boots cleanly and ticks the event /
-// CVar / UI / console / audio / input wiring.
+// CLI: --self-test, --deterministic, --frames=N, viewport/locale, plus playable
+// bootstrap: --scene=, --seed=, --cvars-toml= (and GW_PLAY_SCENE / GW_UNIVERSE_SEED /
+// GW_CVARS_TOML). Optional scene load uses the same authoring codec as the editor.
 
 #include "engine/core/version.hpp"
 #include "runtime/engine.hpp"
+#include "runtime/playable_bootstrap.hpp"
+#include "runtime/playable_scene_host.hpp"
 
 #include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <string_view>
@@ -38,6 +35,9 @@ void print_usage(const char* argv0) {
         "  --frames=N                  Frames to tick in self-test (default 120)\n"
         "  --width=N  --height=N       Initial virtual viewport\n"
         "  --locale=TAG                BCP-47 tag (default en-US)\n"
+        "  --scene=PATH                Load authoring .gwscene after boot\n"
+        "  --seed=N                    Universe / rng.seed (optional)\n"
+        "  --cvars-toml=PATH         Merge TOML into CVar registry (optional)\n"
         "  --help                      Show this message\n",
         gw::core::version_string(), argv0);
 }
@@ -45,6 +45,9 @@ void print_usage(const char* argv0) {
 } // namespace
 
 int main(int argc, char** argv) {
+    gw::runtime::PlayableCliOptions play{};
+    gw::runtime::parse_playable_cli(argc, argv, play);
+
     gw::runtime::EngineConfig cfg{};
     bool self_test = false;
 
@@ -57,6 +60,9 @@ int main(int argc, char** argv) {
         if (starts_with(a, "--width="))  { cfg.width_px  = parse_u32(a.substr(8), cfg.width_px); continue; }
         if (starts_with(a, "--height=")) { cfg.height_px = parse_u32(a.substr(9), cfg.height_px); continue; }
         if (starts_with(a, "--locale=")) { cfg.locale = std::string{a.substr(9)}; continue; }
+        if (starts_with(a, "--scene="))   { continue; }
+        if (starts_with(a, "--seed="))    { continue; }
+        if (starts_with(a, "--cvars-toml=")) { continue; }
         std::fprintf(stderr, "[runtime] unknown argument: %.*s\n",
                      static_cast<int>(a.size()), a.data());
         print_usage(argv[0]);
@@ -68,6 +74,21 @@ int main(int argc, char** argv) {
 
     try {
         gw::runtime::Engine engine{cfg};
+        gw::runtime::apply_playable_bootstrap(engine, play);
+
+        if (!play.scene_path.empty()) {
+            gw::runtime::PlayableSceneLoadSummary sum{};
+            if (!gw::runtime::load_authoring_scene_into_physics(engine, play.scene_path, sum)) {
+                std::fprintf(stderr, "[runtime] SCENE LOAD FAILED path=%s\n",
+                             play.scene_path.c_str());
+                return 3;
+            }
+            std::fprintf(stdout,
+                         "[runtime] SCENE LOAD OK path=%s entities=%u blockout_bodies=%u\n",
+                         play.scene_path.c_str(),
+                         static_cast<unsigned>(sum.entities),
+                         static_cast<unsigned>(sum.blockout_bodies));
+        }
 
         if (self_test) {
             engine.run_frames(cfg.self_test_frames);
@@ -75,9 +96,6 @@ int main(int argc, char** argv) {
             return 0;
         }
 
-        // Non-self-test path: run a bounded loop until quit is requested.
-        // Gameplay path / window / render pump live in Phase 12+. For now
-        // we run indefinitely but still respect a --frames cap for smoke.
         const std::uint32_t frames = cfg.self_test_frames ? cfg.self_test_frames : 600;
         engine.run_frames(frames);
     } catch (const std::exception& ex) {

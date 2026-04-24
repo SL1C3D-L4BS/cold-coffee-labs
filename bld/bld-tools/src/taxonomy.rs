@@ -1,5 +1,6 @@
-//! The Phase 9 tool taxonomy — 79 stub tools across 13 categories, plus
-//! 5 `seq.*` tools when built with the `seq-tools` feature (Phase 18-B).
+//! The Phase 9 tool taxonomy — 86 stub tools across 14 categories (includes
+//! seven `sacrilege.*` descriptor stubs), plus 5 `seq.*` tools when built with
+//! the `seq-tools` feature (Phase 18-B).
 //!
 //! This file registers descriptors for every tool BLD exposes. The
 //! bodies are the concern of Wave 9B–9D; this wave ensures the registry,
@@ -28,8 +29,9 @@
 //! | `rag.*`      |    3  | Read                        |
 //! | `agent.*`    |    6  | Mutate                      |
 //! | `editor.*`   |    8  | Mutate                      |
+//! | `sacrilege.*`|    7  | Read / Mutate (ADR-0109)    |
 //! | `seq.*`      |    5  | Read / Mutate (18-B)         |
-//! | **Total**    | **84** (with `seq-tools`; else **79**)      |
+//! | **Total**    | **91** (with `seq-tools`; else **86**)      |
 //!
 //! If this table is out of sync with the descriptors, the
 //! `taxonomy_count_matches` unit test fails.
@@ -193,9 +195,10 @@ mod tests {
 
     #[test]
     fn taxonomy_count_matches() {
-        // 78 entries in this file + `project.list_scenes` in lib.rs = 79 stubs.
+        // 78 entries in this file + `project.list_scenes` in lib.rs + seven
+        // `sacrilege.*` in `sacrilege_tools.rs` = 86 stubs.
         // With `--features seq-tools`, five `seq.*` `#[bld_tool]`s add to that.
-        let expected = if cfg!(feature = "seq-tools") { 84 } else { 79 };
+        let expected = if cfg!(feature = "seq-tools") { 91 } else { 86 };
         let ids: Vec<_> = registry::all().map(|d| d.id).collect();
         assert_eq!(
             ids.len(),
@@ -219,7 +222,7 @@ mod tests {
         const VALID: &[&str] = &[
             "scene.", "component.", "asset.", "code.", "vscript.",
             "build.", "runtime.", "project.", "debug.", "docs.",
-            "rag.", "agent.", "editor.", "seq.",
+            "rag.", "agent.", "editor.", "sacrilege.", "seq.",
         ];
         for d in registry::all() {
             assert!(

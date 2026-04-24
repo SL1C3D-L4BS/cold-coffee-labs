@@ -50,7 +50,14 @@ void StatsPanel::on_imgui_render(EditorContext& ctx) {
         ImGui::TextColored(gw::editor::theme::active_positive_imgui(),
                            "FPS  %6.1f", s.fps);
         ImGui::SameLine();
-        ImGui::TextDisabled(" |  %.2f ms", s.cpu_ms);
+        ImGui::TextDisabled(" |  %.2f ms CPU", s.cpu_ms);
+        ImGui::SameLine();
+        if (ctx.framegraph_gpu_ms > 0.f) {
+            ImGui::TextDisabled(" |  %.2f ms GPU (scene→post, editor CB)",
+                                 ctx.framegraph_gpu_ms);
+        } else {
+            ImGui::TextDisabled(" |  GPU (scene→post) —");
+        }
 
         const ImVec2 plot_size{-1.f, 48.f};
         char overlay[32]; std::snprintf(overlay, sizeof(overlay),
@@ -80,6 +87,10 @@ void StatsPanel::on_imgui_render(EditorContext& ctx) {
         ImGui::Checkbox("Bounds",        &d.draw_bounds);        ImGui::SameLine();
         ImGui::Checkbox("Light volumes", &d.draw_light_volumes);
         ImGui::Checkbox("Freeze culling", &d.freeze_culling);
+
+        ImGui::Separator();
+        ImGui::TextDisabled("Perf budgets (unified overlay — plan week 159)");
+        ImGui::BulletText("Hell Frame / director / AI: see gw_perf_gate_* when wired");
     } else {
         ImGui::TextDisabled("No RenderSettings bound");
     }

@@ -36,6 +36,7 @@
             "name": "release-win",
             "inherits": "dev-win",
             "displayName": "Release Windows",
+            "description": "NDEBUG + cook_trust Ed25519 paths. Requires clang-cl on PATH (LLVM VS workload or install); match CI windows-latest.",
             "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
         },
         {

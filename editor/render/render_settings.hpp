@@ -11,6 +11,8 @@
 // so PIE snapshots + `.gwscene` save can roll it in without ceremony once
 // Phase-8 lands the scene-level settings record.
 
+#include "engine/render/authoring_lighting.hpp"
+
 #include <array>
 #include <cstdint>
 
@@ -62,26 +64,8 @@ struct LuminanceHistogram {
     std::array<float, kBucketCount> buckets{};
 };
 
-// -----------------------------------------------------------------------
-// LightingParams — ambient colour + a fixed-count of dynamic lights.
-// The cockpit's "light" panel cycles through `lights[]` via an int
-// index; `light_count` caps the iterated subset.
-// -----------------------------------------------------------------------
-struct DynamicLight {
-    float color[3]    = {1.f, 1.f, 1.f};
-    float intensity   = 1.0f;
-    float position[3] = {0.f, 3.f, 0.f};
-    float range       = 10.0f;
-    bool  enabled     = true;
-};
-
-struct LightingParams {
-    float ambient_color[3] = {0.56f, 0.65f, 0.90f};  // image's blue sky tint
-    float ambient_intensity = 0.25f;
-    int   active_light      = 0;                      // UI "light N" selector
-    int   light_count       = 2;
-    std::array<DynamicLight, 8> lights{};
-};
+using DynamicLight   = gw::render::authoring::DynamicLight;
+using LightingParams = gw::render::authoring::LightingParams;
 
 // -----------------------------------------------------------------------
 // DebugToggles — viewport/debug-draw switches exposed in the stats panel.
@@ -103,7 +87,8 @@ struct DebugToggles {
 struct FrameStats {
     float fps              = 0.f;
     float cpu_ms           = 0.f;    // time this frame spent on the CPU
-    float gpu_ms           = 0.f;    // reserved for when the renderer fills it
+    /// Vulkan timestamp span scene pass → post/ImGui (editor CB), not full frame-graph yet.
+    float gpu_ms = 0.f;
     std::uint64_t frame_id = 0;
 
     static constexpr std::size_t kHistoryCount = 128;

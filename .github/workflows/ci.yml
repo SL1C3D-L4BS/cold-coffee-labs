@@ -3,6 +3,11 @@ name: ci
 # Greywater CI matrix — the required-check set on main.
 # {windows-latest, ubuntu-latest} × {Debug, Release}.
 # docs/02_ROADMAP_AND_OPERATIONS.md week 003; docs/01_CONSTITUTION_AND_PROGRAM.md §2.2.
+#
+# Phase 24 weeks 155–162 regression matrix: pair this workflow with
+# determinism.yml, fuzz.yml, sanitizers.yml, steam_deck.yml, agentshield.yml;
+# run sandboxes (director_budgets, living_sandbox, god_machine_rc) per docs/02
+# as they are wired into scheduled jobs.
 
 on:
   push:
@@ -170,7 +175,8 @@ jobs:
           # Release CTest smoke: catches tests that only fail under -O2/NDEBUG
           # (UB, ODR, asserts compiled out, constexpr divergence). Keeps the full
           # test matrix in Debug for speed; Release only re-runs the same cases
-          # against the Release binaries built above.
+          # against the Release binaries built above. Includes `cook_trust` NDEBUG
+          # paths (Ed25519 verify + smoke vector); filter locally: ctest -R cook_trust
           ctest --preset ${{ matrix.preset_release }} --output-on-failure
         continue-on-error: false
 

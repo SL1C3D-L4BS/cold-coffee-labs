@@ -53,6 +53,24 @@ CPMAddPackage(
     GIT_TAG          v2.4.11
 )
 
+# --- orlp/ed25519 (Phase 24 — cook_trust verify, ADR-0096 / ADR-0115) ----------
+CPMAddPackage(
+    NAME              orlp_ed25519
+    GITHUB_REPOSITORY orlp/ed25519
+    GIT_TAG           b1f19fab4aebe607805620d25a5e42566ce46a0e
+    DOWNLOAD_ONLY     YES
+)
+file(GLOB GW_ORLP_ED25519_SOURCES CONFIGURE_DEPENDS
+    "${orlp_ed25519_SOURCE_DIR}/src/*.c")
+add_library(gw_orlp_ed25519 STATIC ${GW_ORLP_ED25519_SOURCES})
+target_include_directories(gw_orlp_ed25519 PUBLIC
+    "${orlp_ed25519_SOURCE_DIR}/src")
+if(MSVC)
+    target_compile_options(gw_orlp_ed25519 PRIVATE /W0)
+else()
+    target_compile_options(gw_orlp_ed25519 PRIVATE -w)
+endif()
+
 # --- Vulkan-Headers (always download for consistency) --------------------
 CPMAddPackage(
     NAME Vulkan-Headers

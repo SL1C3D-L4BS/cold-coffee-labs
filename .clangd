@@ -3,6 +3,12 @@
 # After `cmake --preset dev-win` (or dev-linux), root CMake mirrors
 # build/<preset>/compile_commands.json → ./compile_commands.json (gitignored).
 #
+# Cursor/VS Code: `.vscode/settings.json` sets `--compile-commands-dir=${workspaceFolder}`
+# so clangd resolves this repo even when the editor's CWD is not the tree root.
+#
+# NOTE: `${workspaceFolder}` is NOT expanded inside this file — do not put it in -I flags
+# (it becomes a bogus path and can break <glm/...> resolution).
+#
 # IDE often runs WarningsAsErrors='*' for clang-tidy, which floods the Problems
 # panel with style findings. Strip tidy from clangd entirely; CI still runs tidy.
 ---
@@ -16,36 +22,35 @@ Diagnostics:
 If:
   PathMatch: .*
 CompileFlags:
-  # Mirrored by CMake from build/<preset>/compile_commands.json (see root CMakeLists.txt).
   CompilationDatabase: .
   Add:
     - -std=c++23
     - -I.
     - -Ieditor
     - -Ibld
-    # FetchContent deps (preset build dirs — keep in sync after CMake configure)
+    # FetchContent deps (preset build dirs — configure once per checkout)
     - -Ibuild/dev-win/_deps/glm-src
     - -Ibuild/dev-linux/_deps/glm-src
     - -Ibuild/dev-win/_deps/doctest-src
     - -Ibuild/dev-linux/_deps/doctest-src
     - -Ibuild/dev-win/_deps/volk-src
     - -Ibuild/dev-linux/_deps/volk-src
-    # `${workspaceFolder}` helps clangd when the CWD for relative `-Ibuild/...` is not the repo root.
-    - -I${workspaceFolder}/build/dev-win/_deps/volk-src
-    - -I${workspaceFolder}/build/dev-linux/_deps/volk-src
     - -Ibuild/dev-win/_deps/vulkan-headers-src/include
     - -Ibuild/dev-linux/_deps/vulkan-headers-src/include
-    - -I${workspaceFolder}/build/dev-win/_deps/vulkan-headers-src/include
-    - -I${workspaceFolder}/build/dev-linux/_deps/vulkan-headers-src/include
     - -Ibuild/dev-win/_deps/vulkanmemoryallocator-src/include
     - -Ibuild/dev-linux/_deps/vulkanmemoryallocator-src/include
-    - -I${workspaceFolder}/build/dev-win/_deps/vulkanmemoryallocator-src/include
-    - -I${workspaceFolder}/build/dev-linux/_deps/vulkanmemoryallocator-src/include
-    # Generated engine headers (version.generated.hpp) — same layout as preset binaryDir.
+    # Generated engine headers (version.generated.hpp)
     - -Ibuild/dev-win/engine/gen
     - -Ibuild/dev-linux/engine/gen
-    - -I${workspaceFolder}/build/dev-win/engine/gen
-    - -I${workspaceFolder}/build/dev-linux/engine/gen
+
+---
+# gameai + enemy headers: extra GLM -I merge when the inferred TU lacks FetchContent paths.
+If:
+  PathMatch: 'engine/gameai/.*|gameplay/enemies/.*'
+CompileFlags:
+  Add:
+    - -Ibuild/dev-win/_deps/glm-src
+    - -Ibuild/dev-linux/_deps/glm-src
 
 ---
 # `sandbox_studio` compile definitions normally come from CMake; mirror them for TU-only analysis.

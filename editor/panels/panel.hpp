@@ -34,6 +34,8 @@ struct EditorContext {
     gw::ecs::World*            world        = nullptr;
     gw::assets::AssetDatabase* asset_db     = nullptr;
     float                      delta_time_s = 0.f;
+    /// Editor Vulkan timestamps: scene pass → post/ImGui (not full shared frame graph).
+    float                      framegraph_gpu_ms = 0.f;
     bool                       in_pie       = false;
     /// Phase 18-B — optional; nullptr in headless tests.
     gw::seq::SequencerWorld*          sequencer          = nullptr;

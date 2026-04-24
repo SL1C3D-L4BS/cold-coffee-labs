@@ -4,6 +4,9 @@
 // Phase 10 ships the interface + a null provider + a stub voxel-grid
 // provider. Phase 12 replaces the grid provider with a Jolt raycast-based
 // implementation without touching this file.
+//
+// Audio-only: this models listener↔emitter occlusion for propagation. It is
+// not a substitute for render visibility (GPU culling, clusters, streaming).
 
 #include "engine/audio/audio_types.hpp"
 

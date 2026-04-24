@@ -28,6 +28,7 @@ IntensityState from_gw(ai_runtime::DirectorState s) noexcept {
 
 DirectorResult evaluate(const DirectorRequest& req) noexcept {
     ai_runtime::DirectorPolicyInput in{};
+    in.logical_tick          = req.logical_tick;
     in.player_health_ratio   = req.player_health_ratio;
     in.recent_damage_taken   = req.recent_damage_taken;
     in.recent_kills_per_sec  = req.recent_kps;

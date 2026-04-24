@@ -1,5 +1,4 @@
 #include "submit.hpp"
-#include "engine/core/assert.hpp"
 #include <expected>
 
 namespace gw::render::frame_graph {
@@ -291,46 +290,22 @@ Result<std::vector<QueueSubmission>> MultiQueueScheduler::build_submissions(
     const std::vector<PassData>& passes,
     const std::vector<PassHandle>& execution_order,
     const std::vector<PassBarriers>& barriers) {
-    
-    std::vector<QueueSubmission> submissions;
-    submissions.reserve(execution_order.size());
-    
-    for (size_t i = 0; i < execution_order.size(); ++i) {
-        PassHandle pass_handle = execution_order[i];
-        const auto& pass = passes[pass_handle];
-        [[maybe_unused]] const auto& pass_barriers = barriers[i];
-        
-        QueueSubmission submission(pass.desc.queue);
+    (void)passes;
+    (void)barriers;
 
-        // Get timeline semaphore for this queue
-        auto timeline_result = timeline_manager_->get_timeline_semaphore(pass.desc.queue);
-        if (!timeline_result) {
-            return std::unexpected(timeline_result.error());
-        }
-
-        // Set timeline values: wait on the most recent prior signal value
-        // (pure read), then reserve exactly one new value for this submission.
-        submission.wait_timeline_value   = timeline_manager_->current_value(pass.desc.queue);
-        submission.signal_timeline_value = timeline_manager_->reserve_next_signal_value(pass.desc.queue);
-
-        // Add timeline semaphore to wait/signal lists
-        submission.wait_semaphores.push_back(timeline_result.value());
-        submission.wait_values.push_back(submission.wait_timeline_value);
-        submission.signal_semaphores.push_back(timeline_result.value());
-        submission.signal_values.push_back(submission.signal_timeline_value);
-        
-        // P20-FRAMEGRAPH-CMDBUF: create_command_buffer_for_pass requires the
-        // per-pass command recorder + barrier emitter that Phase 20 hardening
-        // brings online. Until that lands, rather than pushing a submission
-        // with a null command buffer, the pass stubs out loudly.
-        GW_UNIMPLEMENTED("P20-FRAMEGRAPH-CMDBUF",
-                         "per-pass command buffer creation pending Phase 20 hardening");
-        // submission.command_buffer = create_command_buffer_for_pass(pass_handle, pass_barriers);
-
-        submissions.push_back(std::move(submission));
+    // ADR-0063 / P20-FRAMEGRAPH-CMDBUF: recording real per-pass command buffers
+    // into these submissions requires the render-context command pool path wired
+    // through execute(). Until then, refuse multi-queue scheduling for non-empty
+    // graphs with a structured error instead of GW_UNIMPLEMENTED (process abort).
+    if (!execution_order.empty()) {
+        return std::unexpected(FrameGraphError{
+            FrameGraphErrorType::CompilationFailed,
+            "P20-FRAMEGRAPH-CMDBUF: multi-queue schedule requires per-pass Vulkan "
+            "command buffers; use single-queue FrameGraph::execute() or complete "
+            "ADR-0063 recording"});
     }
-    
-    return submissions;
+
+    return std::vector<QueueSubmission>{};
 }
 
 Result<std::monostate> MultiQueueScheduler::add_cross_queue_dependencies(

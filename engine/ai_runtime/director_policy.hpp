@@ -15,6 +15,7 @@ enum class DirectorState : std::uint8_t {
 };
 
 struct DirectorPolicyInput {
+    std::uint64_t logical_tick   = 0;
     float  player_health_ratio   = 1.f;
     float  recent_damage_taken   = 0.f;
     float  recent_kills_per_sec  = 0.f;

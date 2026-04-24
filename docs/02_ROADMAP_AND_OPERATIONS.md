@@ -34,7 +34,7 @@
 | 20 | **GPTM, Nine Circles Geometry, Floating Origin** | 127–134 | 8w | *Nine Circles Ground* | ✅ Complete |
 | 21 | **Hell Frame & Narrative Skin** | 135–142 | 8w | *Hell Frame* | ✅ Complete |
 | 22 | **Martyrdom & God Mode** | 143–148 | 6w | *Martyrdom Online* | ✅ Complete |
-| 23 | **Damned Host, Encounters, God Machine + Logos** | 149–154 | 6w | *God Machine RC* | 🔜 Planned |
+| 23 | **Damned Host, Encounters, God Machine + Logos** | 149–154 | 6w | *God Machine RC* | ✅ Complete |
 | 24 | Hardening & Release (**Sacrilege ships**) | 155–162 | 8w | *Release Candidate* | 🔜 Planned |
 | 25 | LTS Sustenance | 163–∞ | Ongoing | Quarterly LTS | 🔜 Ongoing |
 | 26 | **Runtime AI Stack** (ai_runtime, hybrid Director, symbolic music) | parallel 135–162 | 8w | *Living Director* | 🔜 Planned |
@@ -44,9 +44,9 @@
 
 ---
 
-## Active Phase: Phase 23 — Damned Host, Encounters, God Machine + Logos
+## Active Phase: Phase 24 — Hardening & Release
 
-*Phases 20–22 landed on `pivot/phase-21-22-execution`. See §Retrospectives below.*
+*Phase 23 (*God Machine RC*) is complete — see §Completed Phase: Phase 23 below. Prior pivot work: phases 20–22 on `pivot/phase-21-22-execution`.*
 
 ## Completed Phase: Phase 20 — GPTM, Nine Circles Geometry, Floating Origin
 
@@ -129,7 +129,7 @@
 
 ---
 
-## Upcoming Phase: Phase 23 — Damned Host, Encounters, God Machine + Logos
+## Completed Phase: Phase 23 — Damned Host, Encounters, God Machine + Logos
 
 *The phase that makes Sacrilege a game, not a tech demo — and adds the Grace finale (Logos alternate Phase 4).* 
 
@@ -144,6 +144,12 @@
 | 153 | God Machine boss: 4 phases, arena collapse, Martyrdom economy gating; **Logos alternate Phase 4** — Silent God speaks with player's own voice from Sin-signature data; **Grace meter** unlocks in Act III | A |
 | 154 | *God Machine RC* exit gate: Circle IX (**The Silentium / Throne of the Logos** skin) end-to-end playable; God Machine defeatable by damage **and** Logos defeatable by Grace (`forgive` Blasphemy); editor **AI Director Sandbox** + **Editor Copilot** panels land | A |
 
+### Phase 23 retrospective
+
+- **Landed:** `gameplay/enemies/` (eight archetypes + shared BT), `gameplay/combat/gore_system` with `gore_service` delegation, `encounter_director_bridge` → `director::evaluate`, `gameplay/weapons/` six-weapon runtime, `gameplay/boss/god_machine` + Logos Phase 4 / Grace hooks, `apps/sandbox_god_machine_rc` exit banner + CTest gate, Sacrilege **AI Director Sandbox** and **Editor Copilot** panels (ImGui).
+- **Shift:** multi-queue `FrameGraph` scheduling had a `GW_UNIMPLEMENTED` abort in `submit.cpp` when any pass was scheduled; Phase 23 closes this with a **structured `CompilationFailed`** error (`P20-FRAMEGRAPH-CMDBUF`) and unit tests — use single-queue `execute()` until per-pass command recording ships under ADR-0063.
+- **Preflight:** `pre-eng-ai-runtime-dispatch` — `director_service`, `audio_weave`, and `material_forge` already include and call `engine/ai_runtime`; runtime AI budget scaffold **`gw_perf_gate_director`** (`tests/perf/director_budgets_perf_test.cpp`, CTest `director_budgets_perf`) passes under default (non-strict) CI settings.
+
 ---
 
 ## Phase 24 — Hardening & Release
@@ -157,6 +163,26 @@
 | 160 | 4-client co-op session stable 15+ min; voice chat works; gameplay_replay capture (< 1 MB per run) round-trips deterministically | B |
 | 161 | Engineering handbook, LTS runbook, onboarding guide, Mod SDK docs — all indexable by BLD | A |
 | 162 | *Release Candidate* — all 9 Circles completable; God Machine defeatable; Logos defeatable by Grace; 10-min demo; **Sacrilege ships** | A |
+
+### Phase 24 engineering checklist (weeks 155–162)
+
+Use this as the **repo-local execution surface** for the week table above (CI + focused tests). Full program work (installers, 4-client soak, handbook) stays in Linear/cards; these items are the merge gates we can verify in-tree.
+
+| Weeks | Repo / CI signal |
+|------|-------------------|
+| 155–156 | `.github/workflows/ci.yml` matrix (Debug + Release on Ubuntu + Windows); `determinism.yml`, `fuzz.yml`, `sanitizers.yml`, `steam_deck.yml`, `agentshield.yml` green on schedule; `ctest --preset dev-win` / `dev-linux` full monolith. |
+| 157 | WCAG / a11y acceptance in editor + gameplay (manual QA); code: `photosensitivity_warn_ack_` path in editor (Phase 24 week 157). |
+| 158 | Release `NDEBUG`: `cmake --preset release-win` / `release-linux`, `ctest` on Release build; `engine/assets/cook_trust` + `tools/cook/content_signing` alignment per ADR-0096. |
+| 159 | BLD tool surface + RAG asset (tracked separately in `bld/`). |
+| 160 | `gameplay_replay` + director tests; net stack soak (manual / perf job). |
+| 161 | Docs index + LTS runbook (`docs/` + onboarding — card-driven). |
+| 162 | RC exit: `sandbox_god_machine_rc` (or successor RC gate), Steam Deck probe, 10-min demo script. |
+
+### After Phase 24 RC (Phases 25–29 entry)
+
+**Phase 25 (LTS):** quarterly sustenance on the shipped Phase 24 baseline — security/crash hotfixes, toolchain bumps, and `docs/02` Phase 25 row (ongoing).
+
+**Parallel franchise platform (26–29):** start from the week tables in this doc §Phase 26–29 — **26** Runtime AI (`engine/ai_runtime`, director perf gates), **27** franchise services contract tests, **28** cook-time ML pipelines, **29** second-IP prototypes. None of these block Sacrilege RC; they consume dedicated WIP slots per Kanban rules above.
 
 ---
 

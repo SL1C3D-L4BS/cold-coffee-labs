@@ -4,6 +4,7 @@
 #include <vector>
 #include <memory>
 #include <algorithm>
+#include <string>
 
 using namespace gw::render::frame_graph;
 
@@ -24,7 +25,7 @@ TEST_CASE("Frame Graph - Simple Two Pass Chain") {
     std::vector<ResourceHandle> pass1_writes = {color};
     PassDesc pass1("RenderPass");
     pass1.writes = pass1_writes;
-    pass1.execute = [](CommandBuffer& cmd) { /* Mock implementation */ };
+    pass1.execute = [](CommandBuffer& /*cmd*/) { /* Mock implementation */ };
     
     auto pass1_result = fg->add_pass(std::move(pass1));
     CHECK(pass1_result.has_value());
@@ -33,7 +34,7 @@ TEST_CASE("Frame Graph - Simple Two Pass Chain") {
     std::vector<ResourceHandle> pass2_reads = {color};
     PassDesc pass2("PostProcessPass");
     pass2.reads = pass2_reads;
-    pass2.execute = [](CommandBuffer& cmd) { /* Mock implementation */ };
+    pass2.execute = [](CommandBuffer& /*cmd*/) { /* Mock implementation */ };
     
     auto pass2_result = fg->add_pass(std::move(pass2));
     CHECK(pass2_result.has_value());
@@ -84,7 +85,7 @@ TEST_CASE("Frame Graph - Diamond Dependency") {
     PassDesc pass1("Pass1");
     pass1.reads = p1_reads;
     pass1.writes = p1_writes;
-    pass1.execute = [](CommandBuffer& cmd) {};
+    pass1.execute = [](CommandBuffer& /*cmd*/) {};
     
     // Pass 2: input -> temp (parallel with Pass1)
     std::vector<ResourceHandle> p2_reads = {input_res.value()};
@@ -92,7 +93,7 @@ TEST_CASE("Frame Graph - Diamond Dependency") {
     PassDesc pass2("Pass2");
     pass2.reads = p2_reads;
     pass2.writes = p2_writes;
-    pass2.execute = [](CommandBuffer& cmd) {};
+    pass2.execute = [](CommandBuffer& /*cmd*/) {};
     
     // Pass 3: temp -> output
     std::vector<ResourceHandle> p3_reads = {temp_res.value()};
@@ -100,7 +101,7 @@ TEST_CASE("Frame Graph - Diamond Dependency") {
     PassDesc pass3("Pass3");
     pass3.reads = p3_reads;
     pass3.writes = p3_writes;
-    pass3.execute = [](CommandBuffer& cmd) {};
+    pass3.execute = [](CommandBuffer& /*cmd*/) {};
     
     auto p1_handle = fg->add_pass(std::move(pass1));
     auto p2_handle = fg->add_pass(std::move(pass2));
@@ -148,7 +149,7 @@ TEST_CASE("Frame Graph - Cycle Detection") {
     PassDesc pass1("Pass1");
     pass1.reads = p1_reads;
     pass1.writes = p1_writes;
-    pass1.execute = [](CommandBuffer& cmd) {};
+    pass1.execute = [](CommandBuffer& /*cmd*/) {};
     
     // Pass 2: reads res1, writes res2 (creates cycle)
     std::vector<ResourceHandle> p2_reads = {res1.value()};
@@ -156,10 +157,10 @@ TEST_CASE("Frame Graph - Cycle Detection") {
     PassDesc pass2("Pass2");
     pass2.reads = p2_reads;
     pass2.writes = p2_writes;
-    pass2.execute = [](CommandBuffer& cmd) {};
+    pass2.execute = [](CommandBuffer& /*cmd*/) {};
     
-    fg->add_pass(std::move(pass1));
-    fg->add_pass(std::move(pass2));
+    CHECK(fg->add_pass(std::move(pass1)).has_value());
+    CHECK(fg->add_pass(std::move(pass2)).has_value());
     
     // Compile should fail with cycle error
     auto compile_result = fg->compile();
@@ -173,7 +174,7 @@ TEST_CASE("Frame Graph - Undeclared Resource Error") {
     std::vector<ResourceHandle> reads = {999};  // Invalid handle
     PassDesc pass("InvalidPass");
     pass.reads = reads;
-    pass.execute = [](CommandBuffer& cmd) {};
+    pass.execute = [](CommandBuffer& /*cmd*/) {};
     
     auto result = fg->add_pass(std::move(pass));
     CHECK(!result.has_value());
@@ -204,6 +205,30 @@ TEST_CASE("Frame Graph - Resource Declaration") {
     CHECK(buf_result.value() == 1);  // Second resource
 }
 
+TEST_CASE("Multi-queue scheduler - empty execution order schedules without error") {
+    MultiQueueScheduler sched(VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE);
+    std::vector<PassData> passes;
+    std::vector<PassHandle> order;
+    std::vector<PassBarriers> barriers;
+    auto r = sched.schedule(passes, order, barriers);
+    CHECK(r.has_value());
+    CHECK(r->submissions.empty());
+}
+
+TEST_CASE("Multi-queue scheduler - non-empty order returns P20-FRAMEGRAPH-CMDBUF error") {
+    MultiQueueScheduler sched(VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE);
+    PassDesc pd("solo");
+    pd.execute = [](CommandBuffer&) {};
+    std::vector<PassData> passes;
+    passes.emplace_back(PassData(std::move(pd)));
+    std::vector<PassHandle> order = {0};
+    std::vector<PassBarriers> barriers(order.size());
+    auto r = sched.schedule(passes, order, barriers);
+    CHECK(!r.has_value());
+    CHECK(r.error().type == FrameGraphErrorType::CompilationFailed);
+    CHECK(r.error().message.find("P20-FRAMEGRAPH-CMDBUF") != std::string::npos);
+}
+
 TEST_CASE("Frame Graph - Validation") {
     auto fg = std::make_unique<FrameGraph>();
     // Create valid resources and passes
@@ -219,9 +244,9 @@ TEST_CASE("Frame Graph - Validation") {
     std::vector<ResourceHandle> writes = {res.value()};
     PassDesc pass("ValidPass");
     pass.writes = writes;
-    pass.execute = [](CommandBuffer& cmd) {};
+    pass.execute = [](CommandBuffer& /*cmd*/) {};
     
-    fg->add_pass(std::move(pass));
+    CHECK(fg->add_pass(std::move(pass)).has_value());
     
     // Validation should succeed
     auto validation_result = fg->validate();

@@ -63,6 +63,8 @@ GW_EDITOR_API const char* gw_editor_command_stack_summary(uint32_t max_entries);
 // ---------------------------------------------------------------------------
 GW_EDITOR_API bool gw_editor_save_scene(const char* path);
 GW_EDITOR_API bool gw_editor_load_scene(const char* path);
+/// Relative (or as passed) UTF-8 path last successfully saved/loaded; may be empty.
+GW_EDITOR_API const char* gw_editor_active_scene_path();
 
 // ---------------------------------------------------------------------------
 // PIE
@@ -148,6 +150,15 @@ namespace gw::editor::bld_api {
         std::string                    seq_tool_last_json{};
         /// Entity carrying `SeqPlayerComponent` for BLD `seq.play` (see EditorApplication).
         std::uint64_t                  seq_player_entity_bits = 0;
+        /// Last scene path passed to save/load (UTF-8), for external runtime launch.
+        std::string                    active_scene_path_utf8{};
+        /// BLD → in-process PIE (`gw_editor_enter_play` / `gw_editor_stop`).
+        using PieHostContext   = void*;
+        using PieEnterPlayFn   = bool (*)(PieHostContext);
+        using PieStopPlayFn    = void (*)(PieHostContext);
+        PieEnterPlayFn pie_enter_play     = nullptr;
+        PieStopPlayFn  pie_stop_play      = nullptr;
+        PieHostContext pie_host_context   = nullptr;
     };
 
     // Defined in editor_bld_api.cpp; written once by EditorApplication.

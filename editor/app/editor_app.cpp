@@ -37,6 +37,10 @@
 #include "engine/ecs/hierarchy.hpp"
 #include "engine/scene/seq/seq_cut.hpp"
 #include "engine/scene/scene_file.hpp"
+#include "engine/platform/process.hpp"
+#include "engine/play/playable_paths.hpp"
+#include "engine/play/play_bootstrap_cvars.hpp"
+#include "engine/core/config/standard_cvars.hpp"
 #include "engine/scene/seq/sequencer_world.hpp"
 
 // Phase 21 wire-up: Sacrilege-specific authoring panels (pack.yml: pre-ed-sacrilege-panels).
@@ -107,7 +111,21 @@
 #include <string_view>
 #include <vector>
 
+static void touch_play_cvars_stub_file(const std::filesystem::path& abs) {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    fs::create_directories(abs.parent_path(), ec);
+    std::ofstream f(abs, std::ios::binary);
+    if (f) {
+        f << "# Editor play-from-here CVar snapshot (merged into `pie_bootstrap_cvars_` on "
+             "PIE sync; see `gw::play::apply_play_bootstrap_to_registry`).\n";
+    }
+}
+
 namespace gw::editor {
+
+bool editor_bld_pie_enter(void* ctx);
+void editor_bld_pie_stop(void* ctx);
 
 namespace {
 
@@ -243,6 +261,12 @@ struct EditorVulkanBackend {
     VkDescriptorSet          scene_imgui_ds    = VK_NULL_HANDLE;
     VkExtent2D               scene_extent      = {};
     VkFormat                 scene_format      = VK_FORMAT_R8G8B8A8_UNORM;
+
+    VkQueryPool              timestamp_query_pool = VK_NULL_HANDLE;
+    float                    gpu_timestamp_period_ns = 1.f;
+    float                    last_gpu_time_ms        = 0.f;
+    bool                     gpu_timestamps_enabled = false;
+    int                      gpu_timestamp_warmup_frames = 3;
 };
 
 // ---------------------------------------------------------------------------
@@ -330,6 +354,9 @@ EditorApplication::EditorApplication()
     gw::editor::bld_api::g_globals.sequencer_world   = &sequencer_world_;
     gw::editor::bld_api::g_globals.cinematic_system  = &cinematic_camera_;
     gw::editor::bld_api::install_bld_host_callbacks();
+    gw::editor::bld_api::g_globals.pie_enter_play   = &editor_bld_pie_enter;
+    gw::editor::bld_api::g_globals.pie_stop_play    = &editor_bld_pie_stop;
+    gw::editor::bld_api::g_globals.pie_host_context = this;
 
     // Seed the scene with three demo entities so the Outliner and Inspector
     // have something to display on first launch. A root with two children
@@ -383,9 +410,28 @@ EditorApplication::EditorApplication()
 }
 
 EditorApplication::~EditorApplication() {
+    gw::editor::bld_api::g_globals.pie_enter_play   = nullptr;
+    gw::editor::bld_api::g_globals.pie_stop_play    = nullptr;
+    gw::editor::bld_api::g_globals.pie_host_context = nullptr;
     shutdown_imgui();
     shutdown_vulkan();
     shutdown_window();
+}
+
+bool EditorApplication::bld_pie_enter() {
+    if (shell_phase_ != EditorShellPhase::MainEditor) return false;
+    pie_ctx_.world = &scene_world_;
+    pie_ctx_.time  = &pie_time_;
+    pie_time_      = {};
+    sync_pie_play_bootstrap_with_scene();
+    return pie_.enter_play(pie_ctx_);
+}
+
+void EditorApplication::bld_pie_stop() {
+    if (shell_phase_ != EditorShellPhase::MainEditor) return;
+    pie_.stop(pie_ctx_);
+    pie_time_ = {};
+    clear_pie_play_bootstrap_paths();
 }
 
 // ---------------------------------------------------------------------------
@@ -466,12 +512,15 @@ void EditorApplication::run() {
         gw::seq::CutSystem::tick(scene_world_, play_head);
         cinematic_camera_.tick(scene_world_);
 
+        render_settings_.stats.gpu_ms = vk_->last_gpu_time_ms;
+
         EditorContext ctx{
             .selection    = selection_,
             .cmd_stack    = cmd_stack_,
             .world        = &scene_world_,
             .asset_db     = nullptr,   // Phase 8
             .delta_time_s = dt,
+            .framegraph_gpu_ms = vk_->last_gpu_time_ms,
             .in_pie       = pie_.in_play(),
             .sequencer    = &sequencer_world_,
             .cinematic    = &cinematic_camera_,
@@ -615,6 +664,13 @@ void EditorApplication::init_vulkan() {
     vkGetDeviceQueue(vk_->device, vk_->graphics_family, 0, &vk_->graphics_queue);
     vkGetDeviceQueue(vk_->device, vk_->present_family,  0, &vk_->present_queue);
 
+    VkPhysicalDeviceProperties phys_props{};
+    vkGetPhysicalDeviceProperties(vk_->physical_device, &phys_props);
+    vk_->gpu_timestamp_period_ns = phys_props.limits.timestampPeriod;
+    vk_->gpu_timestamps_enabled =
+        phys_props.limits.timestampComputeAndGraphics == VK_TRUE &&
+        phys_props.limits.timestampPeriod > 0.f;
+
     // --- Swapchain ---------------------------------------------------------
     recreate_swapchain();
 
@@ -679,6 +735,19 @@ void EditorApplication::init_vulkan() {
     ai.instance         = vk_->instance;
     ai.pVulkanFunctions = &vma_fns;
     GW_VKCHECK(vmaCreateAllocator(&ai, &vk_->allocator));
+
+    if (vk_->gpu_timestamps_enabled) {
+        VkQueryPoolCreateInfo qpci{};
+        qpci.sType      = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+        qpci.queryType  = VK_QUERY_TYPE_TIMESTAMP;
+        qpci.queryCount = kFramesInFlight * 2;
+        const VkResult qp =
+            vkCreateQueryPool(vk_->device, &qpci, nullptr, &vk_->timestamp_query_pool);
+        if (qp != VK_SUCCESS) {
+            vk_->gpu_timestamps_enabled = false;
+            vk_->timestamp_query_pool   = VK_NULL_HANDLE;
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1036,6 +1105,11 @@ void EditorApplication::shutdown_vulkan() {
             vk_->cmd_pool = VK_NULL_HANDLE;
         }
 
+        if (vk_->timestamp_query_pool) {
+            vkDestroyQueryPool(vk_->device, vk_->timestamp_query_pool, nullptr);
+            vk_->timestamp_query_pool = VK_NULL_HANDLE;
+        }
+
         for (VkImageView v : vk_->swapchain_views)
             if (v) vkDestroyImageView(vk_->device, v, nullptr);
         vk_->swapchain_views.clear();
@@ -1085,6 +1159,23 @@ bool EditorApplication::begin_frame() {
     // Wait for this frame-in-flight's fence.
     vkWaitForFences(vk_->device, 1, &vk_->in_flight[vk_->frame_index], VK_TRUE, UINT64_MAX);
 
+    const uint32_t fi = vk_->frame_index;
+    if (vk_->gpu_timestamps_enabled && vk_->timestamp_query_pool &&
+        vk_->gpu_timestamp_warmup_frames <= 0) {
+        std::uint64_t ts[2]{};
+        const VkResult qr = vkGetQueryPoolResults(
+            vk_->device, vk_->timestamp_query_pool, fi * 2, 2, sizeof(ts), ts,
+            sizeof(std::uint64_t),
+            VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
+        if (qr == VK_SUCCESS && ts[1] > ts[0]) {
+            const double delta_ns = static_cast<double>(ts[1] - ts[0]) *
+                static_cast<double>(vk_->gpu_timestamp_period_ns);
+            vk_->last_gpu_time_ms = static_cast<float>(delta_ns * 1e-6);
+        }
+    } else if (vk_->gpu_timestamp_warmup_frames > 0) {
+        --vk_->gpu_timestamp_warmup_frames;
+    }
+
     // Acquire an image.
     uint32_t image_index = 0;
     VkResult acq = vkAcquireNextImageKHR(
@@ -1125,6 +1216,10 @@ bool EditorApplication::begin_frame() {
     bi.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     bi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     GW_VKCHECK(vkBeginCommandBuffer(cmd, &bi));
+
+    if (vk_->gpu_timestamps_enabled && vk_->timestamp_query_pool) {
+        vkCmdResetQueryPool(cmd, vk_->timestamp_query_pool, fi * 2, 2);
+    }
 
     // --- Offscreen scene render (Phase 7 §6.1) ---------------------------
     // Transition UNDEFINED → COLOR_ATTACHMENT_OPTIMAL, clear to a distinctive
@@ -1189,6 +1284,14 @@ bool EditorApplication::begin_frame() {
         dep.imageMemoryBarrierCount = 1;
         dep.pImageMemoryBarriers    = &to_sampled;
         vkCmdPipelineBarrier2(cmd, &dep);
+
+        if (vk_->gpu_timestamps_enabled && vk_->timestamp_query_pool) {
+            vkCmdWriteTimestamp2(cmd, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                 vk_->timestamp_query_pool, fi * 2);
+        }
+    } else if (vk_->gpu_timestamps_enabled && vk_->timestamp_query_pool) {
+        vkCmdWriteTimestamp2(cmd, VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+                             vk_->timestamp_query_pool, fi * 2);
     }
 
     return true;
@@ -1399,7 +1502,62 @@ void EditorApplication::open_project(const std::filesystem::path& root) {
     } else {
         fs::create_directories(def_abs.parent_path(), ec);
         (void)gw::scene::save_scene(def_abs, scene_world_);
+        gw::editor::bld_api::g_globals.active_scene_path_utf8 =
+            def_scene.lexically_normal().generic_string();
     }
+}
+
+void EditorApplication::launch_detached_headless_runtime() {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    std::string       rel = gw::editor::bld_api::g_globals.active_scene_path_utf8;
+    if (rel.empty()) {
+        rel = "content/scenes/_editor_play_export.gwscene";
+    }
+    const fs::path out = project_root_ / fs::path(rel);
+    fs::create_directories(out.parent_path(), ec);
+    const auto saved = gw::scene::save_scene(out, scene_world_);
+    if (!saved) {
+        std::fprintf(stderr, "[editor] export scene failed: %.*s\n",
+                     static_cast<int>(gw::scene::to_string(saved.error()).size()),
+                     gw::scene::to_string(saved.error()).data());
+        return;
+    }
+    gw::editor::bld_api::g_globals.active_scene_path_utf8 = rel;
+
+    const std::string cvars_rel = gw::play::play_cvars_rel_for_scene_path(rel);
+    const fs::path    cvars_abs = project_root_ / fs::path(cvars_rel);
+    touch_play_cvars_stub_file(cvars_abs);
+
+    const std::string editor_exe = gw::platform::current_executable_path();
+    if (editor_exe.empty()) {
+        std::fprintf(stderr, "[editor] could not resolve editor executable path\n");
+        return;
+    }
+    const fs::path bin_dir = fs::path(editor_exe).parent_path();
+#if defined(_WIN32)
+    const fs::path play = bin_dir / "sandbox_playable.exe";
+#else
+    const fs::path play = bin_dir / "sandbox_playable";
+#endif
+    if (!fs::is_regular_file(play, ec)) {
+        std::fprintf(stderr, "[editor] sandbox_playable not found at %s\n",
+                     play.string().c_str());
+        return;
+    }
+    std::vector<std::string> argv;
+    argv.emplace_back("--frames=120");
+    argv.emplace_back(std::string("--scene=") + rel);
+    argv.emplace_back(std::string("--cvars-toml=") + cvars_rel);
+    argv.emplace_back(std::string("--seed=") +
+                      std::to_string(gw::play::kDefaultPlayUniverseSeed));
+    if (!gw::platform::spawn_detached(play.string(), argv)) {
+        std::fprintf(stderr, "[editor] spawn_detached failed for %s\n",
+                     play.string().c_str());
+        return;
+    }
+    std::fprintf(stdout, "[editor] launched %s (scene %s)\n", play.string().c_str(),
+                 rel.c_str());
 }
 
 void EditorApplication::build_ui() {
@@ -1424,6 +1582,23 @@ void EditorApplication::build_ui() {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0.f, 0.f});
     ImGui::Begin("##DockHost", nullptr, host_flags);
     ImGui::PopStyleVar(3);
+
+    if (!photosensitivity_warn_ack_ &&
+        !ImGui::IsPopupOpen("Photosensitivity##gw_editor")) {
+        ImGui::OpenPopup("Photosensitivity##gw_editor");
+    }
+    if (ImGui::BeginPopupModal("Photosensitivity##gw_editor", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted(
+            "This editor and in-engine content may include intense visuals and flashing effects.");
+        ImGui::TextUnformatted(
+            "If you are photosensitive, use accessibility settings and reduce motion before proceeding.");
+        if (ImGui::Button("Acknowledge and continue", ImVec2{240.f, 0.f})) {
+            photosensitivity_warn_ack_ = true;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
 
     if (ImGui::BeginMenuBar()) {
         if (ImGui::BeginMenu("File")) {
@@ -1491,6 +1666,7 @@ void EditorApplication::build_ui() {
                 pie_ctx_.world = &scene_world_;
                 pie_ctx_.time  = &pie_time_;
                 pie_time_      = {};
+                sync_pie_play_bootstrap_with_scene();
                 (void)pie_.enter_play(pie_ctx_);
             }
             if (ImGui::MenuItem("Pause", "F6", is_paused, in_play)) {
@@ -1499,6 +1675,17 @@ void EditorApplication::build_ui() {
             if (ImGui::MenuItem("Stop", "Shift+F5", false, in_play)) {
                 pie_.stop(pie_ctx_);
                 pie_time_ = {};
+                clear_pie_play_bootstrap_paths();
+            }
+            if (ImGui::MenuItem("Run headless runtime (export scene)…", nullptr, false,
+                                 shell_phase_ == EditorShellPhase::MainEditor)) {
+                launch_detached_headless_runtime();
+            }
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                ImGui::SetTooltip(
+                    "Writes the active scene to disk and spawns `sandbox_playable` from the "
+                    "same build directory (CI-style headless tick). Full scene load inside "
+                    "the runtime lands in Phase 11+; this closes the export + launch seam.");
             }
             ImGui::EndMenu();
         }
@@ -1689,6 +1876,7 @@ void EditorApplication::end_frame() {
     ImGui::Render();
 
     VkCommandBuffer cmd   = vk_->cmd_buffers[vk_->frame_index];
+    const uint32_t  fi    = vk_->frame_index;
     const uint32_t  image = vk_->acquired_image;
     VkImage         swap_image = vk_->swapchain_images[image];
     VkImageView     swap_view  = vk_->swapchain_views[image];
@@ -1735,6 +1923,11 @@ void EditorApplication::end_frame() {
     vkCmdBeginRendering(cmd, &rinfo);
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
     vkCmdEndRendering(cmd);
+
+    if (vk_->gpu_timestamps_enabled && vk_->timestamp_query_pool) {
+        vkCmdWriteTimestamp2(cmd, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                             vk_->timestamp_query_pool, fi * 2 + 1);
+    }
 
     // COLOR_ATTACHMENT_OPTIMAL -> PRESENT_SRC_KHR.
     {
@@ -1869,11 +2062,13 @@ void EditorApplication::on_key_callback(GLFWwindow* w, int key,
                 if (app->pie_.in_play()) {
                     app->pie_.stop(app->pie_ctx_);
                     app->pie_time_ = {};
+                    app->clear_pie_play_bootstrap_paths();
                 }
             } else if (!app->pie_.in_play()) {
                 app->pie_ctx_.world = &app->scene_world_;
                 app->pie_ctx_.time  = &app->pie_time_;
                 app->pie_time_      = {};
+                app->sync_pie_play_bootstrap_with_scene();
                 (void)app->pie_.enter_play(app->pie_ctx_);
             }
             return;
@@ -1914,6 +2109,41 @@ void EditorApplication::on_drop_paths(GLFWwindow* w, int count, const char** pat
     p          = fs::weakly_canonical(p, ec);
     if (!fs::is_directory(p, ec)) return;
     app->pending_folder_drop_ = std::move(p);
+}
+
+void EditorApplication::sync_pie_play_bootstrap_with_scene() {
+    if (shell_phase_ != EditorShellPhase::MainEditor) return;
+    namespace fs = std::filesystem;
+    std::string rel = gw::editor::bld_api::g_globals.active_scene_path_utf8;
+    if (rel.empty()) rel = "content/scenes/_editor_play_export.gwscene";
+    const std::string cvars_rel = gw::play::play_cvars_rel_for_scene_path(rel);
+    const fs::path    cvars_abs = project_root_ / fs::path(cvars_rel);
+    touch_play_cvars_stub_file(cvars_abs);
+    pie_play_cvars_abs_storage_       = cvars_abs.generic_string();
+    pie_ctx_.version                  = 2;
+    pie_ctx_.play_universe_seed       = gw::play::kDefaultPlayUniverseSeed;
+    pie_ctx_.play_cvars_toml_abs_utf8 = pie_play_cvars_abs_storage_.c_str();
+
+    pie_bootstrap_cvars_.emplace();
+    (void)gw::config::register_standard_cvars(*pie_bootstrap_cvars_);
+    gw::play::apply_play_bootstrap_to_registry(
+        *pie_bootstrap_cvars_,
+        std::optional<std::int64_t>{pie_ctx_.play_universe_seed},
+        std::string_view{pie_play_cvars_abs_storage_});
+}
+
+void EditorApplication::clear_pie_play_bootstrap_paths() {
+    pie_play_cvars_abs_storage_.clear();
+    pie_ctx_.play_cvars_toml_abs_utf8 = nullptr;
+    pie_bootstrap_cvars_.reset();
+}
+
+bool editor_bld_pie_enter(void* ctx) {
+    return static_cast<EditorApplication*>(ctx)->bld_pie_enter();
+}
+
+void editor_bld_pie_stop(void* ctx) {
+    static_cast<EditorApplication*>(ctx)->bld_pie_stop();
 }
 
 }  // namespace gw::editor

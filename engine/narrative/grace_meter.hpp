@@ -1,5 +1,7 @@
 #pragma once
 
+#include "engine/narrative/narrative_types.hpp"
+
 #include <cstdint>
 
 namespace gw::narrative {
@@ -32,5 +34,10 @@ struct GraceTransaction {
 /// the same `(actor_id, source, seed)` tuple are rejected by the caller
 /// (book-keeping lives in the gameplay layer — docs/07 §2.7).
 void apply_grace_transaction(GraceComponent& grace, const GraceTransaction& tx) noexcept;
+
+/// Terminal `forgive` Blasphemy is authored for Act III only (docs/07 §2.7, §7b).
+[[nodiscard]] inline bool grace_mechanic_unlocked_for_act(Act current_act) noexcept {
+    return current_act == Act::III;
+}
 
 } // namespace gw::narrative

@@ -1,0 +1,10 @@
+# GLM + generated headers for this sandbox TU (merge with repo-root `.clangd`).
+# Paths are relative to this file's directory (`apps/sandbox_god_machine_rc/`).
+---
+CompileFlags:
+  Add:
+    - -I../../
+    - -I../../build/dev-win/_deps/glm-src
+    - -I../../build/dev-linux/_deps/glm-src
+    - -I../../build/dev-win/engine/gen
+    - -I../../build/dev-linux/engine/gen
