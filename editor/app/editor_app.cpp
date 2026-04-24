@@ -36,6 +36,7 @@
 #include "editor/scene/components.hpp"
 #include "engine/ecs/hierarchy.hpp"
 #include "engine/scene/seq/seq_cut.hpp"
+#include "engine/scene/scene_file.hpp"
 #include "engine/scene/seq/sequencer_world.hpp"
 
 // Phase 21 wire-up: Sacrilege-specific authoring panels (pack.yml: pre-ed-sacrilege-panels).
@@ -49,6 +50,9 @@
 #include "editor/panels/sacrilege/pcg_node_graph_panel.hpp"
 #include "editor/panels/sacrilege/shader_forge_panel.hpp"
 #include "editor/panels/sacrilege/sin_signature_panel.hpp"
+#include "editor/panels/sacrilege/sacrilege_library_panel.hpp"
+#include "editor/panels/sacrilege/sacrilege_readiness_panel.hpp"
+#include "editor/panels/sacrilege/panel_manifest.hpp"
 
 // Part C §23 wire-up: audit/tooling panels (pack.yml: pre-ed-audit-panels).
 #include "editor/panels/audit/asset_deps_panel.hpp"
@@ -94,6 +98,7 @@
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -297,6 +302,8 @@ EditorApplication::EditorApplication()
     panels_.add(std::make_unique<PcgNodeGraphPanel>());
     panels_.add(std::make_unique<ShaderForgePanel>());
     panels_.add(std::make_unique<SinSignaturePanel>());
+    panels_.add(std::make_unique<SacrilegeLibraryPanel>());
+    panels_.add(std::make_unique<SacrilegeReadinessPanel>(&panels_));
 
     // Part C §23 wire-up (pre-ed-audit-panels): seven tooling surfaces.
     using namespace gw::editor::panels::audit;
@@ -307,6 +314,14 @@ EditorApplication::EditorApplication()
     panels_.add(std::make_unique<ProfilerPanel>());
     panels_.add(std::make_unique<ShaderHotReloadPanel>());
     panels_.add(std::make_unique<ShaderPermutationsPanel>());
+
+    for (std::string_view sv : gw::editor::panels::sacrilege::kRequiredSacrilegePanelNames) {
+        if (!panels_.find(std::string{sv}.c_str())) {
+            std::string msg = "Sacrilege panel not registered: ";
+            msg += sv;
+            gw_fatal(msg.c_str());
+        }
+    }
 
     // Wire BLD API globals.
     gw::editor::bld_api::g_globals.selection = &selection_;
@@ -357,6 +372,13 @@ EditorApplication::EditorApplication()
         shell_phase_ = EditorShellPhase::ChooseProject;
     } else {
         shell_phase_ = EditorShellPhase::Authenticate;
+    }
+
+    if (shell_phase_ == EditorShellPhase::ChooseProject &&
+        !gw::editor::shell::env_no_auto_project()) {
+        if (auto repo = gw::editor::shell::find_greywater_repo_root()) {
+            open_project(*repo);
+        }
     }
 }
 
@@ -886,6 +908,10 @@ void EditorApplication::init_imgui() {
     namespace fs = std::filesystem;
     const fs::path ini_path   = gw::editor::shell::layout_ini_path();
     const int      disk_schema = gw::editor::shell::read_layout_schema_version();
+    if (disk_schema != gw::editor::shell::kLayoutSchemaVersion) {
+        std::error_code ec;
+        fs::remove(ini_path, ec);
+    }
     if (disk_schema == gw::editor::shell::kLayoutSchemaVersion && fs::exists(ini_path)) {
         std::ifstream f{ini_path, std::ios::binary | std::ios::ate};
         if (f.good()) {
@@ -1075,6 +1101,14 @@ bool EditorApplication::begin_frame() {
     vkResetFences(vk_->device, 1, &vk_->in_flight[vk_->frame_index]);
     vk_->acquired_image = image_index;
 
+    {
+        ImGuiIO& io = ImGui::GetIO();
+        if (viewports_enabled_)
+            io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+        else
+            io.ConfigFlags &= ~ImGuiConfigFlags_ViewportsEnable;
+    }
+
     // ImGui new frame. The Vulkan renderer backend's NewFrame uploads the
     // font atlas on first call (ImGui 1.92 RendererHasTextures API).
     ImGui_ImplVulkan_NewFrame();
@@ -1205,6 +1239,11 @@ void EditorApplication::build_launcher_ui() {
         ImGui::TextUnformatted("Sacrilege franchise");
         ImGui::TextDisabled(
             "Pick a title workspace, browse, drop a folder here, or open a recent project.");
+        ImGui::TextDisabled(
+            "Opening a project loads the full docking editor: Viewport, Sacrilege Library, "
+            "Outliner, and Inspector.");
+        ImGui::TextDisabled(
+            "Encounter / behaviour trees: Window → Sacrilege → Encounter Editor.");
         ImGui::Spacing();
 
         ImGui::PushStyleColor(ImGuiCol_ChildBg,
@@ -1254,6 +1293,13 @@ void EditorApplication::build_launcher_ui() {
                                        ImGuiWindowFlags_NoScrollbar);
                     ImGui::TextUnformatted(g.display_name.c_str());
                     ImGui::TextDisabled("%s", g.slug.c_str());
+                    {
+                        namespace fs = std::filesystem;
+                        std::error_code ec;
+                        if (!fs::is_regular_file(g.root / "CMakeLists.txt", ec))
+                            ImGui::TextDisabled(
+                                "No CMakeLists.txt at title root (OK for content-only).");
+                    }
                     if (ImGui::Button("Open", {120.f, 0.f})) open_project(g.root);
                     ImGui::SameLine();
                     if (ImGui::SmallButton("Copy path"))
@@ -1275,7 +1321,15 @@ void EditorApplication::build_launcher_ui() {
         ImGui::Spacing();
         ImGui::TextDisabled("Other");
         if (ImGui::Button("Browse folder…", ImVec2{200.f, 0.f})) {
-            if (auto picked = gw::editor::shell::pick_folder()) open_project(*picked);
+            const std::filesystem::path* start = nullptr;
+            std::filesystem::path        start_storage;
+            if (!recent_projects_.empty()) {
+                gw::editor::shell::sort_recents_for_display(recent_projects_);
+                start_storage = recent_projects_.front().root.parent_path();
+                if (!start_storage.empty()) start = &start_storage;
+            }
+            if (auto picked = gw::editor::shell::pick_folder_from(start))
+                open_project(*picked);
         }
         ImGui::Spacing();
         ImGui::TextDisabled("Recent projects");
@@ -1336,6 +1390,16 @@ void EditorApplication::open_project(const std::filesystem::path& root) {
     fs::current_path(project_root_, ec);
     gw::editor::shell::touch_recent_project(recent_projects_, project_root_);
     shell_phase_ = EditorShellPhase::MainEditor;
+
+    const fs::path def_scene =
+        fs::path{"content"} / "scenes" / "sacrilege_editor_default.gwscene";
+    const fs::path def_abs = project_root_ / def_scene;
+    if (fs::is_regular_file(def_abs, ec)) {
+        gw_editor_load_scene("content/scenes/sacrilege_editor_default.gwscene");
+    } else {
+        fs::create_directories(def_abs.parent_path(), ec);
+        (void)gw::scene::save_scene(def_abs, scene_world_);
+    }
 }
 
 void EditorApplication::build_ui() {
@@ -1383,6 +1447,17 @@ void EditorApplication::build_ui() {
         // re-runs apply_theme() so ImGui's style reflects the new palette on
         // the next frame.
         if (ImGui::BeginMenu("View")) {
+            if (ImGui::MenuItem("Multi-viewports (floating windows)", nullptr,
+                                 viewports_enabled_)) {
+                viewports_enabled_ = !viewports_enabled_;
+                apply_theme();
+            }
+            if (ImGui::MenuItem("Consolidate to main window", nullptr, false,
+                                 viewports_enabled_)) {
+                viewports_enabled_ = false;
+                apply_theme();
+            }
+            ImGui::Separator();
             if (ImGui::BeginMenu("Theme")) {
                 using gw::editor::theme::ThemeId;
                 auto& registry = gw::editor::theme::ThemeRegistry::instance();
@@ -1428,34 +1503,52 @@ void EditorApplication::build_ui() {
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Window")) {
-            auto toggle_group = [this](const char* title,
-                                       std::initializer_list<const char*> names) {
+            auto toggle_one = [this](const char* n) {
+                if (IPanel* p = panels_.find(n)) {
+                    bool v = p->visible();
+                    if (ImGui::MenuItem(n, nullptr, v)) p->set_visible(!v);
+                }
+            };
+            auto toggle_group = [&toggle_one](const char* title,
+                                              std::initializer_list<const char*> names) {
                 if (ImGui::BeginMenu(title)) {
-                    for (const char* n : names) {
-                        if (IPanel* p = panels_.find(n)) {
-                            bool v = p->visible();
-                            if (ImGui::MenuItem(n, nullptr, v)) p->set_visible(!v);
-                        }
-                    }
+                    for (const char* n : names) toggle_one(n);
                     ImGui::EndMenu();
                 }
             };
-            toggle_group("Cockpit",
-                         {"Viewport", "Scene", "Outliner", "Lighting", "Inspector",
-                          "Render Settings"});
-            toggle_group("Assets & targets",
-                         {"Asset Browser", "Material Forge", "Render Targets"});
+            toggle_group("Core",
+                         {"Viewport", "Outliner", "Inspector", "Lighting", "Render Settings",
+                          "Render Targets", "Stats", "Console"});
+            if (ImGui::BeginMenu("Sacrilege")) {
+                for (std::string_view sv :
+                     gw::editor::panels::sacrilege::kRequiredSacrilegePanelNames) {
+                    const std::string n{sv};
+                    toggle_one(n.c_str());
+                }
+                ImGui::EndMenu();
+            }
             toggle_group("Scripting & agents", {"VScript", "BLD Copilot", "Sequencer"});
-            toggle_group("Sacrilege",
-                         {"Act / Phase", "AI Director Sandbox", "Circle Editor", "Dialogue Graph",
-                          "Editor Copilot", "Encounter Editor", "PCG Node Graph", "Shader Forge",
-                          "Sin-Signature"});
             toggle_group("Audit",
                          {"Asset Dependencies", "Bake", "Heatmap", "Localization", "Profiler",
                           "Shader Hot-Reload", "Shader Permutations"});
-            toggle_group("Output", {"Console"});
+            toggle_group("Tools", {"Asset Browser", "Material Forge", "Sacrilege Library",
+                                   "Sacrilege Readiness"});
             ImGui::Separator();
-            if (ImGui::MenuItem("Reset docking layout")) layout_pending_reset_ = true;
+            if (ImGui::MenuItem("Bake blockout to .gwmesh…", nullptr, false, false)) {}
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                ImGui::SetTooltip(
+                    "Phase 8 mesh export — merges selected blockout primitives to one .gwmesh "
+                    "for cook or handoff.");
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Reset docking layout")) {
+                layout_pending_reset_ = true;
+                gw::editor::shell::write_layout_schema_version(
+                    gw::editor::shell::kLayoutSchemaVersion);
+                namespace fs = std::filesystem;
+                std::error_code ec;
+                fs::remove(gw::editor::shell::layout_ini_path(), ec);
+            }
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Help")) {
@@ -1505,7 +1598,27 @@ void EditorApplication::build_ui() {
         ImGui::SameLine();
         ImGui::TextDisabled("|");
         ImGui::SameLine();
-        ImGui::TextDisabled("layout schema v%d", gw::editor::shell::kLayoutSchemaVersion);
+        if (auto* lib = dynamic_cast<gw::editor::panels::sacrilege::SacrilegeLibraryPanel*>(
+                panels_.find("Sacrilege Library"))) {
+            ImGui::Text("lib %d", lib->catalog_entry_count());
+        } else {
+            ImGui::TextDisabled("lib —");
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("|");
+        ImGui::SameLine();
+        if (const char* hs = std::getenv("GW_HELL_SEED"); hs && hs[0] != '\0')
+            ImGui::TextDisabled("seed %s", hs);
+        else
+            ImGui::TextDisabled("seed —");
+        ImGui::SameLine();
+        ImGui::TextDisabled("|");
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s", cmd_stack_.is_dirty() ? "dirty" : "clean");
+        ImGui::SameLine();
+        ImGui::TextDisabled("|");
+        ImGui::SameLine();
+        ImGui::TextDisabled("layout v%d", gw::editor::shell::kLayoutSchemaVersion);
     }
     ImGui::EndChild();
     ImGui::PopStyleColor();
@@ -1552,12 +1665,23 @@ void EditorApplication::build_ui() {
 }
 
 void EditorApplication::build_docking_layout() {
-    // Fullscreen dockspace only — panels start floating (FirstUseEver positions
-    // in PanelRegistry); user docks into this empty host as they prefer.
     const ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
     ImGui::DockBuilderRemoveNode(dockspace_id);
     ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
     ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->WorkSize);
+
+    ImGuiID dock_main = dockspace_id;
+    ImGuiID dock_bottom =
+        ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Down, 0.28f, nullptr, &dock_main);
+    ImGuiID dock_right =
+        ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Right, 0.24f, nullptr, &dock_main);
+
+    ImGui::DockBuilderDockWindow("Viewport", dock_main);
+    ImGui::DockBuilderDockWindow("Sacrilege Library", dock_bottom);
+    ImGui::DockBuilderDockWindow("Asset Browser", dock_bottom);
+    ImGui::DockBuilderDockWindow("Outliner", dock_right);
+    ImGui::DockBuilderDockWindow("Inspector", dock_right);
+
     ImGui::DockBuilderFinish(dockspace_id);
 }
 
@@ -1710,8 +1834,7 @@ void EditorApplication::update_clear_colors_from_theme() {
 
 void EditorApplication::apply_theme() {
     ImGuiStyle& style = ImGui::GetStyle();
-    const bool vp =
-        (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) != 0;
+    const bool vp = viewports_enabled_;
     const auto& pal =
         gw::editor::theme::ThemeRegistry::instance().active().palette;
     gw::editor::theme::apply_palette_to_imgui_style(pal, style, vp);

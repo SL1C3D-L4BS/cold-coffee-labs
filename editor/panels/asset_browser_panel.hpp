@@ -22,13 +22,13 @@ public:
     [[nodiscard]] const char* name() const override { return "Asset Browser"; }
 
 private:
-    void draw_directory_tree();
+    void draw_directory_tree(EditorContext& ctx);
     void draw_content_grid(EditorContext& ctx);
-    void navigate_to(const std::filesystem::path& dir);
+    void navigate_to(const std::filesystem::path& dir, const std::filesystem::path* project_root);
 
     enum class ViewMode { Grid, List };
 
-    std::filesystem::path current_dir_   = "content/";
+    std::filesystem::path current_dir_;
     ViewMode              view_mode_     = ViewMode::Grid;
     char                  filter_[128]{};
 
@@ -39,8 +39,9 @@ private:
     };
     std::vector<DirEntry> dir_entries_;
 
-    float icon_size_    = 72.f;
-    bool  scanned_once_ = false;
+    float icon_size_           = 72.f;
+    bool  browser_inited_      = false;
+    std::string last_pr_str_{};
 };
 
 }  // namespace gw::editor

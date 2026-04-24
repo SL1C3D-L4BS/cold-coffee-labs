@@ -7,7 +7,7 @@
 namespace gw::editor::shell {
 
 /// Bump when default docking graph or required windows change.
-constexpr int kLayoutSchemaVersion = 2;
+constexpr int kLayoutSchemaVersion = 3;
 
 [[nodiscard]] std::filesystem::path layout_ini_directory() noexcept;
 [[nodiscard]] std::filesystem::path layout_ini_path() noexcept;

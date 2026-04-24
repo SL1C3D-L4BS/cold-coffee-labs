@@ -41,14 +41,26 @@ namespace {
 
 } // namespace
 
-void AssetBrowserPanel::navigate_to(const fs::path& dir) {
-    current_dir_ = dir;
+void AssetBrowserPanel::navigate_to(const fs::path& dir, const fs::path* project_root) {
+    std::error_code ec;
+    fs::path        abs;
+    if (dir.is_absolute()) {
+        abs = fs::weakly_canonical(dir, ec);
+        if (ec) abs = dir;
+    } else if (project_root && !project_root->empty()) {
+        abs = fs::weakly_canonical(*project_root / dir, ec);
+        if (ec) abs = *project_root / dir;
+    } else {
+        abs = fs::weakly_canonical(fs::current_path() / dir, ec);
+        if (ec) abs = fs::current_path() / dir;
+    }
+
+    if (!fs::exists(abs, ec) || !fs::is_directory(abs, ec)) return;
+
+    current_dir_ = abs;
     dir_entries_.clear();
 
-    std::error_code ec;
-    if (!fs::exists(dir, ec) || !fs::is_directory(dir, ec)) return;
-
-    for (const auto& entry : fs::directory_iterator(dir, ec)) {
+    for (const auto& entry : fs::directory_iterator(abs, ec)) {
         DirEntry de;
         de.name   = entry.path().filename().string();
         de.is_dir = entry.is_directory(ec);
@@ -63,16 +75,19 @@ void AssetBrowserPanel::navigate_to(const fs::path& dir) {
         });
 }
 
-void AssetBrowserPanel::draw_directory_tree() {
+void AssetBrowserPanel::draw_directory_tree(EditorContext& ctx) {
     ImGui::BeginChild("##dir_tree", {180.f, 0.f}, true);
+    ImGui::PushID("dir_shortcuts");
     ImGui::TextDisabled("content/");
+    const fs::path* root = ctx.project_root;
     if (ImGui::TreeNode("content")) {
-        if (ImGui::Selectable("meshes")) navigate_to("content/meshes");
-        if (ImGui::Selectable("textures")) navigate_to("content/textures");
-        if (ImGui::Selectable("scenes")) navigate_to("content/scenes");
-        if (ImGui::Selectable("materials")) navigate_to("content/materials");
+        if (ImGui::Selectable("meshes")) navigate_to("content/meshes", root);
+        if (ImGui::Selectable("textures")) navigate_to("content/textures", root);
+        if (ImGui::Selectable("scenes")) navigate_to("content/scenes", root);
+        if (ImGui::Selectable("materials")) navigate_to("content/materials", root);
         ImGui::TreePop();
     }
+    ImGui::PopID();
     ImGui::EndChild();
 }
 
@@ -90,7 +105,8 @@ void AssetBrowserPanel::draw_content_grid(EditorContext& ctx) {
                     [[maybe_unused]] const std::string reldir{sv.substr(tab + 1)};
                     const fs::path out = *ctx.project_root / "content" / "materials" / "ambient_cg" /
                                          (id + ".gwmat");
-                    if (write_minimal_gwmat_stub(out)) navigate_to(out.parent_path());
+                    if (write_minimal_gwmat_stub(out))
+                        navigate_to(out.parent_path(), ctx.project_root);
                 }
             }
         }
@@ -164,10 +180,11 @@ void AssetBrowserPanel::draw_content_grid(EditorContext& ctx) {
         dl->AddText(badge_pos, color32_to_im_u32(pal.text, 230.f / 255.f), badge);
 
         if (ImGui::Selectable("##item", false, 0, item_size)) {
-            if (de.is_dir) navigate_to(current_dir_ / de.name);
+            if (de.is_dir) navigate_to(current_dir_ / de.name, ctx.project_root);
         }
 
-        if (!de.is_dir && ImGui::BeginDragDropSource()) {
+        if (!de.is_dir &&
+            ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
             std::string path_str = (current_dir_ / de.name).string();
             ImGui::SetDragDropPayload("ASSET_PATH",
                 path_str.c_str(), path_str.size() + 1);
@@ -190,9 +207,29 @@ void AssetBrowserPanel::draw_content_grid(EditorContext& ctx) {
 void AssetBrowserPanel::on_imgui_render(EditorContext& ctx) {
     ImGui::Begin(name(), &visible_);
 
-    if (dir_entries_.empty() && !scanned_once_) {
-        navigate_to(current_dir_);
-        scanned_once_ = true;
+    if (ctx.project_root) {
+        const std::string pr = ctx.project_root->string();
+        if (pr != last_pr_str_) {
+            last_pr_str_      = pr;
+            browser_inited_   = false;
+            current_dir_.clear();
+            dir_entries_.clear();
+        }
+    } else if (!last_pr_str_.empty()) {
+        last_pr_str_.clear();
+        browser_inited_ = false;
+        current_dir_.clear();
+        dir_entries_.clear();
+    }
+
+    if (!browser_inited_ && ctx.project_root && !ctx.project_root->empty()) {
+        browser_inited_ = true;
+        std::error_code ec;
+        const fs::path content = *ctx.project_root / "content";
+        if (fs::is_directory(content, ec))
+            navigate_to(content, ctx.project_root);
+        else
+            navigate_to(*ctx.project_root, ctx.project_root);
     }
 
     ImGui::TextDisabled("%s", current_dir_.string().c_str());
@@ -204,10 +241,15 @@ void AssetBrowserPanel::on_imgui_render(EditorContext& ctx) {
     ImGui::SameLine();
     if (ImGui::SmallButton("List")) view_mode_ = ViewMode::List;
     ImGui::SameLine();
-    if (ImGui::SmallButton("Rescan")) navigate_to(current_dir_);
+    if (ImGui::SmallButton("Rescan")) {
+        if (!current_dir_.empty())
+            navigate_to(current_dir_, ctx.project_root);
+        else if (ctx.project_root && !ctx.project_root->empty())
+            navigate_to(*ctx.project_root, ctx.project_root);
+    }
     ImGui::Separator();
 
-    draw_directory_tree();
+    draw_directory_tree(ctx);
     ImGui::SameLine();
     draw_content_grid(ctx);
 

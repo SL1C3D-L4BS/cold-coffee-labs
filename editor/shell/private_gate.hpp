@@ -7,6 +7,9 @@ namespace gw::editor::shell {
 
 [[nodiscard]] bool env_skip_private_gate() noexcept;
 
+/// When set (non-empty, not "0"), editor does not auto-open repo root from exe/cwd.
+[[nodiscard]] bool env_no_auto_project() noexcept;
+
 /// `%APPDATA%/GreywaterEditor/private_gate.toml` (or XDG equivalent).
 [[nodiscard]] bool private_gate_file_exists() noexcept;
 

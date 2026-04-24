@@ -8,7 +8,6 @@
 // Spec ref: Phase 7 §10 (Inspector), ADR-0005 §2.7 (SetComponentFieldCommand).
 #include "inspector_panel.hpp"
 #include "editor/reflect/widget_drawer.hpp"
-#include "editor/reflect/reflect.hpp"
 #include "editor/undo/commands.hpp"
 #include "editor/scene/components.hpp"
 #include "engine/ecs/world.hpp"
@@ -16,6 +15,8 @@
 #include "engine/core/field_reflection.hpp"
 
 #include <imgui.h>
+
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -94,6 +95,50 @@ void draw_reflected_component(EditorContext& ctx,
     }
 }
 
+void draw_blockout_material_field(EditorContext& ctx, gw::ecs::World& world, EntityHandle e) {
+    auto* bp = world.get_component<scene::BlockoutPrimitiveComponent>(e);
+    if (!bp) return;
+
+    ImGui::Separator();
+    ImGui::Text("Blockout material (.gwmat)");
+    ImGui::PushID("__blockout_mat");
+    ImGui::SetNextItemWidth(-1.f);
+    ImGui::InputText("##gwmat_rel", bp->gwmat_rel.data(), bp->gwmat_rel.size());
+    if (ImGui::BeginDragDropTarget()) {
+        if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
+            const char* raw = static_cast<const char*>(pl->Data);
+            std::string path{raw, raw + pl->DataSize};
+            if (!path.empty() && path.back() == '\0') path.pop_back();
+            std::string lower = path;
+            for (char& c : lower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            if (lower.size() >= 6 && lower.compare(lower.size() - 6, 6, ".gwmat") == 0) {
+                const std::size_t n = std::min(path.size(), bp->gwmat_rel.size() - 1);
+                std::memcpy(bp->gwmat_rel.data(), path.data(), n);
+                bp->gwmat_rel[n] = '\0';
+            }
+        }
+        if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("AMBIENTCG_MAT")) {
+            const char* raw = static_cast<const char*>(pl->Data);
+            if (raw && pl->DataSize > 1) {
+                std::string payload{raw, raw + pl->DataSize - 1};
+                const auto tab = payload.find('\t');
+                if (tab != std::string::npos) {
+                    const std::string id = payload.substr(0, tab);
+                    std::string guess =
+                        std::string{"content/materials/ambient_cg/"} + id + ".gwmat";
+                    const std::size_t n = std::min(guess.size(), bp->gwmat_rel.size() - 1);
+                    std::memcpy(bp->gwmat_rel.data(), guess.data(), n);
+                    bp->gwmat_rel[n] = '\0';
+                }
+            }
+        }
+        ImGui::EndDragDropTarget();
+    }
+    ImGui::TextDisabled("Drop .gwmat from Asset Browser or Sacrilege Library.");
+    ImGui::PopID();
+    (void)ctx;
+}
+
 } // namespace
 
 // ---------------------------------------------------------------------------
@@ -120,6 +165,7 @@ void InspectorPanel::on_imgui_render(EditorContext& ctx) {
 
     // Name (special-cased; no GW_REFLECT).
     draw_name_component(ctx, *world, primary);
+    draw_blockout_material_field(ctx, *world, primary);
     ImGui::Separator();
 
     // Iterate every component type present on the entity's archetype.

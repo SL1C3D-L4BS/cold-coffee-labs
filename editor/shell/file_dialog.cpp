@@ -19,7 +19,8 @@
 
 namespace gw::editor::shell {
 
-std::optional<std::filesystem::path> pick_folder() noexcept {
+std::optional<std::filesystem::path> pick_folder_from(
+    const std::filesystem::path* initial_dir) noexcept {
 #ifdef _WIN32
     std::optional<std::filesystem::path> result;
     HRESULT co = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
@@ -36,6 +37,20 @@ std::optional<std::filesystem::path> pick_folder() noexcept {
     DWORD opts = 0;
     if (SUCCEEDED(dlg->GetOptions(&opts))) {
         dlg->SetOptions(opts | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM);
+    }
+
+    if (initial_dir && !initial_dir->empty()) {
+        namespace fs = std::filesystem;
+        std::error_code ec;
+        if (fs::is_directory(*initial_dir, ec)) {
+            IShellItem* folder_item = nullptr;
+            const std::wstring w = initial_dir->wstring();
+            if (SUCCEEDED(SHCreateItemFromParsingName(w.c_str(), nullptr,
+                                                       IID_PPV_ARGS(&folder_item)))) {
+                dlg->SetFolder(folder_item);
+                folder_item->Release();
+            }
+        }
     }
 
     if (FAILED(dlg->Show(nullptr))) {
@@ -60,6 +75,7 @@ std::optional<std::filesystem::path> pick_folder() noexcept {
     if (SUCCEEDED(co)) CoUninitialize();
     return result;
 #else
+    (void)initial_dir;
     FILE* p = popen("zenity --file-selection --directory 2>/dev/null", "r");
     if (!p) return std::nullopt;
     char buf[4096]{};
@@ -75,6 +91,10 @@ std::optional<std::filesystem::path> pick_folder() noexcept {
     if (s.empty()) return std::nullopt;
     return std::filesystem::path{s};
 #endif
+}
+
+std::optional<std::filesystem::path> pick_folder() noexcept {
+    return pick_folder_from(nullptr);
 }
 
 } // namespace gw::editor::shell

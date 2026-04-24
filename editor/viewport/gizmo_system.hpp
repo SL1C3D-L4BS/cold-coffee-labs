@@ -59,6 +59,12 @@ public:
     // Delta applied this frame (only valid when draw() returns true).
     [[nodiscard]] const glm::mat4& delta_matrix() const noexcept { return delta_; }
 
+    /// Clears cached entity → matrix map (call each frame before set_entity_matrix).
+    void clear_entity_matrices() noexcept { entity_mats_.clear(); }
+
+    /// World matrix ImGuizmo manipulated last (single-selection pivot).
+    [[nodiscard]] const glm::mat4& pivot_matrix() const noexcept { return pivot_mat_; }
+
 private:
     GizmoOp    current_op_    = GizmoOp::Translate;
     GizmoSpace current_space_ = GizmoSpace::World;

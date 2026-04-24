@@ -141,6 +141,8 @@ private:
     // Layout built flag — persisted via ImGui ini.
     bool layout_built_ = false;
     bool layout_pending_reset_ = false;
+    /// ImGui multi-viewport (floating windows). Off = consolidate to main GLFW window.
+    bool viewports_enabled_ = true;
 
     // Swapchain resize deferred flag.
     bool swapchain_resize_pending_ = false;

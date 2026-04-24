@@ -1,0 +1,6 @@
+# sacrilege_library.tsv — id<TAB>kind<TAB>rel_path
+# Regenerate: python tools/build_sacrilege_library.py --root franchises/sacrilege/sacrilege
+# Subset checked in; full regen merges AmbientCG index + gwmat + loose textures.
+AcousticFoam001	ambientcg_cc0	content/textures/ambient_cg/AcousticFoam001
+Asphalt001	ambientcg_cc0	content/textures/ambient_cg/Asphalt001
+Metal001	ambientcg_cc0	content/textures/ambient_cg/Metal001

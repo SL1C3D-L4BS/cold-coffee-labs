@@ -127,7 +127,10 @@ add_executable(gw_editor
     panels/sacrilege/sin_signature_panel.cpp
     panels/sacrilege/act_state_panel.cpp
     panels/sacrilege/ai_director_sandbox_panel.cpp
+    panels/sacrilege/ambient_cg_browser.cpp
     panels/sacrilege/material_forge_panel.cpp
+    panels/sacrilege/sacrilege_library_panel.cpp
+    panels/sacrilege/sacrilege_readiness_panel.cpp
     panels/sacrilege/pcg_node_graph_panel.cpp
     panels/sacrilege/shader_forge_panel.cpp
     panels/sacrilege/editor_copilot_panel.cpp
@@ -196,6 +199,7 @@ if(WIN32)
         # ImGui multi-viewport on Windows uses dwmapi.
         dwmapi
         ole32
+        shell32
     )
 elseif(UNIX AND NOT APPLE)
     target_link_libraries(gw_editor PRIVATE pthread dl m)

@@ -200,6 +200,7 @@ void ensure_editor_component_types(gw::ecs::World& w) {
     (void)w.component_registry().id_of<gw::editor::scene::TransformComponent>();
     (void)w.component_registry().id_of<gw::editor::scene::VisibilityComponent>();
     (void)w.component_registry().id_of<gw::editor::scene::WorldMatrixComponent>();
+    (void)w.component_registry().id_of<gw::editor::scene::BlockoutPrimitiveComponent>();
     (void)w.component_registry().id_of<gw::ecs::HierarchyComponent>();
 }
 
@@ -250,6 +251,25 @@ void register_editor_migrations_once() {
                 return true;
             },
             "TransformComponent: widen position vec3->dvec3");
+
+        using gw::editor::scene::BlockoutPrimitiveComponent;
+        constexpr std::uint32_t kBlockoutV1 = 4u;
+        static_assert(sizeof(BlockoutPrimitiveComponent) == 196u,
+                      "keep BlockoutPrimitive migration in sync");
+        gw::scene::MigrationRegistry::global().register_fn<BlockoutPrimitiveComponent>(
+            kBlockoutV1,
+            [](std::span<const std::uint8_t> src,
+               std::span<std::uint8_t>       dst) {
+                if (src.size() != kBlockoutV1 ||
+                    dst.size() != sizeof(BlockoutPrimitiveComponent)) {
+                    return false;
+                }
+                BlockoutPrimitiveComponent b{};
+                std::memcpy(&b.shape, src.data(), kBlockoutV1);
+                std::memcpy(dst.data(), &b, sizeof(b));
+                return true;
+            },
+            "BlockoutPrimitiveComponent: add gwmat_rel path buffer");
     });
 }
 

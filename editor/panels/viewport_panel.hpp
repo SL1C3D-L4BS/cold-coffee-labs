@@ -4,6 +4,7 @@
 // Spec ref: Phase 7 §6.
 
 #include "panel.hpp"
+#include "editor/undo/commands.hpp"
 #include "editor/viewport/editor_camera.hpp"
 #include "editor/viewport/gizmo_system.hpp"
 
@@ -45,6 +46,10 @@ public:
     // Scroll delta injected by GLFW scroll callback.
     void inject_scroll(float delta) noexcept { scroll_accumulator_ += delta; }
 
+    /// Blockout / level tool: 0 Place, 1 Move, 2 Rotate, 3 Scale (Phase-1 stub).
+    [[nodiscard]] int blockout_tool() const noexcept { return blockout_tool_; }
+    void set_blockout_tool(int t) noexcept { blockout_tool_ = t; }
+
 private:
     void draw_toolbar(EditorContext& ctx);
     void draw_overlay(EditorContext& ctx);
@@ -67,6 +72,15 @@ private:
     EditorCamera      camera_;
     GizmoSystem       gizmo_;
     float             scroll_accumulator_ = 0.f;
+    int               blockout_tool_      = 0;
+    int               blockout_place_seq_ = 0;
+    int               blockout_shape_     = 0; // 0 box … 3 ramp (see BlockoutPrimitiveComponent)
+    bool              snap_grid_enabled_  = false;
+    float             snap_grid_step_     = 1.f;
+    bool              gizmo_was_using_    = false;
+    bool              gizmo_undo_armed_   = false;
+    EntityHandle      gizmo_undo_entity_  = kNullEntity;
+    gw::editor::undo::TransformSnapshot gizmo_undo_before_{};
 
     // Entity picking staging buffer — written to by GPU, read by CPU next frame.
     // Full picking pipeline wired in Phase 7 §6.4.

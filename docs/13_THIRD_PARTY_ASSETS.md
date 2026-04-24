@@ -55,7 +55,17 @@ By default this updates **`content/manifests/ambient_cg_index.tsv`** only (the b
 
 ## Editor
 
-**Material Forge** (bottom dock, tab with **Asset Browser** / **Console**) resolves the index in this order:
+**Shipping vs. CC0 posture:** see **[ADR-0120 — AmbientCG CC0 and GW-SAC-001](adr/ADR-0120-ambientcg-cc0-shipping.md)** (look-dev baseline vs. replacement path).
+
+**Sacrilege Library** panel merges a baked **`sacrilege_library.tsv`** (materials, loose textures, CC0 rows) with live disk checks. Generate or refresh the catalog from a title root:
+
+```text
+python tools/build_sacrilege_library.py --root franchises/sacrilege/sacrilege
+```
+
+Outputs **`assets/manifests/sacrilege_library.tsv`** by default (AmbientCG index + `*.gwmat` under `content/` + images under `content/textures/`). The editor resolves it from `assets/manifests/` or `content/manifests/`, same as the AmbientCG index.
+
+**Material Forge** (Sacrilege Library → **CC0** tab, or legacy **Material Forge** window) resolves the AmbientCG index in this order:
 
 1. `<project_root>/content/manifests/ambient_cg_index.tsv` (output of `import_from_downloader.py` / `build_index.py`).
 2. `<project_root>/assets/manifests/ambient_cg_index.tsv` (small **bundled** sample list in git so the panel is never empty before your first import).
@@ -75,6 +85,8 @@ After **`import_from_downloader.py`** or a manual unzip into `content/textures/a
 ## Cook (textures → runtime)
 
 Authoring sources under `content/` are not sampled by the renderer until cooked. From your build tree, run the **content cook** target you use in CI (e.g. **`gw_cook`** / `tools/cook`) so eligible images become packaged **`*.gwtex`** (and related) under `assets/` as defined by your cook manifests. Re-run cook after adding or changing AmbientCG folders.
+
+**GW-SAC-001 §14 (256/512 ship doctrine):** a future cook option should downsample oversized albedo/normal inputs before writing `*.gwtex`. Until that flag exists, the **Sacrilege Library** CC0 grid tags high-resolution source paths (**HI TX**) so authors know cook is not yet clamping them for shipping tiers.
 
 ## Disk expectations
 

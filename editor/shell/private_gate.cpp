@@ -71,6 +71,13 @@ struct GateFile {
 
 } // namespace
 
+bool env_no_auto_project() noexcept {
+    if (const char* e = std::getenv("GW_EDITOR_NO_AUTO_PROJECT"); e &&
+        e[0] != '\0' && std::strcmp(e, "0") != 0)
+        return true;
+    return false;
+}
+
 bool env_skip_private_gate() noexcept {
 #if defined(GREYWATER_EDITOR_SKIP_GATE) && GREYWATER_EDITOR_SKIP_GATE
     return true;

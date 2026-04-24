@@ -108,4 +108,20 @@ struct VisibilityComponent {
 static_assert(sizeof(NameComponent)        == 64);
 static_assert(sizeof(VisibilityComponent)  == 4);
 
+// ---------------------------------------------------------------------------
+// BlockoutPrimitiveComponent — Phase-1 greybox (tooling + ECS; mesh later).
+// shape: 0 box, 1 cylinder, 2 plane, 3 ramp/stairs stub.
+// gwmat_rel: optional title-relative path (e.g. content/materials/foo.gwmat);
+// edited in Inspector + drag-drop from Sacrilege Library / Asset Browser.
+// ---------------------------------------------------------------------------
+struct BlockoutPrimitiveComponent {
+    std::uint8_t shape = 0;
+    std::uint8_t _pad[3]{};
+    std::array<char, 192> gwmat_rel{};
+
+    GW_REFLECT(BlockoutPrimitiveComponent, shape)
+};
+
+static_assert(sizeof(BlockoutPrimitiveComponent) == 196);
+
 } // namespace gw::editor::scene

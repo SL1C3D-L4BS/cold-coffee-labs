@@ -2,6 +2,8 @@
 
 #include "editor/panels/sacrilege/circle_editor_panel.hpp"
 
+#include <cstdlib>
+
 #if __has_include(<imgui.h>)
 #  include <imgui.h>
 #  define GW_HAS_IMGUI 1
@@ -37,6 +39,11 @@ void CircleEditorPanel::on_imgui_render(gw::editor::EditorContext& /*ctx*/) {
         return;
     }
     ImGui::Begin(name(), &visible_);
+
+    if (const char* seed = std::getenv("GW_HELL_SEED"); seed && seed[0] != '\0')
+        ImGui::TextDisabled("Hell Seed (GW_HELL_SEED): %s", seed);
+    else
+        ImGui::TextDisabled("Hell Seed: (set GW_HELL_SEED for deterministic Blacklake preview)");
 
     const auto& profiles = gw::world::circle_profiles();
 

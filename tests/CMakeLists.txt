@@ -163,8 +163,21 @@ add_executable(gw_tests
     unit/gameplay/diegetic_hud_test.cpp
     # Phase 21 W140 — Sacrilege editor panels (data model only).
     unit/editor/sacrilege_panels_test.cpp
+    unit/editor/sacrilege_panel_registry_test.cpp
+    "${CMAKE_SOURCE_DIR}/editor/panels/panel_registry.cpp"
+    "${CMAKE_SOURCE_DIR}/editor/render/imgui_texture_cache.cpp"
+    "${CMAKE_SOURCE_DIR}/editor/theme/theme_registry.cpp"
+    "${CMAKE_SOURCE_DIR}/editor/theme/imgui_style_from_palette.cpp"
+    "${CMAKE_SOURCE_DIR}/editor/panels/sacrilege/ambient_cg_browser.cpp"
     "${CMAKE_SOURCE_DIR}/editor/panels/sacrilege/circle_editor_panel.cpp"
     "${CMAKE_SOURCE_DIR}/editor/panels/sacrilege/encounter_editor_panel.cpp"
+    "${CMAKE_SOURCE_DIR}/editor/panels/sacrilege/ai_director_sandbox_panel.cpp"
+    "${CMAKE_SOURCE_DIR}/editor/panels/sacrilege/editor_copilot_panel.cpp"
+    "${CMAKE_SOURCE_DIR}/editor/panels/sacrilege/material_forge_panel.cpp"
+    "${CMAKE_SOURCE_DIR}/editor/panels/sacrilege/pcg_node_graph_panel.cpp"
+    "${CMAKE_SOURCE_DIR}/editor/panels/sacrilege/shader_forge_panel.cpp"
+    "${CMAKE_SOURCE_DIR}/editor/panels/sacrilege/sacrilege_library_panel.cpp"
+    "${CMAKE_SOURCE_DIR}/editor/panels/sacrilege/sacrilege_readiness_panel.cpp"
     # Phase 22 W148 — Dialogue / Sin-signature / Act-state panel models.
     unit/editor/sacrilege_p22_panels_test.cpp
     "${CMAKE_SOURCE_DIR}/editor/panels/sacrilege/dialogue_graph_panel.cpp"
@@ -198,6 +211,7 @@ add_executable(gw_tests
 target_link_libraries(gw_tests
     PRIVATE
         greywater::core
+        engine_render
         greywater::assets
         greywater::audio
         greywater::input
@@ -224,6 +238,13 @@ target_link_libraries(gw_tests
         gw_seq
         bld_ffi
 )
+
+if(TARGET greywater::imgui)
+    target_link_libraries(gw_tests PRIVATE greywater::imgui)
+endif()
+if(TARGET greywater::imguizmo)
+    target_link_libraries(gw_tests PRIVATE greywater::imguizmo)
+endif()
 
 # Pull in Vulkan/VMA headers that asset headers need.
 target_include_directories(gw_tests PRIVATE
