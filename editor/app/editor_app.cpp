@@ -1356,7 +1356,7 @@ void EditorApplication::build_launcher_ui() {
         ImGui::PushStyleColor(ImGuiCol_ChildBg,
                               gw::editor::theme::imgui_vec4(
                                   gw::editor::theme::ThemeRegistry::instance().active()
-                                      .palette.panel,
+                                      .palette.surface_2,
                                   0.92f));
         ImGui::BeginChild("##drop_zone", {0.f, 72.f}, true, ImGuiWindowFlags_NoScrollbar);
         ImGui::TextDisabled("Drop a project folder");
@@ -1838,6 +1838,8 @@ void EditorApplication::build_ui() {
                                  &a11y_config_.keyboard_only_nav);
         dirty |= ImGui::Checkbox("Colour-blind (Wong) palette overlay",
                                  &a11y_config_.colour_blind_wong);
+        dirty |= ImGui::Checkbox("Reduce motion (vignette pulse, glitch, jitter)",
+                                 &a11y_config_.reduce_motion);
         if (dirty) {
             gw::editor::a11y::apply(a11y_config_);
             apply_theme();

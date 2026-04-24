@@ -22,14 +22,16 @@ public:
     [[nodiscard]] const char* name() const override { return "Asset Browser"; }
 
 private:
-    void draw_directory_tree(EditorContext& ctx);
-    void draw_content_grid(EditorContext& ctx);
+    void draw_folder_tree(EditorContext& ctx);
+    void draw_content_list(EditorContext& ctx);
     void navigate_to(const std::filesystem::path& dir, const std::filesystem::path* project_root);
 
-    enum class ViewMode { Grid, List };
+    /// Recursive `content/` subtree; `dir_abs` must stay under `tree_root_abs`.
+    void draw_folder_tree_nodes(const std::filesystem::path& tree_root_abs,
+                                const std::filesystem::path& dir_abs,
+                                const std::filesystem::path* project_root);
 
     std::filesystem::path current_dir_;
-    ViewMode              view_mode_     = ViewMode::Grid;
     char                  filter_[128]{};
 
     struct DirEntry {
@@ -39,7 +41,7 @@ private:
     };
     std::vector<DirEntry> dir_entries_;
 
-    float icon_size_           = 72.f;
+    float list_thumb_size_     = 28.f; // optional texture column in list view
     bool  browser_inited_      = false;
     std::string last_pr_str_{};
 };

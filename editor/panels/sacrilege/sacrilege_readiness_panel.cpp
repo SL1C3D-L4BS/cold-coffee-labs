@@ -6,6 +6,8 @@
 #include "editor/panels/panel_registry.hpp"
 #include "editor/shell/manifest_paths.hpp"
 
+#include "editor/theme/palette_imgui.hpp"
+
 #include <imgui.h>
 
 #include <filesystem>
@@ -16,7 +18,8 @@ namespace {
 void traffic(const char* label, bool ok) {
     ImGui::BulletText("%s", label);
     ImGui::SameLine();
-    ImGui::TextColored(ok ? ImVec4{0.35f, 0.85f, 0.4f, 1.f} : ImVec4{0.95f, 0.45f, 0.35f, 1.f},
+    ImGui::TextColored(ok ? gw::editor::theme::active_positive_imgui()
+                         : gw::editor::theme::active_destructive_imgui(),
                        "%s", ok ? "OK" : "FAIL");
 }
 

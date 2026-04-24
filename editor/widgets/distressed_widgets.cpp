@@ -14,6 +14,8 @@ namespace gw::editor::widgets {
 namespace {
 
 [[nodiscard]] bool distressed_enabled() noexcept {
+    if (gw::editor::theme::ThemeRegistry::instance().reduce_motion())
+        return false;
     return gw::editor::theme::ThemeRegistry::instance()
         .active()
         .effects.has(gw::editor::theme::EF_Distressed);
@@ -28,6 +30,8 @@ namespace {
 }
 
 [[nodiscard]] bool glitch_enabled() noexcept {
+    if (gw::editor::theme::ThemeRegistry::instance().reduce_motion())
+        return false;
     return gw::editor::theme::ThemeRegistry::instance()
         .active()
         .effects.has(gw::editor::theme::EF_GlitchHover);

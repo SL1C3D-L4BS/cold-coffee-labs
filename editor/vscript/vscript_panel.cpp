@@ -4,6 +4,7 @@
 #include "engine/vscript/parser.hpp"
 
 #include "editor/theme/graph_theme.hpp"
+#include "editor/theme/palette_imgui.hpp"
 #include "editor/theme/theme_registry.hpp"
 
 #include <imgui.h>
@@ -345,7 +346,7 @@ void VScriptPanel::draw_toolbar() {
     if (!parse_error_.empty()) {
         // Use a dedicated wrapped line so long diagnostics (with byte
         // values from the lexer) are never clipped by the toolbar width.
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{1.0f, 0.45f, 0.45f, 1.f});
+        ImGui::PushStyleColor(ImGuiCol_Text, gw::editor::theme::active_destructive_imgui());
         ImGui::TextWrapped("%s", parse_error_.c_str());
         ImGui::PopStyleColor();
     }
@@ -471,8 +472,8 @@ void VScriptPanel::draw_preview_panel() {
         }
     }
     if (!exec_error_.empty()) {
-        ImGui::TextColored({1.f, 0.4f, 0.4f, 1.f},
-                           "exec error: %s", exec_error_.c_str());
+        ImGui::TextColored(gw::editor::theme::active_destructive_imgui(), "exec error: %s",
+                           exec_error_.c_str());
         return;
     }
     if (!last_result_) {

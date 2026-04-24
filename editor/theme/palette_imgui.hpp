@@ -21,24 +21,63 @@ namespace gw::editor::theme {
     return ImGui::GetColorU32(imgui_vec4(c, alpha_scale));
 }
 
+[[nodiscard]] inline const Palette& active_palette() noexcept {
+    return ThemeRegistry::instance().active().palette;
+}
+
+/// Elevation ramp: 1 = menu/toolbar step, 2 = popups, 3 = peak chrome.
+[[nodiscard]] inline ImVec4 active_surface_imgui(int level) noexcept {
+    const Palette& p = active_palette();
+    switch (level) {
+    case 1: return imgui_vec4(p.surface_1);
+    case 2: return imgui_vec4(p.surface_2);
+    case 3: return imgui_vec4(p.surface_3);
+    default: return imgui_vec4(p.panel);
+    }
+}
+
 [[nodiscard]] inline ImVec4 active_positive_imgui() noexcept {
-    return imgui_vec4(ThemeRegistry::instance().active().palette.positive);
+    return imgui_vec4(active_palette().positive);
 }
 
 [[nodiscard]] inline ImVec4 active_muted_imgui() noexcept {
-    return imgui_vec4(ThemeRegistry::instance().active().palette.text_muted);
+    return imgui_vec4(active_palette().text_muted);
 }
 
 [[nodiscard]] inline ImVec4 active_warning_imgui() noexcept {
-    return imgui_vec4(ThemeRegistry::instance().active().palette.warning);
+    return imgui_vec4(active_palette().warning);
 }
 
 [[nodiscard]] inline ImVec4 active_accent_imgui() noexcept {
-    return imgui_vec4(ThemeRegistry::instance().active().palette.accent);
+    return imgui_vec4(active_palette().accent);
 }
 
 [[nodiscard]] inline ImVec4 active_accent_secondary_imgui() noexcept {
-    return imgui_vec4(ThemeRegistry::instance().active().palette.accent_secondary);
+    return imgui_vec4(active_palette().accent_secondary);
+}
+
+[[nodiscard]] inline ImVec4 active_accent_strong_imgui() noexcept {
+    return imgui_vec4(active_palette().accent_strong);
+}
+
+[[nodiscard]] inline ImVec4 active_destructive_imgui() noexcept {
+    return imgui_vec4(active_palette().destructive);
+}
+
+[[nodiscard]] inline ImVec4 active_info_imgui() noexcept {
+    return imgui_vec4(active_palette().info);
+}
+
+[[nodiscard]] inline ImVec4 active_link_imgui() noexcept {
+    return imgui_vec4(active_palette().link);
+}
+
+[[nodiscard]] inline ImVec4 active_focus_imgui() noexcept {
+    return imgui_vec4(active_palette().focus);
+}
+
+[[nodiscard]] inline ImVec4 active_on_accent_imgui() noexcept {
+    return imgui_vec4(active_palette().on_accent);
 }
 
 } // namespace gw::editor::theme

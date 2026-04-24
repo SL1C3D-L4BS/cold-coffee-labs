@@ -274,7 +274,8 @@ void AmbientCgBrowser::draw_material_forge_chrome(gw::editor::EditorContext& ctx
         ImGui::TextDisabled("Index: %s", resolved_index_path_->string().c_str());
     }
     if (!load_error_.empty())
-        ImGui::TextColored(ImVec4{1.f, 0.4f, 0.4f, 1.f}, "%s", load_error_.c_str());
+        ImGui::TextColored(gw::editor::theme::active_destructive_imgui(), "%s",
+                           load_error_.c_str());
     if (ImGui::Button("Reload index")) {
         request_reload();
         try_load_index(ctx.project_root);

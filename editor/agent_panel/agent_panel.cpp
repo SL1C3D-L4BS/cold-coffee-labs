@@ -19,13 +19,18 @@ namespace gw::editor::agent {
 namespace {
 
 ImVec4 role_accent(MsgRole r) {
+    using gw::editor::theme::active_accent_secondary_imgui;
+    using gw::editor::theme::active_info_imgui;
+    using gw::editor::theme::active_link_imgui;
+    using gw::editor::theme::active_muted_imgui;
+    using gw::editor::theme::active_warning_imgui;
     switch (r) {
-        case MsgRole::User:      return {0.30f, 0.79f, 0.65f, 1.f};  // teal
-        case MsgRole::Assistant: return {0.62f, 0.72f, 0.96f, 1.f};  // pale blue
-        case MsgRole::Tool:      return {0.96f, 0.65f, 0.14f, 1.f};  // amber
-        case MsgRole::System:    return {0.55f, 0.58f, 0.68f, 1.f};  // grey
+        case MsgRole::User:      return active_info_imgui();
+        case MsgRole::Assistant: return active_link_imgui();
+        case MsgRole::Tool:      return active_warning_imgui();
+        case MsgRole::System:    return active_muted_imgui();
     }
-    return {1.f, 1.f, 1.f, 1.f};
+    return active_accent_secondary_imgui();
 }
 
 const char* role_label(MsgRole r) {
@@ -50,14 +55,19 @@ const char* status_label(SessionStatus s) {
 }
 
 ImVec4 status_accent(SessionStatus s) {
+    using gw::editor::theme::active_accent_secondary_imgui;
+    using gw::editor::theme::active_accent_strong_imgui;
+    using gw::editor::theme::active_muted_imgui;
+    using gw::editor::theme::active_positive_imgui;
+    using gw::editor::theme::active_warning_imgui;
     switch (s) {
-        case SessionStatus::Idle:         return {0.30f, 0.79f, 0.65f, 1.f};
-        case SessionStatus::Thinking:     return {0.96f, 0.65f, 0.14f, 1.f};
-        case SessionStatus::Acting:       return {0.98f, 0.45f, 0.23f, 1.f};
-        case SessionStatus::Awaiting:     return {0.84f, 0.30f, 0.62f, 1.f};
-        case SessionStatus::Disconnected: return {0.55f, 0.58f, 0.68f, 1.f};
+        case SessionStatus::Idle:         return active_positive_imgui();
+        case SessionStatus::Thinking:     return active_warning_imgui();
+        case SessionStatus::Acting:       return active_accent_strong_imgui();
+        case SessionStatus::Awaiting:     return active_accent_secondary_imgui();
+        case SessionStatus::Disconnected: return active_muted_imgui();
     }
-    return {1.f, 1.f, 1.f, 1.f};
+    return active_accent_secondary_imgui();
 }
 
 }  // namespace
@@ -193,7 +203,7 @@ void AgentPanel::render_transcript() {
         ImGui::PushStyleColor(
             ImGuiCol_ChildBg,
             gw::editor::theme::imgui_vec4(
-                gw::editor::theme::ThemeRegistry::instance().active().palette.panel));
+                gw::editor::theme::ThemeRegistry::instance().active().palette.surface_1));
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, kBubbleRounding);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
                             ImVec2{kBubblePadding, kBubblePadding});
@@ -284,7 +294,7 @@ void AgentPanel::render_elicitation_modal() {
     if (ImGui::BeginPopupModal("BLD requests approval##elicit",
                                 nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         const ElicitationRequest& req = elicitations_.front();
-        ImGui::TextColored({0.96f, 0.65f, 0.14f, 1.f}, "Tool: %s",
+        ImGui::TextColored(gw::editor::theme::active_warning_imgui(), "Tool: %s",
                            req.tool_id.c_str());
         ImGui::Separator();
         ImGui::PushTextWrapPos(480.f);

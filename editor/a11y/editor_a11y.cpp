@@ -20,10 +20,12 @@ void apply(const EditorA11yConfig& cfg) noexcept {
     if (cfg.force_high_contrast) {
         theme.set_active(gw::editor::theme::ThemeId::FieldTestHC);
     }
+    theme.set_wong_semantic_overlay(cfg.colour_blind_wong && !cfg.force_high_contrast);
+    theme.set_reduce_motion(cfg.reduce_motion);
     if (cfg.reduce_corruption) {
-        theme.override_effect(gw::editor::theme::EF_Distressed,  false);
+        theme.override_effect(gw::editor::theme::EF_Distressed, false);
         theme.override_effect(gw::editor::theme::EF_GlitchHover, false);
-        theme.override_effect(gw::editor::theme::EF_CornerCracks,false);
+        theme.override_effect(gw::editor::theme::EF_CornerCracks, false);
     }
     if (cfg.disable_vignette) {
         theme.override_effect(gw::editor::theme::EF_Vignette, false);

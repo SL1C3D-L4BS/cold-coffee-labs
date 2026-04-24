@@ -21,7 +21,7 @@ constexpr TypographyPack TYPO_CORRUPTED_RELIC{
     "assets/editor/fonts/metamorphous_display.gwtex",
     "assets/editor/fonts/metamorphous_body.gwtex",
     "assets/editor/fonts/jetbrains_mono.gwtex",
-    20.f, 14.f, 13.f,
+    20.f, 15.f, 13.f,
 };
 
 constexpr TypographyPack TYPO_BREWED_SLATE{

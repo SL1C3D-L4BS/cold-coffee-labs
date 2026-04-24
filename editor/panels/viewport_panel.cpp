@@ -133,8 +133,8 @@ void ViewportPanel::draw_toolbar(EditorContext& ctx) {
     if (!in_pie) ImGui::EndDisabled();
 
     if (pie_transport_fail_flash_ > 0) {
-        ImGui::TextColored(ImVec4{1.f, 0.4f, 0.35f, 1.f},
-            "Could not enter Play (snapshot or gameplay module). See stderr.");
+        ImGui::TextColored(gw::editor::theme::active_destructive_imgui(),
+                            "Could not enter Play (snapshot or gameplay module). See stderr.");
     }
 
     ImGui::SameLine(0.f, 16.f);

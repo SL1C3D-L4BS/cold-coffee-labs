@@ -36,9 +36,29 @@ Theme theme_for(ThemeId id) noexcept {
     return t;
 }
 
-void ThemeRegistry::set_active(ThemeId id) noexcept {
-    active_ = theme_for(id);
+ThemeRegistry::ThemeRegistry() noexcept : stored_theme_id_{ThemeId::BrewedSlate} {
+    rebuild_composed_theme();
 }
+
+void ThemeRegistry::rebuild_composed_theme() noexcept {
+    active_ = theme_for(stored_theme_id_);
+    if (wong_semantic_overlay_ && stored_theme_id_ != ThemeId::FieldTestHC) {
+        active_.palette = overlay_wong_semantics(active_.palette);
+        active_.graph    = overlay_wong_graph_semantics(active_.graph);
+    }
+}
+
+void ThemeRegistry::set_active(ThemeId id) noexcept {
+    stored_theme_id_ = id;
+    rebuild_composed_theme();
+}
+
+void ThemeRegistry::set_wong_semantic_overlay(bool on) noexcept {
+    wong_semantic_overlay_ = on;
+    rebuild_composed_theme();
+}
+
+void ThemeRegistry::set_reduce_motion(bool on) noexcept { reduce_motion_ = on; }
 
 void ThemeRegistry::override_effect(ThemeEffectFlags flag, bool on) noexcept {
     active_.effects.set(flag, on);

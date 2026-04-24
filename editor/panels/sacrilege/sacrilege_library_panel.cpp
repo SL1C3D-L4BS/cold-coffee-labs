@@ -191,7 +191,8 @@ void SacrilegeLibraryPanel::on_imgui_render(gw::editor::EditorContext& ctx) {
     ImGui::TextDisabled("Sacrilege Library — indexed materials & textures + CC0 baseline.");
     ImGui::InputTextWithHint("##lib_filt", "Filter id…", cat_filter_, sizeof(cat_filter_));
     if (!catalog_err_.empty())
-        ImGui::TextColored(ImVec4{1.f, 0.45f, 0.35f, 1.f}, "%s", catalog_err_.c_str());
+        ImGui::TextColored(gw::editor::theme::active_destructive_imgui(), "%s",
+                           catalog_err_.c_str());
 
     if (ImGui::BeginTabBar("##lib_tabs")) {
         if (ImGui::BeginTabItem("Materials")) {

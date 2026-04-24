@@ -10,6 +10,11 @@
 namespace gw::editor::theme {
 
 void tick_pulse(CorruptionPulseState& s, float dt_sec) noexcept {
+    if (ThemeRegistry::instance().reduce_motion()) {
+        s.amplitude = 0.f;
+        s.target    = 0.f;
+        return;
+    }
     const float step = s.decay_per_sec * dt_sec;
     if (s.amplitude < s.target) {
         s.amplitude = std::min(s.amplitude + step * 4.f, s.target);
@@ -24,6 +29,8 @@ void trigger_pulse(CorruptionPulseState& s, float magnitude) noexcept {
 }
 
 void draw_pulse_overlay(const CorruptionPulseState& s) noexcept {
+    if (ThemeRegistry::instance().reduce_motion())
+        return;
     if (s.amplitude <= 0.001f) return;
     const ThemeEffects& fx = ThemeRegistry::instance().active().effects;
     if (!fx.has(EF_Vignette)) return;

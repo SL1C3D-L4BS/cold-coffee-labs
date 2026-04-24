@@ -40,10 +40,26 @@ public:
     /// Per-user opt-in toggle for individual effects without switching theme.
     void override_effect(ThemeEffectFlags flag, bool on) noexcept;
 
-private:
-    ThemeRegistry() noexcept { set_active(ThemeId::BrewedSlate); }
+    /// Wong accent overlay on current theme surfaces (no-op when Field Test HC).
+    void set_wong_semantic_overlay(bool on) noexcept;
 
-    Theme active_{};
+    /// Minimize vignette pulse, glitch, and border jitter (presentation-only).
+    void set_reduce_motion(bool on) noexcept;
+
+    [[nodiscard]] bool wong_semantic_overlay() const noexcept {
+        return wong_semantic_overlay_;
+    }
+    [[nodiscard]] bool reduce_motion() const noexcept { return reduce_motion_; }
+
+private:
+    ThemeRegistry() noexcept;
+
+    void rebuild_composed_theme() noexcept;
+
+    ThemeId stored_theme_id_{ThemeId::BrewedSlate};
+    bool      wong_semantic_overlay_{false};
+    bool      reduce_motion_{false};
+    Theme     active_{};
 };
 
 [[nodiscard]] Theme theme_for(ThemeId id) noexcept;

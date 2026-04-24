@@ -13,6 +13,7 @@ struct EditorA11yConfig {
     bool force_mono_font    = false;  // JetBrains Mono everywhere
     bool keyboard_only_nav  = false;  // promote Tab order, hide mouse hints
     bool colour_blind_wong  = false;  // Wong palette overlay
+    bool reduce_motion      = false;  // vignette pulse, glitch offset, border jitter
 };
 
 /// Persist / load to editor config TOML via engine/core/config.
