@@ -1,6 +1,7 @@
 // editor/panels/viewport_panel.cpp
 // Spec ref: Phase 7 §6 — offscreen render target, camera, gizmos, debug draw.
 #include "viewport_panel.hpp"
+#include "editor/bld_api/editor_bld_api.hpp"
 #include "editor/theme/palette_imgui.hpp"
 #include "editor/viewport/debug_draw.hpp"
 #include "editor/scene/components.hpp"
@@ -108,18 +109,33 @@ void ViewportPanel::draw_toolbar(EditorContext& ctx) {
     float btn_size = 24.f;
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {4.f, 2.f});
 
+    if (pie_transport_fail_flash_ > 0)
+        --pie_transport_fail_flash_;
+
     bool in_pie = ctx.in_pie;
     if (in_pie) ImGui::BeginDisabled();
     if (ImGui::Button("  Play  ", {0.f, btn_size})) {
-        // PIE enter — wired in EditorApplication via callback.
+        if (!gw_editor_enter_play())
+            pie_transport_fail_flash_ = 120;
     }
     if (in_pie) ImGui::EndDisabled();
 
     ImGui::SameLine();
     if (!in_pie) ImGui::BeginDisabled();
-    if (ImGui::Button(" Pause ", {0.f, btn_size})) {}
-    if (ImGui::Button("  Stop  ", {0.f, btn_size})) {}
+    const char* pause_label = ctx.pie_paused ? "Resume" : " Pause ";
+    if (ImGui::Button(pause_label, {0.f, btn_size})) {
+        if (ctx.pie_pause_toggle)
+            ctx.pie_pause_toggle(ctx.pie_pause_user_data);
+    }
+    if (ImGui::Button("  Stop  ", {0.f, btn_size})) {
+        (void)gw_editor_stop();
+    }
     if (!in_pie) ImGui::EndDisabled();
+
+    if (pie_transport_fail_flash_ > 0) {
+        ImGui::TextColored(ImVec4{1.f, 0.4f, 0.35f, 1.f},
+            "Could not enter Play (snapshot or gameplay module). See stderr.");
+    }
 
     ImGui::SameLine(0.f, 16.f);
 

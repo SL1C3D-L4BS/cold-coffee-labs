@@ -37,6 +37,11 @@ struct EditorContext {
     /// Editor Vulkan timestamps: scene pass → post/ImGui (not full shared frame graph).
     float                      framegraph_gpu_ms = 0.f;
     bool                       in_pie       = false;
+    /// True while PIE is paused (`in_pie` is still true). Toolbar Pause/Resume label.
+    bool                       pie_paused   = false;
+    /// Host-only: toggles pause/resume when in PIE (same behavior as Play menu / F6).
+    void (*pie_pause_toggle)(void* user_data) = nullptr;
+    void*                      pie_pause_user_data = nullptr;
     /// Phase 18-B — optional; nullptr in headless tests.
     gw::seq::SequencerWorld*          sequencer          = nullptr;
     gw::seq::CinematicCameraSystem*   cinematic          = nullptr;

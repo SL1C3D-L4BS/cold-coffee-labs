@@ -75,6 +75,8 @@ private:
     int               blockout_tool_      = 0;
     int               blockout_place_seq_ = 0;
     int               blockout_shape_     = 0; // 0 box … 3 ramp (see BlockoutPrimitiveComponent)
+    /// Frames remaining to show Play-enter failure banner after `gw_editor_enter_play` returns false.
+    int               pie_transport_fail_flash_ = 0;
     bool              snap_grid_enabled_  = false;
     float             snap_grid_step_     = 1.f;
     bool              gizmo_was_using_    = false;

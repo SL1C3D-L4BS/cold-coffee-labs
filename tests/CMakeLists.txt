@@ -12,6 +12,7 @@
 #   ctest -R "encounter_director"
 #   ctest -R "simulation_step"
 #   ctest -R "gameplay_host"
+#   ctest -R "EditorContext"
 # Also run `gw_runtime --self-test`, `sandbox_playable`, determinism.yml, and
 # sandboxes (director_budgets, living_sandbox, god_machine_rc) per CI jobs.
 
@@ -69,6 +70,7 @@ add_executable(gw_tests
     unit/editor/franchise_roots_test.cpp
     "${CMAKE_SOURCE_DIR}/editor/shell/franchise_roots.cpp"
     unit/editor/selection_test.cpp
+    unit/editor/editor_context_test.cpp
     # Editor implementation units needed by tests (not part of gw_editor binary).
     "${CMAKE_SOURCE_DIR}/editor/selection/selection_context.cpp"
     # Phase 10 — Runtime I: Audio

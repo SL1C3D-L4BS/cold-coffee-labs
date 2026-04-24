@@ -320,4 +320,34 @@ One paragraph explaining what this builds on and why it matters now.
 
 ---
 
+## Editor stub audit backlog (Phase 24 tooling)
+
+**Audit scope:** `apps/`, `editor/`, `engine/`, `gameplay/`, `runtime/`, `bld/` (exclude `third_party/`). **Method:** ripgrep for `stub`, `scaffold`, `Unimplemented` (Rust), `GW_UNIMPLEMENTED`, and comments of the form “wired in Phase …” / “lands in Phase …”, then classify each hit as **A** (user-visible dead UI), **B** (authoring/runtime seam), **C** (intentional infra, e.g. ADR-0018 spatial stub), **D** (future-phase engine or tool taxonomy).
+
+**Counts (indicative, 2026-04-24):** `stub|scaffold` appears across dozens of engine/editor files (theme scaffolds, PIE overlay shells, `engine/audio/spatial.*`, services such as `material_forge`, `editor_copilot`, `combat_simulator`, etc.). `GW_UNIMPLEMENTED` remains in `engine/core/assert.*` and `engine/render/frame_graph/submit.cpp`. Rust `Unimplemented` surfaces in `bld/bld-tools/src/lib.rs` and `bld/bld-mcp/src/server.rs` (tool taxonomy).
+
+### Prioritized follow-ups (tracked here until ticketed)
+
+| Priority | Class | Item | Notes |
+|----------|-------|------|--------|
+| Done (2026-04-24) | A | Viewport **Play / Pause / Stop** | Calls `gw_editor_enter_play` / `gw_editor_stop` and `EditorContext::pie_pause_toggle` (parity with **Play** menu and **F5 / F6 / Shift+F5**). Enter-play failure shows a short ImGui banner. |
+| P1 | A | **Console** panel | Still placeholder copy in `editor/panels/console_panel.hpp`; wire `gw_editor_log` sink + scrollback (Phase 11 scope). |
+| P1 | B | **Editor scene RT mesh draw** | `editor/app/editor_app.cpp` `begin_frame` clears RT only; mesh pass + honest primitives vs debug AABB overlay. |
+| P2 | B | **Viewport asset drop** | Asset path ignored after entity create (`viewport_panel.cpp`); needs `AssetDatabase` + mesh assignment. |
+| P2 | B | **`EditorContext::asset_db`** | Always `nullptr` until Phase 8 wiring. |
+| P2 | D | **IBL** `engine/render/ibl/ibl.cpp` | KTX/HDR paths still stderr-stubbed. |
+| P2 | D | **PIE rollback inspector draw** | `gameplay_host.cpp` — overlay scaffold no-op until Phase 22 persistence. |
+| P3 | D | **BLD tool bodies** | `bld-tools` / `bld-mcp` — implement per tool when agent workflows need them. |
+
+### Manual checklist — Viewport PIE transport vs keyboard
+
+Run `gw_editor`, open a project to **MainEditor**, focus the **Viewport** panel:
+
+1. **Play:** Toolbar **Play** and **F5** both enter PIE (Outliner/time advance consistent with menu **Play → Play**).
+2. **Pause:** Toolbar **Pause** / **Resume** and **F6** both toggle paused simulation (`GameplayHost::PIEState`).
+3. **Stop:** Toolbar **Stop** and **Shift+F5** both exit PIE and restore the pre-play snapshot.
+4. **Failure path:** If enter play fails (e.g. snapshot/DLL), toolbar shows red banner for ~2 s; stderr retains detailed errors from `GameplayHost`.
+
+---
+
 *The phase is the contract. The week is the budget. The milestone is the proof.*

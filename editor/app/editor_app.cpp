@@ -522,6 +522,10 @@ void EditorApplication::run() {
             .delta_time_s = dt,
             .framegraph_gpu_ms = vk_->last_gpu_time_ms,
             .in_pie       = pie_.in_play(),
+            .pie_paused   = pie_.in_play() &&
+                (pie_.state() == GameplayHost::PIEState::Paused),
+            .pie_pause_toggle     = &EditorApplication::pie_pause_toggle_static,
+            .pie_pause_user_data  = this,
             .sequencer    = &sequencer_world_,
             .cinematic    = &cinematic_camera_,
             .scene_color_descriptor = reinterpret_cast<void*>(vk_->scene_imgui_ds),
@@ -2098,6 +2102,15 @@ void EditorApplication::on_framebuffer_resize(GLFWwindow* w,
                                                int /*width*/, int /*height*/) {
     auto* app = static_cast<EditorApplication*>(glfwGetWindowUserPointer(w));
     if (app) app->swapchain_resize_pending_ = true;
+}
+
+void EditorApplication::pie_pause_toggle_static(void* user_data) {
+    auto* app = static_cast<EditorApplication*>(user_data);
+    if (!app || !app->pie_.in_play()) return;
+    if (app->pie_.state() == GameplayHost::PIEState::Paused)
+        app->pie_.resume();
+    else
+        app->pie_.pause();
 }
 
 void EditorApplication::on_drop_paths(GLFWwindow* w, int count, const char** paths) {

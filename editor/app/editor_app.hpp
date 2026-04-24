@@ -113,6 +113,9 @@ private:
     static void on_framebuffer_resize(GLFWwindow* w, int width, int height);
     static void on_drop_paths(GLFWwindow* w, int count, const char** paths);
 
+    /// `EditorContext::pie_pause_toggle` — matches Play menu Pause/Resume / F6.
+    static void pie_pause_toggle_static(void* user_data);
+
     // -----------------------------------------------------------------------
     // State
     // -----------------------------------------------------------------------
