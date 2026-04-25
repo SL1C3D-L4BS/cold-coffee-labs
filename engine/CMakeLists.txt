@@ -124,6 +124,7 @@ target_sources(greywater_core
         play/play_bootstrap_cvars.cpp
         core/version.cpp
         core/log.cpp
+        replay/gameplay_replay_validate.cpp
         core/assert.cpp
         core/error.cpp
         core/string.cpp
@@ -156,6 +157,7 @@ target_sources(greywater_core
             core/hash_map.hpp
             core/ring_buffer.hpp
             core/string.hpp
+            replay/gameplay_replay_validate.hpp
             platform/window.hpp
             platform/input.hpp
             platform/time.hpp

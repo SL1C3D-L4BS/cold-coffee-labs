@@ -1,12 +1,15 @@
-// tests/fuzz/fuzz_dialogue_graph.cpp — Part C §25 scaffold (ADR-0117).
-// LibFuzzer harness for the narrative dialogue graph parser.
+// tests/fuzz/fuzz_dialogue_graph.cpp — narrative line harness.
+
+#include "engine/narrative/dialogue_graph.hpp"
 
 #include <cstddef>
 #include <cstdint>
+#include <span>
 
-extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size) {
-    // TODO(#gw-fuzz-25): parse via gw::narrative::parse_dialogue_graph().
-    (void)data;
-    (void)size;
+extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, const std::size_t size) {
+    if (data == nullptr) {
+        return 0;
+    }
+    gw::narrative::parse_dialogue_graph_fuzz_harness(std::span<const std::uint8_t>(data, size));
     return 0;
 }

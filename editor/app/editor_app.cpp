@@ -37,6 +37,7 @@
 #include "engine/ecs/hierarchy.hpp"
 #include "engine/scene/seq/seq_cut.hpp"
 #include "engine/scene/scene_file.hpp"
+#include "engine/core/log.hpp"
 #include "engine/platform/process.hpp"
 #include "engine/play/playable_paths.hpp"
 #include "engine/play/play_bootstrap_cvars.hpp"
@@ -438,6 +439,8 @@ void EditorApplication::bld_pie_stop() {
 // Main loop
 // ---------------------------------------------------------------------------
 void EditorApplication::run() {
+    gw::core::log_init_from_environment();
+
     double last_time = glfwGetTime();
 
     while (!glfwWindowShouldClose(window_) && running_) {

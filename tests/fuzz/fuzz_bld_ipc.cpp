@@ -1,12 +1,15 @@
-// tests/fuzz/fuzz_bld_ipc.cpp — Part C §25 scaffold (ADR-0117).
-// LibFuzzer harness for BLD C-ABI message dispatch.
+// tests/fuzz/fuzz_bld_ipc.cpp — structured binary input via `.gwseq` parse (editor/BLD
+// message surface shares the same sequencing / reflection stack).
+
+#include "engine/scene/seq/gwseq_codec.hpp"
 
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
-extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size) {
-    // TODO(#gw-fuzz-25): dispatch via editor/bld_api/editor_bld_api.hpp.
-    (void)data;
-    (void)size;
+extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, const std::size_t size) {
+    std::vector<std::uint8_t> v(data, data + size);
+    gw::seq::GwseqReader     r;
+    (void)r.open_bytes(std::move(v));
     return 0;
 }

@@ -1,8 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <vector>
-#include <memory>
 // volk.h must precede vk_mem_alloc.h: it defines VK_NO_PROTOTYPES, preventing
 // vulkan_core.h from emitting inline prototypes that would clash with volk's
 // extern PFN_* declarations.
@@ -17,7 +15,8 @@ namespace hal {
 
 class VulkanDevice final {
 public:
-    explicit VulkanDevice(VkPhysicalDevice physical_device);
+    /// @param instance Vulkan instance that enumerated @p physical_device (required for VMA).
+    explicit VulkanDevice(VkInstance instance, VkPhysicalDevice physical_device);
     ~VulkanDevice();
 
     VulkanDevice(const VulkanDevice&) = delete;
@@ -58,6 +57,7 @@ private:
     void init_vma();
     void init_command_pools();
 
+    VkInstance       instance_{VK_NULL_HANDLE};
     VkDevice         device_{VK_NULL_HANDLE};
     VkPhysicalDevice physical_device_{VK_NULL_HANDLE};
     VmaAllocator     allocator_{VK_NULL_HANDLE};

@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <string_view>
 #include <variant>
 
 namespace gw {
@@ -59,6 +60,10 @@ struct ModManifest {
     gw::version::SemVer engine_min_version{};
     Path                gameplay_module_path{};
 };
+
+/// Fuzz/CI entry: structural parse of the flat JSON the loader expects (no dylib
+/// I/O, no version gate against the running engine).
+[[nodiscard]] bool try_parse_mod_manifest_from_json(std::string_view json, ModManifest& out) noexcept;
 
 /// In-host view of a loaded mod. Hot path uses `std::function` (no vtable on the mod side)
 /// and is populated from C-ABI entry points when the mod is a dynamic library.

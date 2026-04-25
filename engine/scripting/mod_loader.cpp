@@ -298,5 +298,34 @@ void ModRegistry::tick_all(gw::ecs::World& world, const f32 dt) {
     poll_hot_reload_(world);
 }
 
+bool try_parse_mod_manifest_from_json(const std::string_view json, ModManifest& out) noexcept {
+    if (json.empty()) {
+        return false;
+    }
+    const std::string j{json};
+
+    std::string mod_id;
+    std::string display;
+    std::string ver;
+    std::string eng;
+    if (!parse_quoted(j, "mod_id", mod_id) || !parse_quoted(j, "version", ver) ||
+        !parse_quoted(j, "engine_min_version", eng)) {
+        return false;
+    }
+    if (!parse_quoted(j, "display_name", display)) {
+        display = mod_id;
+    }
+
+    ModManifest man{};
+    if (!man.mod_id.assign(mod_id) || !man.display_name.assign(display)) {
+        return false;
+    }
+    if (!parse_ver(ver, man.version) || !parse_ver(eng, man.engine_min_version)) {
+        return false;
+    }
+    out = std::move(man);
+    return true;
+}
+
 }  // namespace scripting
 }  // namespace gw

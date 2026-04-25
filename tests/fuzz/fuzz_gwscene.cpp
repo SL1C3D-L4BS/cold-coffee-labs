@@ -1,13 +1,14 @@
-// tests/fuzz/fuzz_gwscene.cpp — Part C §25 scaffold (ADR-0117).
-// LibFuzzer harness for the .gwscene loader.
+// tests/fuzz/fuzz_gwscene.cpp — LibFuzzer harness for `.gwscene` / decode_scene.
+
+#include "engine/ecs/world.hpp"
+#include "engine/scene/scene_file.hpp"
 
 #include <cstddef>
 #include <cstdint>
+#include <span>
 
-extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size) {
-    // TODO(#gw-fuzz-25): call gw::scene::parse_gwscene(data, size) once the
-    // loader exposes a byte-buffer entry point.
-    (void)data;
-    (void)size;
+extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, const std::size_t size) {
+    gw::ecs::World w;
+    (void)gw::scene::decode_scene(std::span<const std::uint8_t>(data, size), w, {});
     return 0;
 }

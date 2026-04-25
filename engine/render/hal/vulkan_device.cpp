@@ -1,7 +1,8 @@
 #include "vulkan_device.hpp"
 #include <volk.h>
+#include <cstring>
 #include <stdexcept>
-#include <algorithm>
+#include <vector>
 
 #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
@@ -10,8 +11,9 @@ namespace gw {
 namespace render {
 namespace hal {
 
-VulkanDevice::VulkanDevice(VkPhysicalDevice physical_device)
-    : physical_device_(physical_device) {
+VulkanDevice::VulkanDevice(VkInstance instance, VkPhysicalDevice physical_device)
+    : instance_(instance)
+    , physical_device_(physical_device) {
 
     // Get device properties and features
     vkGetPhysicalDeviceProperties(physical_device, &properties_);
@@ -100,6 +102,9 @@ VulkanDevice::VulkanDevice(VkPhysicalDevice physical_device)
     // Create logical device
     std::vector<VkDeviceQueueCreateInfo> queue_create_infos;
     std::vector<float> queue_priorities;
+    // Up to 3 queue create infos; reserve so emplace_back cannot reallocate and
+    // invalidate pQueuePriorities pointers stored in queue_create_infos.
+    queue_priorities.reserve(3);
     
     // Graphics queue
     if (graphics_queue_family_ != UINT32_MAX) {
@@ -225,7 +230,7 @@ void VulkanDevice::init_vma() {
     VmaAllocatorCreateInfo ai{};
     ai.physicalDevice   = physical_device_;
     ai.device           = device_;
-    ai.instance         = VK_NULL_HANDLE;  // optional; filled when instance is passed in
+    ai.instance         = instance_;
     ai.vulkanApiVersion = VK_API_VERSION_1_2;
     ai.pVulkanFunctions = &vk_fns;
 
@@ -254,7 +259,8 @@ VulkanDevice::~VulkanDevice() {
 }
 
 VulkanDevice::VulkanDevice(VulkanDevice&& other) noexcept
-    : device_(other.device_)
+    : instance_(other.instance_)
+    , device_(other.device_)
     , physical_device_(other.physical_device_)
     , allocator_(other.allocator_)
     , graphics_queue_(other.graphics_queue_)
@@ -268,6 +274,7 @@ VulkanDevice::VulkanDevice(VulkanDevice&& other) noexcept
     , properties_(other.properties_)
     , memory_properties_(other.memory_properties_)
     , caps_(other.caps_) {
+    other.instance_          = VK_NULL_HANDLE;
     other.device_            = VK_NULL_HANDLE;
     other.physical_device_   = VK_NULL_HANDLE;
     other.allocator_         = VK_NULL_HANDLE;
@@ -277,6 +284,7 @@ VulkanDevice::VulkanDevice(VulkanDevice&& other) noexcept
 VulkanDevice& VulkanDevice::operator=(VulkanDevice&& other) noexcept {
     if (this != &other) {
         release();
+        instance_              = other.instance_;
         device_                = other.device_;
         physical_device_       = other.physical_device_;
         allocator_             = other.allocator_;
@@ -291,6 +299,7 @@ VulkanDevice& VulkanDevice::operator=(VulkanDevice&& other) noexcept {
         properties_            = other.properties_;
         memory_properties_     = other.memory_properties_;
         caps_                  = other.caps_;
+        other.instance_          = VK_NULL_HANDLE;
         other.device_            = VK_NULL_HANDLE;
         other.physical_device_   = VK_NULL_HANDLE;
         other.allocator_         = VK_NULL_HANDLE;

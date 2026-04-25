@@ -38,4 +38,7 @@ private:
     std::span<const DialogueLine> lines_{};
 };
 
+/// LibFuzzer/CI: exercise UTF-8 line splitting + `DialogueGraph::find` on stable ids.
+void parse_dialogue_graph_fuzz_harness(std::span<const std::uint8_t> data) noexcept;
+
 } // namespace gw::narrative

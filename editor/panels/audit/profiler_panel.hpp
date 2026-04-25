@@ -1,5 +1,5 @@
 #pragma once
-// editor/panels/audit/profiler_panel.hpp — Part C §23 scaffold.
+// editor/panels/audit/profiler_panel.hpp — GPU ms sparkline, ECS count, Tracy hints.
 
 #include "editor/panels/panel.hpp"
 

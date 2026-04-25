@@ -19,10 +19,17 @@
 #include "engine/render/frame_graph/frame_graph.hpp"
 #include "engine/render/frame_graph/types.hpp"
 #include "engine/render/frame_graph/error.hpp"
+#include "engine/render/hal/vulkan_device.hpp"
+#include "engine/render/hal/vulkan_instance.hpp"
+#include "engine/render/validation/milestone_validator.hpp"
+
+#include <volk.h>
+
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <exception>
 #include <string>
 #include <vector>
 
@@ -228,14 +235,54 @@ int main() {
     test_fg_mixed_queue_passes();
     test_fg_compile_time();
 
-    // GPU mode (optional) — only when run with GW_GPU_TESTS=1
+    // GPU mode (optional) — GW_GPU_TESTS=1. Full MilestoneValidator on a real
+    // hal::VulkanDevice (incl. ~5 s performance benchmark; see milestone_validator).
     const char* gpu_env = std::getenv("GW_GPU_TESTS");
     if (gpu_env && std::string(gpu_env) == "1") {
-        std::fprintf(stdout, "\n[perf-gate] GPU mode enabled — MilestoneValidator full run\n");
-        std::fprintf(stdout, "    (GPU validation stub: wired after hal::VulkanDevice window integration)\n");
-        // TODO(w032-gpu): Instantiate hal::VulkanDevice + MilestoneValidator here.
-        //   Requires GLFW headless context or offscreen swapchain.
-        //   Target: validate_foundation_renderer() returns passed=true.
+        std::fprintf(stdout,
+            "\n[perf-gate] GPU mode: MilestoneValidator (frame graph + forward+ + CSM + "
+            "IBL + async + perf)\n");
+        try {
+            if (volkInitialize() != VK_SUCCESS) {
+                check(false, "volkInitialize");
+            } else {
+                gw::render::hal::VulkanInstance vinst("gw_foundation_perf_gpu");
+                VkInstance inst = vinst.native_handle();
+                std::uint32_t n = 0;
+                vkEnumeratePhysicalDevices(inst, &n, nullptr);
+                if (n == 0) {
+                    check(false, "vkEnumeratePhysicalDevices: zero GPUs");
+                } else {
+                    std::vector<VkPhysicalDevice> gpus(static_cast<std::size_t>(n));
+                    vkEnumeratePhysicalDevices(inst, &n, gpus.data());
+                    VkPhysicalDevice phys = gpus[0];
+                    for (const auto g : gpus) {
+                        VkPhysicalDeviceProperties p{};
+                        vkGetPhysicalDeviceProperties(g, &p);
+                        if (p.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
+                            phys = g;
+                            break;
+                        }
+                    }
+                    gw::render::hal::VulkanDevice vdev(inst, phys);
+                    check(vdev.native_handle() != VK_NULL_HANDLE,
+                        "hal::VulkanDevice valid logical device (GPU smoke)");
+
+                    gw::render::validation::MilestoneValidator   validator(vdev);
+                    const gw::render::validation::MilestoneConfig full_cfg{};
+                    const auto init = validator.initialize(full_cfg);
+                    if (!init) {
+                        check(false, "MilestoneValidator::initialize");
+                    } else {
+                        const auto milestone = validator.validate_foundation_renderer();
+                        check(milestone.passed, "MilestoneValidator::validate_foundation_renderer");
+                    }
+                }
+            }
+        } catch (const std::exception& ex) {
+            std::fprintf(stderr, "  GPU path exception: %s\n", ex.what());
+            check(false, "GPU path exception");
+        }
     }
 
     std::fprintf(stdout, "\n=== Results: %d failure(s) ===\n", g_failed);

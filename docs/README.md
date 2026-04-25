@@ -71,6 +71,8 @@
 
 **Conflict resolution:** `01` → `07` → `11` → `08` → `06` → `04` → `09`. ADRs always win over prose. When `07` and `11` disagree, `07` owns mechanics and budgets; `11` owns narrative, voice, and canon lore.
 
+**Implementation completeness (Cursor):** The **Stub completion program** plan (saved in Cursor Plans) is the engineering closeout for **live code** (no dead stubs in shipped surfaces). It does **not** override `01`: words like **optional** in this README still mean **product / player** optionals where the Constitution allows — not “leave the C++ path empty.” See `02_ROADMAP_AND_OPERATIONS.md` § *Stub Completion Program alignment*.
+
 ---
 
 ## The Game Vision

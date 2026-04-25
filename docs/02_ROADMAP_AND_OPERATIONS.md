@@ -337,7 +337,18 @@ One paragraph explaining what this builds on and why it matters now.
 | P2 | B | **`EditorContext::asset_db`** | Always `nullptr` until Phase 8 wiring. |
 | P2 | D | **IBL** `engine/render/ibl/ibl.cpp` | KTX/HDR paths still stderr-stubbed. |
 | P2 | D | **PIE rollback inspector draw** | `gameplay_host.cpp` — overlay scaffold no-op until Phase 22 persistence. |
-| P3 | D | **BLD tool bodies** | `bld-tools` / `bld-mcp` — implement per tool when agent workflows need them. |
+| P0 | B | **BLD tool bodies + MCP handler** | `bld-tools` / `bld-mcp` — **Stub Completion Program** (Cursor) **Wave 2**: every **shipped** `tool_id` must execute (no production `StubHandler`); see §Stub Completion Program alignment below. |
+
+### Stub Completion Program alignment (Cursor — engineering completeness)
+
+**Source:** Cursor saved plan **Stub completion program** (`stub_completion_program_1d2f4e69.plan.md`, not checked into this repo by default). This section reconciles that plan with **L1** [`01_CONSTITUTION_AND_PROGRAM.md`](01_CONSTITUTION_AND_PROGRAM.md) and the rest of `docs/`.
+
+| Topic | How to read it |
+|-------|----------------|
+| **“No optional deliverables” (plan)** | Means **no optional stubs**: if a subsystem exists in the binary (editor panel, MCP tool id, cloud session API, inference entrypoint, sandbox gate), the **implementation must be real** or the surface must be **removed** from ship — not left as empty UI, `StubHandler` returns, or “Phase N” printouts. It does **not** revoke legitimate **product** optionals in `01` / `README` (e.g. player-tunable CVars, Tier-B co-op, disabling a quality feature). |
+| **“Mock servers” (plan)** | Refers **only** to **automated tests / CI**: fakes or loopback for **Steam / EOS / S3-shaped** APIs so tests run without production credentials. **Default *Sacrilege* play remains local-first**; nothing in that plan requires you to run a dedicated game server for single-player. |
+| **Phase rows marked ✅ in §Phase Overview** | Are **phase contract / milestone** completions. They can still coexist with **code-level** scaffolds tracked in the table above and in the Cursor plan **Gap register** until the stub program waves are closed. If both disagree, **truth for product scope** is still `01` + ADRs; **truth for stub elimination** is the Cursor plan + this backlog. |
+| **ADRs that say “out of scope” or “deferred”** | Still govern **v1 vs v2 design**. The stub program targets **what is already compiled in** today — not a silent expansion of product scope without a new ADR. |
 
 ### Manual checklist — Viewport PIE transport vs keyboard
 
