@@ -4,7 +4,6 @@
 
 #include "engine/assets/image_decode_rgba8.hpp"
 
-#include <volk.h>
 #include <vk_mem_alloc.h>
 
 #include <imgui_impl_vulkan.h>

@@ -22,7 +22,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-[[nodiscard]] bool write_minimal_gwmat_stub(const fs::path& file_path) {
+[[nodiscard]] bool write_encoded_default_pbr_gwmat(const fs::path& file_path) {
     gw::render::material::MaterialTemplateDesc d{};
     d.name                       = "pbr_opaque/metal_rough";
     d.parameter_block_size_bytes = 256;
@@ -205,7 +205,7 @@ void AssetBrowserPanel::draw_content_list(EditorContext& ctx) {
                     [[maybe_unused]] const std::string reldir{sv.substr(tab + 1)};
                     const fs::path out = *ctx.project_root / "content" / "materials" /
                                          "ambient_cg" / (id + ".gwmat");
-                    if (write_minimal_gwmat_stub(out))
+                    if (write_encoded_default_pbr_gwmat(out))
                         navigate_to(out.parent_path(), ctx.project_root);
                 }
             }

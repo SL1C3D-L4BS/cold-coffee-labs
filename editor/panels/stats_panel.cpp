@@ -53,10 +53,10 @@ void StatsPanel::on_imgui_render(EditorContext& ctx) {
         ImGui::TextDisabled(" |  %.2f ms CPU", s.cpu_ms);
         ImGui::SameLine();
         if (ctx.framegraph_gpu_ms > 0.f) {
-            ImGui::TextDisabled(" |  %.2f ms GPU (scene→post, editor CB)",
+            ImGui::TextDisabled(" |  %.2f ms GPU (main UI after scene RT)",
                                  ctx.framegraph_gpu_ms);
         } else {
-            ImGui::TextDisabled(" |  GPU (scene→post) —");
+            ImGui::TextDisabled(" |  GPU (main UI) —");
         }
 
         const ImVec2 plot_size{-1.f, 48.f};

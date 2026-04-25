@@ -43,6 +43,13 @@ GW_EDITOR_API bool     gw_editor_destroy_entity(uint64_t handle);
 // Component field access via reflected path "ComponentName.field_name".
 // value_json is UTF-8 JSON-encoded. Caller owns input strings.
 // gw_editor_get_field returns a heap string; free with gw_free_string().
+//
+// V1 set/get surface (kept in sync with tests and BLD). Full table:
+//   docs/operations/bld_set_field_v1_matrix.md
+//   TransformComponent.{position,scale,rotation} — JSON arrays.
+//   VisibilityComponent.visible, BlockoutPrimitiveComponent.{shape,gwmat_rel},
+//   WorldMatrixComponent.{world read-only, dirty},
+//   NameComponent.value, bare "Name" alias for the display name string.
 // ---------------------------------------------------------------------------
 GW_EDITOR_API bool        gw_editor_set_field(uint64_t    entity,
                                                const char* field_path,

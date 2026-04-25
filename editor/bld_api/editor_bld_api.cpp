@@ -14,9 +14,11 @@
 #include "engine/assets/asset_handle.hpp"
 #include "engine/memory/arena_allocator.hpp"
 #include "editor/scene/authoring_scene_load.hpp"
+#include "editor/scene/components.hpp"
 #include "editor/seq/seq_gwseq_rebuild.hpp"
 #include "bld/include/bld_ffi_seq_export.h"
 
+#include <cctype>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -29,13 +31,17 @@
 #include <unordered_map>
 #include <vector>
 
+#define GLM_FORCE_RADIANS
+#include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
+
 // ---------------------------------------------------------------------------
 // Registrar — opaque handle concrete type (ADR-0007 §2.4). Declared in the
 // bld_register.h header as `struct BldRegistrar` forward; this TU defines it.
 // Intentionally minimal for v1: only tool/widget tables. User data pointers
 // are BLD-owned; we keep the pointer but never dereference or free it.
 // ---------------------------------------------------------------------------
-struct BldEditorHandle {};  // placeholder — no fields crossed today
+struct BldEditorHandle {};  // v1: zero-sized tag; BLD may cast for future state
 
 struct BldRegistrar {
     struct Tool {
@@ -101,6 +107,268 @@ namespace gw::editor::bld_api {
 
 using namespace gw::editor::bld_api;
 
+namespace {
+
+[[nodiscard]] const char* skip_ws(const char* p) noexcept {
+    while (p && *p != '\0' && std::isspace(static_cast<unsigned char>(*p))) {
+        ++p;
+    }
+    return p;
+}
+
+[[nodiscard]] char* alloc_json(std::string_view sv) {
+    char* s = static_cast<char*>(std::malloc(sv.size() + 1));
+    if (!s) {
+        return nullptr;
+    }
+    std::memcpy(s, sv.data(), sv.size());
+    s[sv.size()] = '\0';
+    return s;
+}
+
+void append_json_string_escaped(std::string& out, std::string_view sv) {
+    for (unsigned char uc : sv) {
+        const char c = static_cast<char>(uc);
+        switch (c) {
+        case '"':
+            out += "\\\"";
+            break;
+        case '\\':
+            out += "\\\\";
+            break;
+        case '\b':
+            out += "\\b";
+            break;
+        case '\f':
+            out += "\\f";
+            break;
+        case '\n':
+            out += "\\n";
+            break;
+        case '\r':
+            out += "\\r";
+            break;
+        case '\t':
+            out += "\\t";
+            break;
+        default:
+            if (uc < 0x20u) {
+                char buf[7];
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg,hicpp-signed-bitwise)
+                std::snprintf(buf, sizeof buf, "\\u%04x", static_cast<unsigned>(uc));
+                out += buf;
+            } else {
+                out += c;
+            }
+            break;
+        }
+    }
+}
+
+[[nodiscard]] const char* alloc_json_quoted_string(std::string_view sv) {
+    std::string j;
+    j.reserve(sv.size() + 2 + 8);
+    j.push_back('"');
+    append_json_string_escaped(j, sv);
+    j.push_back('"');
+    return alloc_json(j);
+}
+
+[[nodiscard]] int hex_digit_value(char ch) noexcept {
+    if (ch >= '0' && ch <= '9') {
+        return ch - '0';
+    }
+    if (ch >= 'a' && ch <= 'f') {
+        return ch - 'a' + 10;
+    }
+    if (ch >= 'A' && ch <= 'F') {
+        return ch - 'A' + 10;
+    }
+    return -1;
+}
+
+void push_utf8_codepoint(std::string& out, std::uint32_t cp) {
+    if (cp <= 0x7Fu) {
+        out.push_back(static_cast<char>(cp));
+    } else if (cp <= 0x7FFu) {
+        out.push_back(static_cast<char>(0xC0u | ((cp >> 6u) & 0x1Fu)));
+        out.push_back(static_cast<char>(0x80u | (cp & 0x3Fu)));
+    } else if (cp <= 0xFFFFu) {
+        out.push_back(static_cast<char>(0xE0u | ((cp >> 12u) & 0x0Fu)));
+        out.push_back(static_cast<char>(0x80u | ((cp >> 6u) & 0x3Fu)));
+        out.push_back(static_cast<char>(0x80u | (cp & 0x3Fu)));
+    } else if (cp <= 0x10FFFFu) {
+        out.push_back(static_cast<char>(0xF0u | ((cp >> 18u) & 0x07u)));
+        out.push_back(static_cast<char>(0x80u | ((cp >> 12u) & 0x3Fu)));
+        out.push_back(static_cast<char>(0x80u | ((cp >> 6u) & 0x3Fu)));
+        out.push_back(static_cast<char>(0x80u | (cp & 0x3Fu)));
+    }
+}
+
+[[nodiscard]] bool parse_bool_json(const char* json, bool& out) noexcept {
+    const char* p = skip_ws(json);
+    if (std::strncmp(p, "true", 4) == 0) {
+        out = true;
+        return true;
+    }
+    if (std::strncmp(p, "false", 5) == 0) {
+        out = false;
+        return true;
+    }
+    return false;
+}
+
+[[nodiscard]] bool parse_u8_json(const char* json, std::uint8_t& out) noexcept {
+    const char* p = skip_ws(json);
+    char*       e = nullptr;
+    const long  v = std::strtol(p, &e, 10);
+    if (e == p || v < 0 || v > 255) {
+        return false;
+    }
+    out = static_cast<std::uint8_t>(v);
+    return true;
+}
+
+[[nodiscard]] bool parse_string_json(const char* json, std::string& out) {
+    out.clear();
+    const char* p = skip_ws(json);
+    if (*p == '"') {
+        ++p;
+        while (*p != '\0') {
+            if (*p == '"') {
+                return true;
+            }
+            if (*p == '\\') {
+                ++p;
+                if (*p == '\0') {
+                    return false;
+                }
+                switch (*p) {
+                case '"':
+                    out.push_back('"');
+                    break;
+                case '\\':
+                    out.push_back('\\');
+                    break;
+                case '/':
+                    out.push_back('/');
+                    break;
+                case 'b':
+                    out.push_back('\b');
+                    break;
+                case 'f':
+                    out.push_back('\f');
+                    break;
+                case 'n':
+                    out.push_back('\n');
+                    break;
+                case 'r':
+                    out.push_back('\r');
+                    break;
+                case 't':
+                    out.push_back('\t');
+                    break;
+                case 'u': {
+                    std::uint32_t cp = 0;
+                    for (int k = 0; k < 4; ++k) {
+                        ++p;
+                        const int hv = hex_digit_value(*p);
+                        if (hv < 0) {
+                            return false;
+                        }
+                        cp = (cp << 4u) | static_cast<std::uint32_t>(hv);
+                    }
+                    push_utf8_codepoint(out, cp);
+                    break;
+                }
+                default:
+                    // Loose: preserve unknown escapes as the escaped character.
+                    out.push_back(*p);
+                    break;
+                }
+                ++p;
+                continue;
+            }
+            out.push_back(*p);
+            ++p;
+        }
+        return false;
+    }
+    // Unquoted UTF-8 fallback for tooling.
+    out = p;
+    return !out.empty();
+}
+
+[[nodiscard]] bool parse_vec3d_json(const char* json, glm::dvec3& o) noexcept {
+    double        x = 0.0;
+    double        y = 0.0;
+    double        z = 0.0;
+    const char*   p = skip_ws(json);
+    const int     n = std::sscanf(p, " [ %lf , %lf , %lf ]", &x, &y, &z);
+    if (n == 3) {
+        o = glm::dvec3{x, y, z};
+        return true;
+    }
+    const int n2 = std::sscanf(p, "[%lf,%lf,%lf]", &x, &y, &z);
+    if (n2 == 3) {
+        o = glm::dvec3{x, y, z};
+        return true;
+    }
+    return false;
+}
+
+[[nodiscard]] bool parse_vec3f_json(const char* json, glm::vec3& o) noexcept {
+    float       x = 0.f;
+    float       y = 0.f;
+    float       z = 0.f;
+    const char* p = skip_ws(json);
+    const int   n = std::sscanf(p, " [ %f , %f , %f ]", &x, &y, &z);
+    if (n == 3) {
+        o = glm::vec3{x, y, z};
+        return true;
+    }
+    const int n2 = std::sscanf(p, "[%f,%f,%f]", &x, &y, &z);
+    if (n2 == 3) {
+        o = glm::vec3{x, y, z};
+        return true;
+    }
+    return false;
+}
+
+[[nodiscard]] bool parse_quat_json(const char* json, glm::quat& o) noexcept {
+    float       w = 1.f;
+    float       x = 0.f;
+    float       y = 0.f;
+    float       z = 0.f;
+    const char* p = skip_ws(json);
+    const int   n = std::sscanf(p, " [ %f , %f , %f , %f ]", &w, &x, &y, &z);
+    if (n == 4) {
+        o = glm::quat{w, x, y, z};
+        return true;
+    }
+    const int n2 = std::sscanf(p, "[%f,%f,%f,%f]", &w, &x, &y, &z);
+    if (n2 == 4) {
+        o = glm::quat{w, x, y, z};
+        return true;
+    }
+    return false;
+}
+
+[[nodiscard]] bool split_component_field(const char* field_path, std::string& comp, std::string& field) {
+    if (!field_path) {
+        return false;
+    }
+    const char* dot = std::strchr(field_path, '.');
+    if (!dot || dot == field_path) {
+        return false;
+    }
+    comp.assign(field_path, dot);
+    field.assign(dot + 1);
+    return !comp.empty() && !field.empty();
+}
+
+} // namespace
+
 // ---------------------------------------------------------------------------
 GW_EDITOR_API const char* gw_editor_version() {
     return "gw_editor/0.7.0";
@@ -144,17 +412,226 @@ GW_EDITOR_API bool gw_editor_destroy_entity(uint64_t handle) {
 }
 
 // ---------------------------------------------------------------------------
-GW_EDITOR_API bool gw_editor_set_field(uint64_t    /*entity*/,
-                                        const char* /*field_path*/,
-                                        const char* /*value_json*/) {
-    return false;  // TODO(Phase 8)
+GW_EDITOR_API bool gw_editor_set_field(uint64_t entity, const char* field_path, const char* value_json) {
+    if (!g_globals.world || !field_path || !value_json) {
+        return false;
+    }
+    gw::editor::scene::ensure_authoring_scene_types_for_load(*g_globals.world);
+
+    const gw::ecs::Entity e = gw::ecs::Entity::from_raw_bits(entity);
+    if (!g_globals.world->is_alive(e)) {
+        return false;
+    }
+
+    std::string comp;
+    std::string field;
+    if (!split_component_field(field_path, comp, field)) {
+        // NameComponent has no GW_REFLECT — accept `Name.value` or bare `Name`.
+        if (field_path && std::strcmp(field_path, "Name") == 0) {
+            auto* nc = g_globals.world->get_component<gw::editor::scene::NameComponent>(e);
+            if (!nc) {
+                return false;
+            }
+            std::string v;
+            if (!parse_string_json(value_json, v)) {
+                return false;
+            }
+            const std::size_t n = std::min(v.size(), nc->value.size() - 1);
+            std::memcpy(nc->value.data(), v.data(), n);
+            nc->value[n] = '\0';
+            return true;
+        }
+        return false;
+    }
+
+    if (comp == "TransformComponent") {
+        auto* tr = g_globals.world->get_component<gw::editor::scene::TransformComponent>(e);
+        if (!tr) {
+            return false;
+        }
+        if (field == "position") {
+            return parse_vec3d_json(value_json, tr->position);
+        }
+        if (field == "scale") {
+            return parse_vec3f_json(value_json, tr->scale);
+        }
+        if (field == "rotation") {
+            return parse_quat_json(value_json, tr->rotation);
+        }
+        return false;
+    }
+
+    if (comp == "VisibilityComponent") {
+        auto* vis = g_globals.world->get_component<gw::editor::scene::VisibilityComponent>(e);
+        if (!vis || field != "visible") {
+            return false;
+        }
+        bool b = false;
+        if (!parse_bool_json(value_json, b)) {
+            return false;
+        }
+        vis->visible = b;
+        return true;
+    }
+
+    if (comp == "BlockoutPrimitiveComponent") {
+        auto* bp = g_globals.world->get_component<gw::editor::scene::BlockoutPrimitiveComponent>(e);
+        if (!bp) {
+            return false;
+        }
+        if (field == "shape") {
+            return parse_u8_json(value_json, bp->shape);
+        }
+        if (field == "gwmat_rel") {
+            std::string v;
+            if (!parse_string_json(value_json, v)) {
+                return false;
+            }
+            const std::size_t n = std::min(v.size(), bp->gwmat_rel.size() - 1);
+            std::memcpy(bp->gwmat_rel.data(), v.data(), n);
+            bp->gwmat_rel[n] = '\0';
+            return true;
+        }
+        return false;
+    }
+
+    if (comp == "WorldMatrixComponent") {
+        auto* wm = g_globals.world->get_component<gw::editor::scene::WorldMatrixComponent>(e);
+        if (!wm) {
+            return false;
+        }
+        if (field == "dirty") {
+            return parse_u8_json(value_json, wm->dirty);
+        }
+        // `world` is cache output of the transform system — not mutable via Surface P.
+        return false;
+    }
+
+    if (comp == "NameComponent") {
+        if (field != "value") {
+            return false;
+        }
+        auto* nc = g_globals.world->get_component<gw::editor::scene::NameComponent>(e);
+        if (!nc) {
+            return false;
+        }
+        std::string v;
+        if (!parse_string_json(value_json, v)) {
+            return false;
+        }
+        const std::size_t n = std::min(v.size(), nc->value.size() - 1);
+        std::memcpy(nc->value.data(), v.data(), n);
+        nc->value[n] = '\0';
+        return true;
+    }
+
+    return false;
 }
 
-GW_EDITOR_API const char* gw_editor_get_field(uint64_t    /*entity*/,
-                                               const char* /*field_path*/) {
-    char* s = static_cast<char*>(std::malloc(3));
-    if (s) { s[0]='n'; s[1]='u'; s[2]='\0'; }
-    return s;
+GW_EDITOR_API const char* gw_editor_get_field(uint64_t entity, const char* field_path) {
+    if (!g_globals.world || !field_path) {
+        return alloc_json("null");
+    }
+    gw::editor::scene::ensure_authoring_scene_types_for_load(*g_globals.world);
+    const gw::ecs::Entity e = gw::ecs::Entity::from_raw_bits(entity);
+    if (!g_globals.world->is_alive(e)) {
+        return alloc_json("null");
+    }
+
+    std::string comp;
+    std::string field;
+    if (!split_component_field(field_path, comp, field)) {
+        if (std::strcmp(field_path, "Name") == 0) {
+            if (const auto* nc = g_globals.world->get_component<gw::editor::scene::NameComponent>(e)) {
+                return alloc_json_quoted_string(nc->c_str());
+            }
+        }
+        return alloc_json("null");
+    }
+
+    if (comp == "TransformComponent") {
+        const auto* tr = g_globals.world->get_component<gw::editor::scene::TransformComponent>(e);
+        if (!tr) {
+            return alloc_json("null");
+        }
+        char buf[256]{};
+        if (field == "position") {
+            std::snprintf(buf, sizeof buf, "[%g,%g,%g]", tr->position.x, tr->position.y, tr->position.z);
+            return alloc_json(std::string_view{buf});
+        }
+        if (field == "scale") {
+            std::snprintf(buf, sizeof buf, "[%g,%g,%g]", static_cast<double>(tr->scale.x),
+                static_cast<double>(tr->scale.y), static_cast<double>(tr->scale.z));
+            return alloc_json(std::string_view{buf});
+        }
+        if (field == "rotation") {
+            std::snprintf(buf, sizeof buf, "[%g,%g,%g,%g]", static_cast<double>(tr->rotation.w),
+                static_cast<double>(tr->rotation.x), static_cast<double>(tr->rotation.y),
+                static_cast<double>(tr->rotation.z));
+            return alloc_json(std::string_view{buf});
+        }
+        return alloc_json("null");
+    }
+
+    if (comp == "VisibilityComponent" && field == "visible") {
+        const auto* vis = g_globals.world->get_component<gw::editor::scene::VisibilityComponent>(e);
+        if (!vis) {
+            return alloc_json("null");
+        }
+        return alloc_json(vis->visible ? "true" : "false");
+    }
+
+    if (comp == "BlockoutPrimitiveComponent" && field == "shape") {
+        const auto* bp = g_globals.world->get_component<gw::editor::scene::BlockoutPrimitiveComponent>(e);
+        if (!bp) {
+            return alloc_json("null");
+        }
+        char b[32]{};
+        std::snprintf(b, sizeof b, "%u", static_cast<unsigned>(bp->shape));
+        return alloc_json(std::string_view{b});
+    }
+
+    if (comp == "BlockoutPrimitiveComponent" && field == "gwmat_rel") {
+        if (const auto* bp = g_globals.world->get_component<gw::editor::scene::BlockoutPrimitiveComponent>(e)) {
+            return alloc_json_quoted_string(bp->gwmat_rel.data());
+        }
+    }
+
+    if (comp == "WorldMatrixComponent") {
+        const auto* wm = g_globals.world->get_component<gw::editor::scene::WorldMatrixComponent>(e);
+        if (!wm) {
+            return alloc_json("null");
+        }
+        if (field == "dirty") {
+            char b[32]{};
+            std::snprintf(b, sizeof b, "%u", static_cast<unsigned>(wm->dirty));
+            return alloc_json(std::string_view{b});
+        }
+        if (field == "world") {
+            std::string j = "[";
+            const glm::dmat4& m = wm->world;
+            for (int c = 0; c < 4; ++c) {
+                for (int r = 0; r < 4; ++r) {
+                    if (c != 0 || r != 0) {
+                        j += ',';
+                    }
+                    char num[48]{};
+                    std::snprintf(num, sizeof num, "%.17g", m[c][r]);
+                    j += num;
+                }
+            }
+            j += ']';
+            return alloc_json(j);
+        }
+    }
+
+    if (comp == "NameComponent" && field == "value") {
+        if (const auto* nc = g_globals.world->get_component<gw::editor::scene::NameComponent>(e)) {
+            return alloc_json_quoted_string(nc->c_str());
+        }
+    }
+
+    return alloc_json("null");
 }
 
 GW_EDITOR_API void gw_free_string(const char* s) {
@@ -185,11 +662,12 @@ GW_EDITOR_API const char* gw_editor_command_stack_summary(uint32_t max_entries) 
 }
 
 // ---------------------------------------------------------------------------
-// Scene I/O — Phase 8 week 043. Bridges the C-ABI boundary into
-// engine/scene/scene_file so BLD and the editor menu share one code path.
-// The authoring World is the target on both sides; the caller guarantees
-// thread-exclusive access (editor tick only, BLD tools run on the same
-// thread by ADR-0007 §2.4).
+// Scene I/O — `gw::scene::save_scene` / `load_scene` over the authoring world.
+// BLD and the editor File menu share this path. See
+// `docs/operations/bld_set_field_v1_matrix.md` for the field surface; scene
+// paths are caller-provided (relative to project or absolute). The caller
+// guarantees thread-exclusive access (editor tick, BLD on the same thread;
+// ADR-0007 §2.4).
 GW_EDITOR_API bool gw_editor_save_scene(const char* path) {
     if (!g_globals.world || !path || path[0] == '\0') return false;
     std::filesystem::path p{path};

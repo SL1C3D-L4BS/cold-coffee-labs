@@ -2,7 +2,11 @@
 // editor/viewport/editor_camera.hpp
 // Orbit / Fly / Ortho editor camera.
 // Spec ref: Phase 7 §6.3.
-// TODO(Phase 10): GLFW reads replaced with engine input events.
+// When the viewport is hovered, input is sampled from Dear ImGui (mouse delta,
+// buttons, WASD) so navigation respects ImGui capture; GLFW remains the
+// scroll source via EditorApplication's callback. Wave 1C: this is the intended
+// editor path; PIE / gameplay uses the engine input stack — no Phase-10 split
+// TODO is outstanding for this file.
 
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
@@ -63,10 +67,8 @@ private:
     void update_ortho(float dt, bool hovered, GLFWwindow* w);
 
     CameraState state_;
-    double      last_mouse_x_ = 0.0;
-    double      last_mouse_y_ = 0.0;
-    bool        rmb_down_     = false;
-    bool        mmb_down_     = false;
+    bool        rmb_down_ = false;
+    bool        mmb_down_ = false;
 };
 
 }  // namespace gw::editor

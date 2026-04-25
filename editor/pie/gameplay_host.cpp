@@ -16,6 +16,7 @@
 #include "engine/platform/dll.hpp"
 #include "engine/platform/fs.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <filesystem>
 #include <string>
@@ -160,11 +161,6 @@ void GameplayHost::stop(GameplayContext& ctx) {
         (void)restore_snapshot(*world);
     }
     world_snapshot_.clear();
-
-    // pre-ed-pie-overlays: capture the final deterministic frame so the
-    // Rollback Inspector has a step-back target the instant we leave PIE.
-    // Scaffold draw is a no-op today; state persistence lands in Phase 22.
-    gw::editor::pie::draw_rollback_inspector(rollback_inspector_);
 }
 
 void GameplayHost::tick(GameplayContext& ctx, float dt) {
@@ -175,7 +171,18 @@ void GameplayHost::tick(GameplayContext& ctx, float dt) {
     // guard every tick regardless of Playing/Paused — the Paused state still
     // pays an ImGui cost, so we need the guard active. `dt` is in seconds.
     if (state_ != PIEState::Editor) {
+        pie_debug_hud_.dt_last_s            = dt;
+        pie_debug_hud_.pie_phase          = (state_ == PIEState::Paused) ? 1u : 0u;
+        pie_debug_hud_.gameplay_dll_loaded = static_cast<bool>(lib_handle_);
+        pie_debug_hud_.entity_count       = 0u;
+        if (live_ctx_ != nullptr && live_ctx_->world != nullptr) {
+            auto* w = static_cast<gw::ecs::World*>(live_ctx_->world);
+            const std::size_t n = w->entity_count();
+            pie_debug_hud_.entity_count = static_cast<std::uint32_t>(
+                std::min(n, static_cast<std::size_t>(0xFFFF'FFFFull)));
+        }
         gw::editor::pie::draw_pie_debug_hud(pie_debug_hud_);
+        gw::editor::pie::draw_rollback_inspector(rollback_inspector_);
         gw::editor::pie::tick_perf_guard(pie_perf_guard_, dt * 1000.0f);
     }
 }

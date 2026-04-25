@@ -9,21 +9,18 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
+#include <deque>
+#include <unordered_map>
 #include <vector>
 
 namespace gw::editor::scene {
 
 namespace {
 
-// Compose a local-space dmat4 from a TransformComponent. Scale is promoted to
-// double so the result is precision-clean; rotation is converted via
-// glm::mat4_cast then widened.
 glm::dmat4 local_matrix(const TransformComponent& t) {
-    // Translation × Rotation × Scale, standard TRS.
     const glm::dmat4 tr = glm::translate(glm::dmat4{1.0}, t.position);
     const glm::dmat4 ro = glm::dmat4(glm::mat4_cast(t.rotation));
-    const glm::dmat4 sc = glm::scale(glm::dmat4{1.0},
-                                      glm::dvec3(t.scale));
+    const glm::dmat4 sc = glm::scale(glm::dmat4{1.0}, glm::dvec3(t.scale));
     return tr * ro * sc;
 }
 
@@ -33,16 +30,8 @@ std::size_t update_transforms(gw::ecs::World& w) {
     using gw::ecs::Entity;
     using gw::ecs::HierarchyComponent;
 
-    // Ensure WorldMatrixComponent is registered; consumers may not have
-    // touched it yet.
     (void)w.component_registry().id_of<WorldMatrixComponent>();
 
-    // First pass: collect (entity, local_matrix, parent) triples for each
-    // entity that has a TransformComponent. The iteration is driven by
-    // for_each<TransformComponent> so archetype jump is cache-friendly.
-    //
-    // thread_local keeps the vectors hot across frames; editor workloads
-    // rarely need more than a few hundred transforms.
     struct Record {
         Entity     entity;
         Entity     parent;
@@ -62,63 +51,73 @@ std::size_t update_transforms(gw::ecs::World& w) {
 
     if (records.empty()) return 0;
 
-    // Second pass: compose world matrices. We implement a two-pass fixed
-    // point: iterate until every record has a world matrix (topological sort
-    // in O(n·d) where d is tree depth). For editor workloads d is tiny; a
-    // proper topo-sort can come in Phase 9 once depth starts mattering.
     const std::size_t n = records.size();
-    std::vector<std::uint8_t>  resolved(n, 0);
-    std::vector<glm::dmat4>    world(n);
-
-    auto index_of = [&](Entity e) -> std::size_t {
-        // Linear probe — n is small; cache-friendlier than an unordered_map
-        // for the scales we care about (<4k entities).
-        for (std::size_t i = 0; i < n; ++i) {
-            if (records[i].entity.raw_bits() == e.raw_bits()) return i;
-        }
-        return static_cast<std::size_t>(-1);
-    };
-
-    std::size_t remaining = n;
-    // At most `n` outer passes: every pass resolves at least one node
-    // (the topologically-deepest unresolved root of the working set).
-    for (std::size_t pass = 0; pass < n && remaining > 0; ++pass) {
-        bool progress = false;
-        for (std::size_t i = 0; i < n; ++i) {
-            if (resolved[i]) continue;
-            const auto& rec = records[i];
-            if (rec.parent.is_null()) {
-                world[i]    = rec.local;
-                resolved[i] = 1;
-                --remaining;
-                progress    = true;
-                continue;
-            }
-            const auto pi = index_of(rec.parent);
-            if (pi == static_cast<std::size_t>(-1)) {
-                // Parent entity has no TransformComponent — treat as identity
-                // root so an orphan in the hierarchy still gets a world
-                // matrix rather than being silently skipped.
-                world[i]    = rec.local;
-                resolved[i] = 1;
-                --remaining;
-                progress    = true;
-                continue;
-            }
-            if (!resolved[pi]) continue;
-            world[i]    = world[pi] * rec.local;
-            resolved[i] = 1;
-            --remaining;
-            progress    = true;
-        }
-        if (!progress) break;  // cycle — should be impossible if reparent()
-                                // guards, but don't hang if it does.
+    std::unordered_map<std::uint64_t, std::size_t> entity_to_index;
+    entity_to_index.reserve(n * 2);
+    for (std::size_t i = 0; i < n; ++i) {
+        entity_to_index[records[i].entity.raw_bits()] = i;
     }
 
-    // Third pass: write WorldMatrixComponent for every resolved entity.
+    std::vector<std::vector<std::size_t>> children(n);
+    std::vector<int>                    indegree(n, 0);
+
+    for (std::size_t i = 0; i < n; ++i) {
+        const Entity p = records[i].parent;
+        if (p.is_null()) {
+            indegree[i] = 0;
+            continue;
+        }
+        const auto pit = entity_to_index.find(p.raw_bits());
+        if (pit == entity_to_index.end()) {
+            // Parent has no Transform row — treat as root for ordering.
+            indegree[i] = 0;
+            continue;
+        }
+        indegree[i] = 1;
+        children[pit->second].push_back(i);
+    }
+
+    std::deque<std::size_t> q;
+    for (std::size_t i = 0; i < n; ++i) {
+        if (indegree[i] == 0) q.push_back(i);
+    }
+
+    std::vector<glm::dmat4> world(n);
+    std::vector<std::uint8_t> resolved(n, 0);
+
+    while (!q.empty()) {
+        const std::size_t i = q.front();
+        q.pop_front();
+
+        const Record& rec = records[i];
+        if (rec.parent.is_null()) {
+            world[i] = rec.local;
+        } else {
+            const auto pit = entity_to_index.find(rec.parent.raw_bits());
+            if (pit == entity_to_index.end() || !resolved[pit->second]) {
+                world[i] = rec.local;
+            } else {
+                world[i] = world[pit->second] * rec.local;
+            }
+        }
+        resolved[i] = 1;
+
+        for (const std::size_t c : children[i]) {
+            --indegree[c];
+            if (indegree[c] == 0) q.push_back(c);
+        }
+    }
+
+    // Cycles (should not happen with guarded reparent): fall back to local.
+    for (std::size_t i = 0; i < n; ++i) {
+        if (!resolved[i]) {
+            world[i]    = records[i].local;
+            resolved[i] = 1;
+        }
+    }
+
     std::size_t written = 0;
     for (std::size_t i = 0; i < n; ++i) {
-        if (!resolved[i]) continue;
         auto* wm = w.get_component<WorldMatrixComponent>(records[i].entity);
         if (!wm) {
             wm = &w.add_component(records[i].entity, WorldMatrixComponent{});

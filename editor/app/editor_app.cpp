@@ -17,7 +17,14 @@
 // semaphore per swapchain image for submit->present. Fences gate the host.
 // Dynamic rendering (VK_KHR_dynamic_rendering) drives the single swapchain
 // color attachment per frame. ImGui draw data is rendered into that attachment.
+//
+// volk + VMA must appear before `editor_app.hpp`: that header (via imgui_texture_cache.hpp, etc.)
+// would otherwise install `using Vk* =` forward typedefs and clash with vulkan_core.h.
+#include <volk.h>
+#include <vk_mem_alloc.h>
+
 #include "editor_app.hpp"
+
 #include "editor/bld_api/editor_bld_api.hpp"
 
 #include "editor/panels/outliner_panel.hpp"
@@ -43,6 +50,8 @@
 #include "engine/play/play_bootstrap_cvars.hpp"
 #include "engine/core/config/standard_cvars.hpp"
 #include "engine/scene/seq/sequencer_world.hpp"
+#include "engine/assets/asset_db.hpp"
+#include "engine/assets/vfs/virtual_fs.hpp"
 
 // Phase 21 wire-up: Sacrilege-specific authoring panels (pack.yml: pre-ed-sacrilege-panels).
 #include "editor/panels/sacrilege/act_state_panel.hpp"
@@ -70,6 +79,7 @@
 
 // Part B wire-up: module manifest, theme registry, a11y (pack.yml:
 // pre-ed-module-manifest, pre-ed-theme-menu, pre-ed-a11y-init).
+#include "editor/render/editor_scene_pass.hpp"
 #include "editor/config/editor_config.hpp"
 #include "editor/modules/modules_builtin.hpp"
 #include "editor/shell/file_dialog.hpp"
@@ -82,12 +92,7 @@
 #include "editor/theme/theme_registry.hpp"
 #include "editor/theme/palette_imgui.hpp"
 #include "editor/a11y/editor_a11y.hpp"
-
-// volk must precede every Vulkan include in this TU so that imgui_impl_vulkan
-// picks up volk's dispatch tables (IMGUI_IMPL_VULKAN_USE_VOLK is set by the
-// editor CMakeLists).
-#include <volk.h>
-#include <vk_mem_alloc.h>
+#include "editor/scene/transform_system.hpp"
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -111,6 +116,11 @@
 #include <string>
 #include <string_view>
 #include <vector>
+
+#define GLM_FORCE_RADIANS
+#include <glm/gtc/constants.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/mat4x4.hpp>
 
 static void touch_play_cvars_stub_file(const std::filesystem::path& abs) {
     namespace fs = std::filesystem;
@@ -146,6 +156,8 @@ constexpr uint32_t kFramesInFlight = 2;
             std::exit(EXIT_FAILURE);                                           \
         }                                                                      \
     } while (0)
+
+constexpr uint32_t kEditorHistSampleDim = 128;
 
 struct QueueFamilies {
     std::optional<uint32_t> graphics;
@@ -254,7 +266,7 @@ struct EditorVulkanBackend {
 
     // ----- Offscreen scene render target (Phase 7 §6.1) -----
     // Sized to the Viewport panel's content area; resized on demand from run().
-    // Color-only RGBA8 for now; depth + gbuffers will accrete in Phase 8.
+    // RGBA8 colour + TRANSFER_SRC for G-buffer strip mirrors + luminance readback.
     VkImage                  scene_image       = VK_NULL_HANDLE;
     VmaAllocation            scene_alloc       = VK_NULL_HANDLE;
     VkImageView              scene_view        = VK_NULL_HANDLE;
@@ -263,6 +275,34 @@ struct EditorVulkanBackend {
     VkExtent2D               scene_extent      = {};
     VkFormat                 scene_format      = VK_FORMAT_R8G8B8A8_UNORM;
 
+    // Scene depth (D32 or packed D24S8 — cleared each frame; mesh pass will write).
+    VkImage                  scene_depth_image  = VK_NULL_HANDLE;
+    VmaAllocation            scene_depth_alloc  = VK_NULL_HANDLE;
+    VkImageView              scene_depth_view   = VK_NULL_HANDLE;
+    VkFormat                 scene_depth_format = VK_FORMAT_UNDEFINED;
+    bool                     scene_depth_had_frame  = false;
+    /// Per swapchain of `scene_image`: after the first end-to-end use, the image is
+    // SHADER_READ_ONLY; subsequent frames must transition from that, not from UNDEFINED.
+    bool                     scene_image_had_frame = false;
+
+    // Cockpit G-buffer thumbnails (same extent as scene; filled via vkCmdCopyImage).
+    static constexpr int     kGbufferThumbCount = 5;
+    struct GbufferThumb {
+        VkImage          image     = VK_NULL_HANDLE;
+        VmaAllocation    alloc     = VK_NULL_HANDLE;
+        VkImageView      view      = VK_NULL_HANDLE;
+        VkDescriptorSet  imgui_ds  = VK_NULL_HANDLE;
+    };
+    std::array<GbufferThumb, kGbufferThumbCount> gbuffer_thumbs{};
+
+    // Per-frame staging for GPU → CPU luminance tile (kEditorHistSampleDim² RGBA8).
+    std::array<VkBuffer,     kFramesInFlight> hist_staging_buf{};
+    std::array<VmaAllocation, kFramesInFlight> hist_staging_alloc{};
+    std::array<uint32_t, kFramesInFlight> hist_sample_w{};
+    std::array<uint32_t, kFramesInFlight> hist_sample_h{};
+    std::array<bool, kFramesInFlight>      hist_staging_used{};
+    std::array<bool, kGbufferThumbCount> gbuffer_thumb_seen{};
+
     VkQueryPool              timestamp_query_pool = VK_NULL_HANDLE;
     float                    gpu_timestamp_period_ns = 1.f;
     float                    last_gpu_time_ms        = 0.f;
@@ -270,11 +310,77 @@ struct EditorVulkanBackend {
     int                      gpu_timestamp_warmup_frames = 3;
 };
 
+void build_luminance_histogram_from_rgba8(const std::uint8_t* px, std::uint32_t cw,
+                                          std::uint32_t ch, std::uint32_t row_stride,
+                                          gw::editor::render::LuminanceHistogram& out,
+                                          float& average_luminance) noexcept {
+    float           sum_l = 0.f;
+    std::uint32_t   count = 0;
+    for (std::uint32_t y = 0; y < ch; ++y) {
+        const std::uint8_t* row = px + static_cast<std::size_t>(y) * row_stride;
+        for (std::uint32_t x = 0; x < cw; ++x) {
+            const std::uint8_t* p = row + x * 4u;
+            const float         rf = static_cast<float>(p[0]) * (1.f / 255.f);
+            const float         gf = static_cast<float>(p[1]) * (1.f / 255.f);
+            const float         bf = static_cast<float>(p[2]) * (1.f / 255.f);
+            const float         l  = std::max(0.0001f, 0.2126f * rf + 0.7152f * gf + 0.0722f * bf);
+            sum_l += l;
+            ++count;
+            const int bin = static_cast<int>(l * 63.f + 0.5f);
+            out.buckets[static_cast<std::size_t>(std::clamp(bin, 0, 63))] += 1.f;
+        }
+    }
+    if (count > 0) {
+        average_luminance = sum_l / static_cast<float>(count);
+        float total = 0.f;
+        for (float& b : out.buckets) total += b;
+        if (total > 0.f) {
+            for (float& b : out.buckets) b /= total;
+        }
+    } else {
+        average_luminance = 0.f;
+    }
+}
+
+void refresh_editor_histogram_from_staging(EditorVulkanBackend* vk, uint32_t fi,
+                                           gw::editor::render::RenderSettings& rs) {
+    if (!vk || !vk->hist_staging_buf[fi] || !vk->hist_staging_alloc[fi] || !vk->allocator) return;
+    if (vk->hist_sample_w[fi] == 0 || vk->hist_sample_h[fi] == 0) return;
+
+    VmaAllocationInfo ainfo{};
+    vmaGetAllocationInfo(vk->allocator, vk->hist_staging_alloc[fi], &ainfo);
+
+    void* mapped = nullptr;
+    if (vmaMapMemory(vk->allocator, vk->hist_staging_alloc[fi], &mapped) != VK_SUCCESS ||
+        !mapped)
+        return;
+
+    VkMappedMemoryRange inv{};
+    inv.sType  = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+    inv.memory = ainfo.deviceMemory;
+    inv.offset = ainfo.offset;
+    inv.size   = VK_WHOLE_SIZE;
+    vkInvalidateMappedMemoryRanges(vk->device, 1, &inv);
+
+    rs.histogram.buckets.fill(0.f);
+    const auto* bytes = static_cast<const std::uint8_t*>(mapped);
+    build_luminance_histogram_from_rgba8(bytes, vk->hist_sample_w[fi], vk->hist_sample_h[fi],
+                                         vk->hist_sample_w[fi] * 4u, rs.histogram,
+                                         rs.exposure.average_luminance);
+    vmaUnmapMemory(vk->allocator, vk->hist_staging_alloc[fi]);
+}
+
 // ---------------------------------------------------------------------------
 // Construction / destruction
 // ---------------------------------------------------------------------------
 EditorApplication::EditorApplication()
     : vk_(std::make_unique<EditorVulkanBackend>()) {
+    {
+        const float   a  = 16.f / 9.f;
+        scene_raster_view_ = glm::lookAt(
+            glm::vec3(6.f, 4.f, 6.f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.f, 1.f, 0.f));
+        scene_raster_proj_ = glm::perspective(glm::radians(60.f), a, 0.1f, 2000.f);
+    }
     // pre-ed-module-manifest: register twelve built-in editor modules at
     // startup. Panel/tool factories are still empty stubs (Phase 21+) but the
     // registry is now live so later waves can attach panels declaratively.
@@ -285,13 +391,14 @@ EditorApplication::EditorApplication()
         gw::editor::config::load_saved_theme(
             gw::editor::theme::ThemeId::CorruptedRelic));
 
+    // Load before `init_imgui` so the first atlas build can honour mono sizing.
+    a11y_config_ = gw::editor::a11y::load_from_config();
+
     init_window();
     init_vulkan();
     init_imgui();
 
-    // pre-ed-a11y-init: load accessibility config and apply (theme overrides
-    // + effect flags). Safe to call before any panels exist.
-    a11y_config_ = gw::editor::a11y::load_from_config();
+    // pre-ed-a11y-init: theme overrides + ImGui keyboard nav (requires context).
     gw::editor::a11y::apply(a11y_config_);
     apply_theme();
 
@@ -476,11 +583,18 @@ void EditorApplication::run() {
                 vpp->apply_resize(w, h);
                 if (auto* rtp = dynamic_cast<RenderTargetsPanel*>(
                         panels_.find("Render Targets"))) {
-                    rtp->set_scene_texture(
-                        reinterpret_cast<ImTextureID>(vk_->scene_imgui_ds));
+                    rtp->set_slot(0, reinterpret_cast<ImTextureID>(vk_->scene_imgui_ds), true);
+                    for (std::size_t ti = 0; ti < vk_->gbuffer_thumbs.size(); ++ti) {
+                        rtp->set_slot(static_cast<int>(ti + 1),
+                                      reinterpret_cast<ImTextureID>(
+                                          vk_->gbuffer_thumbs[ti].imgui_ds),
+                                      true);
+                    }
                 }
             }
         }
+
+        (void)gw::editor::scene::update_transforms(scene_world_);
 
         if (!begin_frame()) {
             continue;  // swapchain out-of-date; retry next iteration
@@ -506,6 +620,10 @@ void EditorApplication::run() {
             pie_time_.dt_s = 0.f;
         }
 
+        if (editor_asset_db_) {
+            editor_asset_db_->tick();
+        }
+
         gw::editor::theme::tick_pulse(pulse_, dt);
 
         gw::seq::SequencerSystem::tick(sequencer_world_, scene_world_, nullptr, dt);
@@ -521,7 +639,9 @@ void EditorApplication::run() {
             .selection    = selection_,
             .cmd_stack    = cmd_stack_,
             .world        = &scene_world_,
-            .asset_db     = nullptr,   // Phase 8
+            .asset_db     = (shell_phase_ == EditorShellPhase::MainEditor && editor_asset_db_)
+                ? editor_asset_db_.get()
+                : nullptr,
             .delta_time_s = dt,
             .framegraph_gpu_ms = vk_->last_gpu_time_ms,
             .in_pie       = pie_.in_play(),
@@ -535,7 +655,9 @@ void EditorApplication::run() {
             .project_root = (shell_phase_ == EditorShellPhase::MainEditor)
                 ? &project_root_
                 : nullptr,
-            .imgui_textures = imgui_tex_cache_.get(),
+            .imgui_textures     = imgui_tex_cache_.get(),
+            .scene_raster_view  = &scene_raster_view_,
+            .scene_raster_proj  = &scene_raster_proj_,
         };
 
         build_ui();
@@ -743,6 +865,23 @@ void EditorApplication::init_vulkan() {
     ai.pVulkanFunctions = &vma_fns;
     GW_VKCHECK(vmaCreateAllocator(&ai, &vk_->allocator));
 
+    // Histogram readback staging (one buffer per frame-in-flight).
+    {
+        const VkDeviceSize sz =
+            static_cast<VkDeviceSize>(kEditorHistSampleDim) * kEditorHistSampleDim * 4u;
+        for (uint32_t i = 0; i < kFramesInFlight; ++i) {
+            VkBufferCreateInfo bci{};
+            bci.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+            bci.size  = sz;
+            bci.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+            VmaAllocationCreateInfo aci{};
+            aci.usage = VMA_MEMORY_USAGE_AUTO;
+            aci.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
+            GW_VKCHECK(vmaCreateBuffer(vk_->allocator, &bci, &aci, &vk_->hist_staging_buf[i],
+                                       &vk_->hist_staging_alloc[i], nullptr));
+        }
+    }
+
     if (vk_->gpu_timestamps_enabled) {
         VkQueryPoolCreateInfo qpci{};
         qpci.sType      = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
@@ -775,7 +914,8 @@ void EditorApplication::create_scene_rt(uint32_t w, uint32_t h) {
     ici.samples       = VK_SAMPLE_COUNT_1_BIT;
     ici.tiling        = VK_IMAGE_TILING_OPTIMAL;
     ici.usage         = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-                        VK_IMAGE_USAGE_SAMPLED_BIT;
+                        VK_IMAGE_USAGE_SAMPLED_BIT |
+                        VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     ici.sharingMode   = VK_SHARING_MODE_EXCLUSIVE;
     ici.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
@@ -815,10 +955,132 @@ void EditorApplication::create_scene_rt(uint32_t w, uint32_t h) {
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     vk_->scene_extent = {w, h};
+
+    vk_->scene_depth_image       = VK_NULL_HANDLE;
+    vk_->scene_depth_alloc       = VK_NULL_HANDLE;
+    vk_->scene_depth_view        = VK_NULL_HANDLE;
+    vk_->scene_depth_format      = VK_FORMAT_UNDEFINED;
+    vk_->scene_depth_had_frame   = false;
+    vk_->scene_image_had_frame   = false;
+
+    static constexpr VkFormat kDepthCandidates[] = {
+        VK_FORMAT_D32_SFLOAT,
+        VK_FORMAT_D32_SFLOAT_S8_UINT,
+        VK_FORMAT_D24_UNORM_S8_UINT,
+    };
+    for (VkFormat dfmt : kDepthCandidates) {
+        VkFormatProperties fp{};
+        vkGetPhysicalDeviceFormatProperties(vk_->physical_device, dfmt, &fp);
+        if (fp.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
+            VkImageCreateInfo dci{};
+            dci.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+            dci.imageType     = VK_IMAGE_TYPE_2D;
+            dci.format        = dfmt;
+            dci.extent        = {w, h, 1};
+            dci.mipLevels     = 1;
+            dci.arrayLayers   = 1;
+            dci.samples       = VK_SAMPLE_COUNT_1_BIT;
+            dci.tiling        = VK_IMAGE_TILING_OPTIMAL;
+            dci.usage         = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
+                                VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+            dci.sharingMode   = VK_SHARING_MODE_EXCLUSIVE;
+            dci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+            if (vmaCreateImage(vk_->allocator, &dci, &aci,
+                               &vk_->scene_depth_image, &vk_->scene_depth_alloc, nullptr) != VK_SUCCESS) {
+                vk_->scene_depth_image = VK_NULL_HANDLE;
+                vk_->scene_depth_alloc = VK_NULL_HANDLE;
+                continue;
+            }
+
+            // Depth-only subresource view is sufficient for the depth attachment.
+            const VkImageAspectFlags aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+
+            VkImageViewCreateInfo dvi{};
+            dvi.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+            dvi.image                           = vk_->scene_depth_image;
+            dvi.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
+            dvi.format                          = dfmt;
+            dvi.subresourceRange.aspectMask     = aspect;
+            dvi.subresourceRange.levelCount     = 1;
+            dvi.subresourceRange.layerCount     = 1;
+            if (vkCreateImageView(vk_->device, &dvi, nullptr, &vk_->scene_depth_view) != VK_SUCCESS) {
+                vmaDestroyImage(vk_->allocator, vk_->scene_depth_image, vk_->scene_depth_alloc);
+                vk_->scene_depth_image = VK_NULL_HANDLE;
+                vk_->scene_depth_alloc = VK_NULL_HANDLE;
+                vk_->scene_depth_view  = VK_NULL_HANDLE;
+                continue;
+            }
+            vk_->scene_depth_format = dfmt;
+            break;
+        }
+    }
+
+    // G-buffer strip thumbnails (same format/size; mirrored from scene via copy).
+    for (std::size_t ti = 0; ti < vk_->gbuffer_thumbs.size(); ++ti) {
+        auto& t = vk_->gbuffer_thumbs[ti];
+        VkImageCreateInfo tci{};
+        tci.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        tci.imageType     = VK_IMAGE_TYPE_2D;
+        tci.format        = vk_->scene_format;
+        tci.extent        = {w, h, 1};
+        tci.mipLevels     = 1;
+        tci.arrayLayers   = 1;
+        tci.samples       = VK_SAMPLE_COUNT_1_BIT;
+        tci.tiling        = VK_IMAGE_TILING_OPTIMAL;
+        tci.usage         = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        tci.sharingMode   = VK_SHARING_MODE_EXCLUSIVE;
+        tci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        GW_VKCHECK(vmaCreateImage(vk_->allocator, &tci, &aci, &t.image, &t.alloc, nullptr));
+
+        VkImageViewCreateInfo tvi{};
+        tvi.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        tvi.image                           = t.image;
+        tvi.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
+        tvi.format                          = vk_->scene_format;
+        tvi.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+        tvi.subresourceRange.levelCount     = 1;
+        tvi.subresourceRange.layerCount     = 1;
+        GW_VKCHECK(vkCreateImageView(vk_->device, &tvi, nullptr, &t.view));
+
+        t.imgui_ds = ImGui_ImplVulkan_AddTexture(
+            vk_->scene_sampler, t.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    }
+
+    if (!editor_scene_pass_) {
+        editor_scene_pass_ = std::make_unique<render::EditorScenePass>();
+    }
+    (void)editor_scene_pass_->init_or_recreate(
+        vk_->device, vk_->allocator, vk_->scene_format,
+        (vk_->scene_depth_view != VK_NULL_HANDLE) ? vk_->scene_depth_format : VK_FORMAT_UNDEFINED);
 }
 
 void EditorApplication::destroy_scene_rt() {
     if (!vk_ || !vk_->device) return;
+
+    editor_scene_pass_.reset();
+
+    vk_->hist_sample_w.fill(0);
+    vk_->hist_sample_h.fill(0);
+    vk_->hist_staging_used.fill(false);
+    vk_->gbuffer_thumb_seen.fill(false);
+
+    for (std::size_t ti = 0; ti < vk_->gbuffer_thumbs.size(); ++ti) {
+        auto& t = vk_->gbuffer_thumbs[ti];
+        if (t.imgui_ds) {
+            ImGui_ImplVulkan_RemoveTexture(t.imgui_ds);
+            t.imgui_ds = VK_NULL_HANDLE;
+        }
+        if (t.view) {
+            vkDestroyImageView(vk_->device, t.view, nullptr);
+            t.view = VK_NULL_HANDLE;
+        }
+        if (t.image && t.alloc) {
+            vmaDestroyImage(vk_->allocator, t.image, t.alloc);
+            t.image = VK_NULL_HANDLE;
+            t.alloc = VK_NULL_HANDLE;
+        }
+    }
 
     if (vk_->scene_imgui_ds) {
         ImGui_ImplVulkan_RemoveTexture(vk_->scene_imgui_ds);
@@ -837,6 +1099,20 @@ void EditorApplication::destroy_scene_rt() {
         vk_->scene_image = VK_NULL_HANDLE;
         vk_->scene_alloc = VK_NULL_HANDLE;
     }
+
+    if (vk_->scene_depth_view) {
+        vkDestroyImageView(vk_->device, vk_->scene_depth_view, nullptr);
+        vk_->scene_depth_view = VK_NULL_HANDLE;
+    }
+    if (vk_->scene_depth_image && vk_->scene_depth_alloc) {
+        vmaDestroyImage(vk_->allocator, vk_->scene_depth_image, vk_->scene_depth_alloc);
+        vk_->scene_depth_image = VK_NULL_HANDLE;
+        vk_->scene_depth_alloc = VK_NULL_HANDLE;
+    }
+    vk_->scene_depth_format    = VK_FORMAT_UNDEFINED;
+    vk_->scene_depth_had_frame = false;
+    vk_->scene_image_had_frame = false;
+
     vk_->scene_extent = {};
 }
 
@@ -975,7 +1251,8 @@ void EditorApplication::init_imgui() {
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
     gw::editor::theme::load_editor_fonts(
-        io, gw::editor::theme::ThemeRegistry::instance().active().typography);
+        io, gw::editor::theme::ThemeRegistry::instance().active().typography,
+        a11y_config_.force_mono_font);
 
     // Disable auto-save — we manage ini explicitly.
     io.IniFilename = nullptr;
@@ -1127,6 +1404,14 @@ void EditorApplication::shutdown_vulkan() {
         }
 
         if (vk_->allocator) {
+            for (uint32_t i = 0; i < kFramesInFlight; ++i) {
+                if (vk_->hist_staging_buf[i]) {
+                    vmaDestroyBuffer(vk_->allocator, vk_->hist_staging_buf[i],
+                                     vk_->hist_staging_alloc[i]);
+                    vk_->hist_staging_buf[i]   = VK_NULL_HANDLE;
+                    vk_->hist_staging_alloc[i] = VK_NULL_HANDLE;
+                }
+            }
             vmaDestroyAllocator(vk_->allocator);
             vk_->allocator = VK_NULL_HANDLE;
         }
@@ -1165,6 +1450,7 @@ void EditorApplication::shutdown_window() {
 bool EditorApplication::begin_frame() {
     // Wait for this frame-in-flight's fence.
     vkWaitForFences(vk_->device, 1, &vk_->in_flight[vk_->frame_index], VK_TRUE, UINT64_MAX);
+    refresh_editor_histogram_from_staging(vk_.get(), vk_->frame_index, render_settings_);
 
     const uint32_t fi = vk_->frame_index;
     if (vk_->gpu_timestamps_enabled && vk_->timestamp_query_pool &&
@@ -1228,31 +1514,66 @@ bool EditorApplication::begin_frame() {
         vkCmdResetQueryPool(cmd, vk_->timestamp_query_pool, fi * 2, 2);
     }
 
-    // --- Offscreen scene render (Phase 7 §6.1) ---------------------------
-    // Transition UNDEFINED → COLOR_ATTACHMENT_OPTIMAL, clear to a distinctive
-    // editor blue, then transition → SHADER_READ_ONLY_OPTIMAL so the Viewport
-    // panel's ImGui::Image samples a ready texture in end_frame. Real scene
-    // rendering (meshes, debug-draw) lands in later gates; until then a clear
-    // proves the VMA RT + ImGui binding end-to-end.
+    // --- Offscreen scene render (Phase 7 §6.1) + cockpit G-buffer mirrors ----
+    // Colour clear → optional mesh pass (future) → transfer to thumbnail RTs
+    // and a small RGBA tile for the luminance histogram (GPU readback).
     if (vk_->scene_image) {
-        // -> COLOR_ATTACHMENT_OPTIMAL
-        VkImageMemoryBarrier2 to_color{};
-        to_color.sType                       = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-        to_color.srcStageMask                = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-        to_color.srcAccessMask               = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
-        to_color.dstStageMask                = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-        to_color.dstAccessMask               = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-        to_color.oldLayout                   = VK_IMAGE_LAYOUT_UNDEFINED;
-        to_color.newLayout                   = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        to_color.image                       = vk_->scene_image;
-        to_color.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        to_color.subresourceRange.levelCount = 1;
-        to_color.subresourceRange.layerCount = 1;
+        std::array<VkImageMemoryBarrier2, 2> pre_scene{};
+        std::uint32_t                      n_pre_scene = 0;
+
+        VkImageMemoryBarrier2& to_color = pre_scene[n_pre_scene++];
+        to_color.sType         = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+        to_color.dstStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+        to_color.dstAccessMask  = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+        to_color.newLayout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        to_color.image         = vk_->scene_image;
+        to_color.subresourceRange.aspectMask   = VK_IMAGE_ASPECT_COLOR_BIT;
+        to_color.subresourceRange.levelCount  = 1;
+        to_color.subresourceRange.layerCount  = 1;
+        if (vk_->scene_image_had_frame) {
+            to_color.srcStageMask  = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+            to_color.srcAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+            to_color.oldLayout     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        } else {
+            to_color.srcStageMask  = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
+            to_color.srcAccessMask = 0;
+            to_color.oldLayout     = VK_IMAGE_LAYOUT_UNDEFINED;
+        }
+
+        VkRenderingAttachmentInfo depth_att{};
+        if (vk_->scene_depth_view) {
+            VkImageMemoryBarrier2& to_depth = pre_scene[n_pre_scene++];
+            to_depth.sType         = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+            to_depth.dstStageMask  = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT;
+            to_depth.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                                     VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            to_depth.newLayout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            to_depth.image         = vk_->scene_depth_image;
+            to_depth.subresourceRange.aspectMask   = VK_IMAGE_ASPECT_DEPTH_BIT;
+            to_depth.subresourceRange.levelCount   = 1;
+            to_depth.subresourceRange.layerCount   = 1;
+            if (vk_->scene_depth_had_frame) {
+                to_depth.srcStageMask  = VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+                to_depth.srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                to_depth.oldLayout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            } else {
+                to_depth.srcStageMask  = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
+                to_depth.srcAccessMask = 0;
+                to_depth.oldLayout     = VK_IMAGE_LAYOUT_UNDEFINED;
+            }
+
+            depth_att.sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            depth_att.imageView   = vk_->scene_depth_view;
+            depth_att.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            depth_att.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            depth_att.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
+            depth_att.clearValue.depthStencil     = {1.f, 0u};
+        }
 
         VkDependencyInfo dep{};
         dep.sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-        dep.imageMemoryBarrierCount = 1;
-        dep.pImageMemoryBarriers    = &to_color;
+        dep.imageMemoryBarrierCount = n_pre_scene;
+        dep.pImageMemoryBarriers    = pre_scene.data();
         vkCmdPipelineBarrier2(cmd, &dep);
 
         VkRenderingAttachmentInfo scene_att{};
@@ -1270,30 +1591,173 @@ bool EditorApplication::begin_frame() {
         rinfo.layerCount           = 1;
         rinfo.colorAttachmentCount = 1;
         rinfo.pColorAttachments    = &scene_att;
+        rinfo.pDepthAttachment       = vk_->scene_depth_view ? &depth_att : nullptr;
         vkCmdBeginRendering(cmd, &rinfo);
-        // (Phase 8 will record mesh draws here.)
+        if (editor_scene_pass_ && vk_->scene_depth_view) {
+            editor_scene_pass_->record(
+                cmd, vk_->device, vk_->allocator, vk_->scene_extent.width, vk_->scene_extent.height,
+                scene_raster_view_, scene_raster_proj_, scene_world_, fi, kFramesInFlight);
+        }
         vkCmdEndRendering(cmd);
 
-        // -> SHADER_READ_ONLY_OPTIMAL for ImGui sampling.
-        VkImageMemoryBarrier2 to_sampled{};
-        to_sampled.sType                       = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-        to_sampled.srcStageMask                = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-        to_sampled.srcAccessMask               = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-        to_sampled.dstStageMask                = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-        to_sampled.dstAccessMask               = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
-        to_sampled.oldLayout                   = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        to_sampled.newLayout                   = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        to_sampled.image                       = vk_->scene_image;
-        to_sampled.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        to_sampled.subresourceRange.levelCount = 1;
-        to_sampled.subresourceRange.layerCount = 1;
+        if (vk_->scene_depth_view) {
+            vk_->scene_depth_had_frame = true;
+        }
 
-        dep.imageMemoryBarrierCount = 1;
-        dep.pImageMemoryBarriers    = &to_sampled;
-        vkCmdPipelineBarrier2(cmd, &dep);
+        const uint32_t sw = std::max(1u, vk_->scene_extent.width);
+        const uint32_t sh = std::max(1u, vk_->scene_extent.height);
+        const uint32_t hist_w = std::min(kEditorHistSampleDim, sw);
+        const uint32_t hist_h = std::min(kEditorHistSampleDim, sh);
 
+        std::array<VkImageMemoryBarrier2, 1 + 5> pre_copy{};
+        std::size_t n_pre = 0;
+
+        VkImageMemoryBarrier2& scene_to_xfer = pre_copy[n_pre++];
+        scene_to_xfer.sType                           = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+        scene_to_xfer.srcStageMask                  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+        scene_to_xfer.srcAccessMask                 = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+        scene_to_xfer.dstStageMask                  = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+        scene_to_xfer.dstAccessMask                 = VK_ACCESS_2_TRANSFER_READ_BIT;
+        scene_to_xfer.oldLayout                     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        scene_to_xfer.newLayout                     = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        scene_to_xfer.image                         = vk_->scene_image;
+        scene_to_xfer.subresourceRange.aspectMask   = VK_IMAGE_ASPECT_COLOR_BIT;
+        scene_to_xfer.subresourceRange.levelCount   = 1;
+        scene_to_xfer.subresourceRange.layerCount   = 1;
+
+        for (std::size_t ti = 0; ti < vk_->gbuffer_thumbs.size(); ++ti) {
+            VkImageMemoryBarrier2& tb = pre_copy[n_pre++];
+            tb.sType         = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+            tb.dstStageMask  = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+            tb.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+            if (vk_->gbuffer_thumb_seen[ti]) {
+                tb.srcStageMask  = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+                tb.srcAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+                tb.oldLayout     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            } else {
+                tb.srcStageMask  = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
+                tb.srcAccessMask = 0;
+                tb.oldLayout     = VK_IMAGE_LAYOUT_UNDEFINED;
+            }
+            tb.newLayout                       = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            tb.image                           = vk_->gbuffer_thumbs[ti].image;
+            tb.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+            tb.subresourceRange.levelCount     = 1;
+            tb.subresourceRange.layerCount     = 1;
+        }
+
+        VkBufferMemoryBarrier2 buf_pre{};
+        buf_pre.sType         = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+        buf_pre.dstStageMask  = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+        buf_pre.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+        buf_pre.buffer        = vk_->hist_staging_buf[fi];
+        buf_pre.offset        = 0;
+        buf_pre.size          = VK_WHOLE_SIZE;
+        if (vk_->hist_staging_used[fi]) {
+            buf_pre.srcStageMask  = VK_PIPELINE_STAGE_2_HOST_BIT;
+            buf_pre.srcAccessMask = VK_ACCESS_2_HOST_READ_BIT;
+        } else {
+            buf_pre.srcStageMask  = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
+            buf_pre.srcAccessMask = 0;
+        }
+
+        VkDependencyInfo dep_pre{};
+        dep_pre.sType                    = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+        dep_pre.imageMemoryBarrierCount  = static_cast<uint32_t>(n_pre);
+        dep_pre.pImageMemoryBarriers     = pre_copy.data();
+        dep_pre.bufferMemoryBarrierCount = 1;
+        dep_pre.pBufferMemoryBarriers    = &buf_pre;
+        vkCmdPipelineBarrier2(cmd, &dep_pre);
+
+        VkImageCopy full_copy{};
+        full_copy.srcSubresource.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+        full_copy.srcSubresource.mipLevel       = 0;
+        full_copy.srcSubresource.baseArrayLayer = 0;
+        full_copy.srcSubresource.layerCount     = 1;
+        full_copy.dstSubresource.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+        full_copy.dstSubresource.mipLevel       = 0;
+        full_copy.dstSubresource.baseArrayLayer = 0;
+        full_copy.dstSubresource.layerCount     = 1;
+        full_copy.extent                        = {sw, sh, 1};
+
+        for (std::size_t ti = 0; ti < vk_->gbuffer_thumbs.size(); ++ti) {
+            vkCmdCopyImage(cmd, vk_->scene_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                           vk_->gbuffer_thumbs[ti].image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                           1, &full_copy);
+            vk_->gbuffer_thumb_seen[ti] = true;
+        }
+
+        VkBufferImageCopy bic{};
+        bic.bufferOffset                    = 0;
+        bic.bufferRowLength                 = 0;
+        bic.bufferImageHeight               = 0;
+        bic.imageSubresource.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+        bic.imageSubresource.mipLevel       = 0;
+        bic.imageSubresource.baseArrayLayer = 0;
+        bic.imageSubresource.layerCount     = 1;
+        bic.imageOffset                     = {0, 0, 0};
+        bic.imageExtent                     = {hist_w, hist_h, 1};
+        vkCmdCopyImageToBuffer(cmd, vk_->scene_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                               vk_->hist_staging_buf[fi], 1, &bic);
+        vk_->hist_staging_used[fi] = true;
+
+        std::array<VkImageMemoryBarrier2, 1 + 5> post_copy{};
+        std::size_t n_post = 0;
+
+        VkImageMemoryBarrier2& scene_to_sample = post_copy[n_post++];
+        scene_to_sample.sType                           = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+        scene_to_sample.srcStageMask                  = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+        scene_to_sample.srcAccessMask                 = VK_ACCESS_2_TRANSFER_READ_BIT;
+        scene_to_sample.dstStageMask                  = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+        scene_to_sample.dstAccessMask                 = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+        scene_to_sample.oldLayout                     = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        scene_to_sample.newLayout                     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        scene_to_sample.image                         = vk_->scene_image;
+        scene_to_sample.subresourceRange.aspectMask   = VK_IMAGE_ASPECT_COLOR_BIT;
+        scene_to_sample.subresourceRange.levelCount   = 1;
+        scene_to_sample.subresourceRange.layerCount   = 1;
+
+        for (std::size_t ti = 0; ti < vk_->gbuffer_thumbs.size(); ++ti) {
+            VkImageMemoryBarrier2& tb = post_copy[n_post++];
+            tb.sType                           = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+            tb.srcStageMask                    = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+            tb.srcAccessMask                   = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+            tb.dstStageMask                    = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+            tb.dstAccessMask                   = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+            tb.oldLayout                       = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            tb.newLayout                       = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            tb.image                           = vk_->gbuffer_thumbs[ti].image;
+            tb.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+            tb.subresourceRange.levelCount     = 1;
+            tb.subresourceRange.layerCount     = 1;
+        }
+
+        VkBufferMemoryBarrier2 buf_post{};
+        buf_post.sType                 = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+        buf_post.srcStageMask          = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+        buf_post.srcAccessMask         = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+        buf_post.dstStageMask          = VK_PIPELINE_STAGE_2_HOST_BIT;
+        buf_post.dstAccessMask         = VK_ACCESS_2_HOST_READ_BIT;
+        buf_post.buffer                = vk_->hist_staging_buf[fi];
+        buf_post.offset                = 0;
+        buf_post.size                  = VK_WHOLE_SIZE;
+
+        VkDependencyInfo dep_post{};
+        dep_post.sType                    = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+        dep_post.imageMemoryBarrierCount  = static_cast<uint32_t>(n_post);
+        dep_post.pImageMemoryBarriers     = post_copy.data();
+        dep_post.bufferMemoryBarrierCount = 1;
+        dep_post.pBufferMemoryBarriers    = &buf_post;
+        vkCmdPipelineBarrier2(cmd, &dep_post);
+
+        vk_->hist_sample_w[fi] = hist_w;
+        vk_->hist_sample_h[fi] = hist_h;
+        vk_->scene_image_had_frame = true;
+
+        // Offscreen work is render + transfer + layout barriers — timestamp after
+        // ALL_COMMANDS so the query sees the full cockpit RT + histogram path.
         if (vk_->gpu_timestamps_enabled && vk_->timestamp_query_pool) {
-            vkCmdWriteTimestamp2(cmd, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            vkCmdWriteTimestamp2(cmd, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
                                  vk_->timestamp_query_pool, fi * 2);
         }
     } else if (vk_->gpu_timestamps_enabled && vk_->timestamp_query_pool) {
@@ -1501,6 +1965,13 @@ void EditorApplication::open_project(const std::filesystem::path& root) {
     gw::editor::shell::touch_recent_project(recent_projects_, project_root_);
     shell_phase_ = EditorShellPhase::MainEditor;
 
+    editor_asset_db_.reset();
+    editor_asset_vfs_ = std::make_unique<gw::assets::vfs::VirtualFilesystem>();
+    editor_asset_vfs_->mount("assets/", (project_root_ / "assets").string(), 0);
+    editor_asset_vfs_->mount("content/", (project_root_ / "content").string(), 0);
+    editor_asset_db_ = std::make_unique<gw::assets::AssetDatabase>(
+        gw::assets::AssetDatabaseModHarnessTag{}, *editor_asset_vfs_);
+
     const fs::path def_scene =
         fs::path{"content"} / "scenes" / "sacrilege_editor_default.gwscene";
     const fs::path def_abs = project_root_ / def_scene;
@@ -1692,7 +2163,7 @@ void EditorApplication::build_ui() {
                 ImGui::SetTooltip(
                     "Writes the active scene to disk and spawns `sandbox_playable` from the "
                     "same build directory (CI-style headless tick). Full scene load inside "
-                    "the runtime lands in Phase 11+; this closes the export + launch seam.");
+                    "the detached runtime launcher is enabled; this closes the export + launch seam.");
             }
             ImGui::EndMenu();
         }
@@ -1846,6 +2317,7 @@ void EditorApplication::build_ui() {
         if (dirty) {
             gw::editor::a11y::apply(a11y_config_);
             apply_theme();
+            reload_imgui_fonts_for_a11y();
             gw::editor::config::save_theme(
                 gw::editor::theme::ThemeRegistry::instance().active_id());
         }
@@ -2041,6 +2513,14 @@ void EditorApplication::apply_theme() {
         gw::editor::theme::ThemeRegistry::instance().active().palette;
     gw::editor::theme::apply_palette_to_imgui_style(pal, style, vp);
     update_clear_colors_from_theme();
+}
+
+void EditorApplication::reload_imgui_fonts_for_a11y() noexcept {
+    if (!ImGui::GetCurrentContext()) return;
+    ImGuiIO& io = ImGui::GetIO();
+    gw::editor::theme::load_editor_fonts(
+        io, gw::editor::theme::ThemeRegistry::instance().active().typography,
+        a11y_config_.force_mono_font);
 }
 
 // ---------------------------------------------------------------------------

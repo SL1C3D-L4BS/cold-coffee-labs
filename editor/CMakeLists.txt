@@ -80,6 +80,7 @@ endif()
 add_executable(gw_editor
     main.cpp
     app/editor_app.cpp
+    render/editor_scene_pass.cpp
     render/imgui_texture_cache.cpp
     panels/panel_registry.cpp
     panels/outliner_panel.cpp
@@ -215,7 +216,14 @@ set_target_properties(gw_editor PROPERTIES
 # Vulkan validation layers in Debug builds — mirrors sandbox.
 target_compile_definitions(gw_editor PRIVATE
     $<$<CONFIG:Debug>:GW_VK_VALIDATION=1>
+    CCL_REPO_ROOT="${CMAKE_SOURCE_DIR}"
+    GW_MOD_BUILD="${CMAKE_BINARY_DIR}"
 )
+
+# Wave 1C: editor HLSL compiles to ${CMAKE_BINARY_DIR}/shaders/editor/*.spv
+if(TARGET editor_shaders)
+    add_dependencies(gw_editor editor_shaders)
+endif()
 
 # Strict compile flags inherit from root; silence nothing in editor code.
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR

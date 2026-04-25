@@ -57,7 +57,7 @@ namespace {
     return 0;
 }
 
-[[nodiscard]] bool write_minimal_gwmat_stub(const std::filesystem::path& file_path) {
+[[nodiscard]] bool write_encoded_default_pbr_gwmat(const std::filesystem::path& file_path) {
     namespace fs = std::filesystem;
     gw::render::material::MaterialTemplateDesc d{};
     d.name                       = "pbr_opaque/metal_rough";
@@ -212,10 +212,10 @@ void AmbientCgBrowser::draw_material_cell(gw::editor::EditorContext& ctx, const 
             ImGui::SetClipboardText(full.c_str());
         }
         ImGui::SameLine();
-        if (ctx.project_root && ImGui::SmallButton("Stub .gwmat")) {
+        if (ctx.project_root && ImGui::SmallButton("Write default PBR .gwmat")) {
             const fs::path out = *ctx.project_root / "content" / "materials" / "ambient_cg" /
                                  (id + ".gwmat");
-            if (write_minimal_gwmat_stub(out))
+            if (write_encoded_default_pbr_gwmat(out))
                 ImGui::SetClipboardText(out.string().c_str());
         }
 

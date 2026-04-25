@@ -20,8 +20,9 @@
 #include <glm/gtx/matrix_decompose.hpp>
 #include <algorithm>
 #include <cmath>
-#include <cstring>
 #include <cstdio>
+#include <cstring>
+#include <limits>
 
 namespace gw::editor {
 
@@ -55,6 +56,38 @@ glm::vec3 blockout_hit_on_ground_plane(float mouse_x, float mouse_y, float vp_x,
     const glm::mat4 r = glm::mat4_cast(tc.rotation);
     const glm::mat4 s = glm::scale(glm::mat4{1.f}, tc.scale);
     return t * r * s;
+}
+
+[[nodiscard]] bool ray_intersects_aabb(const glm::vec3& ro, const glm::vec3& rd,
+                                         const glm::vec3& bmin, const glm::vec3& bmax,
+                                         float& t_hit) noexcept {
+    float       tmin = 0.f;
+    float       tmax = std::numeric_limits<float>::max();
+    constexpr float kEps = 1e-6f;
+    for (int i = 0; i < 3; ++i) {
+        if (std::abs(rd[i]) < kEps) {
+            if (ro[i] < bmin[i] || ro[i] > bmax[i]) {
+                return false;
+            }
+            continue;
+        }
+        const float inv_d = 1.f / rd[i];
+        float       t0    = (bmin[i] - ro[i]) * inv_d;
+        float       t1    = (bmax[i] - ro[i]) * inv_d;
+        if (t0 > t1) {
+            std::swap(t0, t1);
+        }
+        tmin = std::max(tmin, t0);
+        tmax = std::min(tmax, t1);
+        if (tmax < tmin) {
+            return false;
+        }
+    }
+    if (tmax < 0.f) {
+        return false;
+    }
+    t_hit = tmin >= 0.f ? tmin : tmax;
+    return true;
 }
 
 void snap_translation_in_place(glm::vec3& v, float step) {
@@ -201,10 +234,10 @@ void ViewportPanel::draw_overlay(EditorContext& ctx) {
     dl->AddText(fps_pos, color32_to_im_u32(pal.positive, 200.f / 255.f), fps_buf);
 
     ImVec2 grid_pos{vp_x_ + 8.f, vp_y_ + vp_h_ - 22.f};
-    char grid_line[160];
+    char grid_line[192];
     std::snprintf(grid_line, sizeof(grid_line),
-                  "Grid 1u  %s  Blockout = designer layer; Blacklake/GPTM mesh is separate "
-                  "(regen must not wipe blockout unless opted-in). Vulkan mesh draw: Phase 8.",
+                  "Grid 1u  %s  Blockout layer (separate from Blacklake mesh). "
+                  "Ray pick = AABB (Move/Rotate/Scale); Place = ground plane.",
                   snap_grid_enabled_ ? "snap on" : "snap off");
     dl->AddText(grid_pos, color32_to_im_u32(pal.text_muted, 160.f / 255.f), grid_line);
 }
@@ -277,13 +310,21 @@ void ViewportPanel::on_imgui_render(EditorContext& ctx) {
             auto* world = ctx.world;
             ctx.cmd_stack.push(std::make_unique<undo::CreateEntityCommand>(
                 std::move(leaf),
-                [world, path = asset_path](const char* nm) -> EntityHandle {
+                [world, path = std::move(asset_path)](const char* nm) -> EntityHandle {
                     if (!world) return kNullEntity;
-                    auto e = world->create_entity();
+                    const auto e = world->create_entity();
                     world->add_component(e, scene::NameComponent{nm});
                     world->add_component(e, scene::TransformComponent{});
                     world->add_component(e, scene::VisibilityComponent{});
-                    (void)path;  // asset wiring lands in Phase 8
+                    // Wave 1C: blockout box + path hint for future mesh cook; scene pass
+                    // rasterizes this primitive with world cache from `update_transforms`.
+                    scene::BlockoutPrimitiveComponent blk{};
+                    const std::size_t plen = (std::min)(path.size(), blk.gwmat_rel.size() - 1u);
+                    if (plen > 0) {
+                        std::memcpy(blk.gwmat_rel.data(), path.data(), plen);
+                    }
+                    blk.gwmat_rel[plen] = '\0';
+                    world->add_component(e, std::move(blk));
                     return e;
                 },
                 [world](EntityHandle h) {
@@ -329,6 +370,58 @@ void ViewportPanel::on_imgui_render(EditorContext& ctx) {
             [world](EntityHandle h) {
                 if (world) world->destroy_entity(h);
             }));
+    }
+
+    // World-space ray vs transform AABB picking (§1C). Move/Rotate/Scale blockout
+    // tools use clicks to retarget selection without a GPU ID buffer.
+    if (!ctx.in_pie && blockout_tool_ != 0 && rt_hovered && ctx.world &&
+        ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGuizmo::IsUsing()) {
+        ImVec2          mouse = ImGui::GetMousePos();
+        const float     aspect = vp_w_ / std::max(vp_h_, 1.f);
+        const glm::mat4 view   = camera_.view();
+        const glm::mat4 proj   = camera_.projection(aspect);
+        const float       ndc_x =
+            (2.f * (mouse.x - vp_x_) / std::max(vp_w_, 1.f)) - 1.f;
+        const float ndc_y = 1.f - (2.f * (mouse.y - vp_y_) / std::max(vp_h_, 1.f));
+        const glm::mat4 inv_vp = glm::inverse(proj * view);
+        glm::vec4       w0     = inv_vp * glm::vec4(ndc_x, ndc_y, -1.f, 1.f);
+        glm::vec4       w1     = inv_vp * glm::vec4(ndc_x, ndc_y, 1.f, 1.f);
+        w0 /= w0.w;
+        w1 /= w1.w;
+        const glm::vec3 ro = glm::vec3(w0);
+        const glm::vec3 rd = glm::normalize(glm::vec3(w1 - w0));
+
+        gw::ecs::Entity best = gw::ecs::Entity::null();
+        float           best_t = std::numeric_limits<float>::infinity();
+        ctx.world->for_each<scene::TransformComponent, scene::VisibilityComponent>(
+            [&](gw::ecs::Entity e, const scene::TransformComponent& tc,
+                const scene::VisibilityComponent& vis) {
+                if (!vis.visible) {
+                    return;
+                }
+                const glm::vec3 c{static_cast<float>(tc.position.x),
+                                  static_cast<float>(tc.position.y),
+                                  static_cast<float>(tc.position.z)};
+                const glm::vec3 h    = tc.scale * 0.5f;
+                const glm::vec3 bmin = c - h;
+                const glm::vec3 bmax = c + h;
+                float           t = 0.f;
+                if (ray_intersects_aabb(ro, rd, bmin, bmax, t) && t < best_t) {
+                    best_t = t;
+                    best   = e;
+                }
+            });
+
+        const bool shift = ImGui::GetIO().KeyShift;
+        if (best != gw::ecs::Entity::null()) {
+            if (shift) {
+                ctx.selection.toggle(best);
+            } else {
+                ctx.selection.set(best);
+            }
+        } else if (!shift) {
+            ctx.selection.clear();
+        }
     }
 
     // Camera update.
@@ -454,6 +547,12 @@ void ViewportPanel::on_imgui_render(EditorContext& ctx) {
         const float aspect = vp_w_ / std::max(vp_h_, 1.f);
         const glm::mat4 view = camera_.view();
         const glm::mat4 proj = camera_.projection(aspect);
+        if (ctx.scene_raster_view != nullptr) {
+            *ctx.scene_raster_view = view;
+        }
+        if (ctx.scene_raster_proj != nullptr) {
+            *ctx.scene_raster_proj = proj;
+        }
         debug_draw::flush_to_imgui(view, proj, vp_x_, vp_y_, vp_w_, vp_h_);
     } else {
         debug_draw::clear();

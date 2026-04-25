@@ -6,30 +6,10 @@
 #include "editor/render/render_settings.hpp"
 
 #include <imgui.h>
-#include <algorithm>
-#include <cmath>
 
 namespace gw::editor {
 
 namespace {
-
-// Seed a plausible histogram shape until the live-luminance reducer lands in
-// the renderer (Phase 8). The curve is a gentle log-normal that reacts to
-// the editor's "average luminance" so the UI still feels coupled.
-void synthesise_histogram(render::LuminanceHistogram& h, float avg) noexcept {
-    const float mean   = std::clamp(avg * 32.f, 0.f, 62.f);
-    const float stddev = 8.f;
-    float total = 0.f;
-    for (std::size_t i = 0; i < h.buckets.size(); ++i) {
-        const float x = static_cast<float>(i) - mean;
-        const float v = std::exp(-0.5f * (x * x) / (stddev * stddev));
-        h.buckets[i]  = v;
-        total        += v;
-    }
-    if (total > 0.f) {
-        for (auto& v : h.buckets) v /= total;
-    }
-}
 
 void draw_tonemap(render::ToneMapParams& tm) {
     if (!ImGui::CollapsingHeader("Tone map options",
@@ -56,7 +36,6 @@ void draw_exposure(render::ExposureParams& ex, render::LuminanceHistogram& hist)
     if (!ImGui::CollapsingHeader("Luminance histogram / exposure",
                                   ImGuiTreeNodeFlags_DefaultOpen)) return;
 
-    synthesise_histogram(hist, ex.average_luminance);
     ImGui::PlotHistogram("##lum_hist", hist.buckets.data(),
                           static_cast<int>(hist.buckets.size()),
                           0, nullptr, FLT_MAX, FLT_MAX, ImVec2{-1.f, 78.f});

@@ -8,19 +8,15 @@
 #include "editor/viewport/editor_camera.hpp"
 #include "editor/viewport/gizmo_system.hpp"
 
-// Vulkan forward declares — avoids pulling in volk in the header.
 #include <cstdint>
-
-struct VkDescriptorSet_T; using VkDescriptorSet = VkDescriptorSet_T*;
+#include <volk.h> // VkDescriptorSet for set_scene_texture; canonical Vk* (no `using` aliases)
 
 namespace gw::editor {
 
 class ViewportPanel final : public IPanel {
 public:
-    // Phase 7: offscreen render target allocation is a TODO (§6.1). The panel
-    // therefore has no Vulkan dependency at construction; it will acquire the
-    // required device + allocator handles via a setter when Phase 8 wires
-    // real scene-image creation.
+    // The panel has no Vulkan dependency at construction; `EditorApplication`
+    // passes the scene image descriptor from `set_scene_texture()` (Phase 7 §6.1).
     ViewportPanel()           = default;
     ~ViewportPanel() override;
 
@@ -84,8 +80,9 @@ private:
     EntityHandle      gizmo_undo_entity_  = kNullEntity;
     gw::editor::undo::TransformSnapshot gizmo_undo_before_{};
 
-    // Entity picking staging buffer — written to by GPU, read by CPU next frame.
-    // Full picking pipeline wired in Phase 7 §6.4.
+    // Reserved for GPU object-ID picking (render-to-texture + readback). Today
+    // selection uses a world-space ray vs. transform AABBs (O(n) over visible
+    // entities) — accurate enough for blockout, not mesh-accurate.
     [[maybe_unused]] bool              picking_requested_   = false;
     [[maybe_unused]] uint32_t          pick_pixel_x_        = 0;
     [[maybe_unused]] uint32_t          pick_pixel_y_        = 0;

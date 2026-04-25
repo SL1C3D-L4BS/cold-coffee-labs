@@ -10,7 +10,6 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <algorithm>
-#include <numeric>
 
 namespace gw::editor {
 
@@ -31,15 +30,12 @@ ImGuizmo::MODE to_imguizmo_mode(GizmoSpace sp) noexcept {
 
 // ---------------------------------------------------------------------------
 void GizmoSystem::set_entity_matrix(EntityHandle h, const glm::mat4& m) {
-    for (auto& e : entity_mats_) {
-        if (e.handle == h) { e.mat = m; return; }
-    }
-    entity_mats_.push_back({h, m});
+    entity_mats_[h.raw_bits()] = m;
 }
 
 glm::mat4 GizmoSystem::get_entity_matrix(EntityHandle h) const {
-    for (const auto& e : entity_mats_)
-        if (e.handle == h) return e.mat;
+    const auto it = entity_mats_.find(h.raw_bits());
+    if (it != entity_mats_.end()) return it->second;
     return glm::mat4{1.f};
 }
 

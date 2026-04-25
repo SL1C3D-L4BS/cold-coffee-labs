@@ -22,6 +22,8 @@
 #include "engine/core/time.hpp"
 #include "engine/ecs/entity.hpp"
 #include "engine/ecs/world.hpp"
+
+#include <glm/fwd.hpp>
 #include "engine/scene/seq/seq_camera.hpp"
 #include "engine/scene/seq/sequencer_world.hpp"
 
@@ -33,6 +35,10 @@
 #include <vector>
 
 struct GLFWwindow;
+
+namespace gw::assets { class AssetDatabase; }
+namespace gw::assets::vfs { class VirtualFilesystem; }
+namespace gw::editor::render { class EditorScenePass; }
 
 namespace gw::editor {
 
@@ -93,6 +99,7 @@ private:
     // -----------------------------------------------------------------------
     void build_docking_layout();
     void apply_theme();
+    void reload_imgui_fonts_for_a11y() noexcept;
     void update_clear_colors_from_theme();
     void build_launcher_ui();
     /// Set project root, chdir for relative content/ paths, recent list, main editor.
@@ -177,6 +184,9 @@ private:
     std::filesystem::path project_root_;
     std::optional<std::filesystem::path> pending_folder_drop_;
     std::unique_ptr<gw::editor::render::ImGuiTextureCache> imgui_tex_cache_;
+    /// Project-scoped VFS + harness-mode asset DB (no engine HAL device).
+    std::unique_ptr<gw::assets::vfs::VirtualFilesystem> editor_asset_vfs_;
+    std::unique_ptr<gw::assets::AssetDatabase>          editor_asset_db_;
     float last_dt_sec_ = 1.f / 60.f;
 
     /// Stable storage for `GameplayContext::play_cvars_toml_abs_utf8` while PIE runs.
@@ -185,6 +195,12 @@ private:
     /// Editor-only registry: mirrors `apply_playable_bootstrap` merge for PIE (Phase 24 follow-through).
     /// `optional` so each PIE sync can `emplace()` a fresh registry (`CVarRegistry` is move-only).
     std::optional<gw::config::CVarRegistry> pie_bootstrap_cvars_{};
+
+    // Wave 1C — offscreen scene raster: view/proj written by Viewport each frame;
+    // read in the following `begin_frame` to match the debug overlay (one-frame latency).
+    glm::mat4 scene_raster_view_{1.f};
+    glm::mat4 scene_raster_proj_{1.f};
+    std::unique_ptr<render::EditorScenePass> editor_scene_pass_{};
 };
 
 }  // namespace gw::editor

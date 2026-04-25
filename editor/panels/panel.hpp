@@ -5,6 +5,9 @@
 
 #include <filesystem>
 
+// glm::mat4 in EditorContext (viewport → offscreen scene pass).
+#include <glm/fwd.hpp>
+
 // Forward declarations to keep this header lightweight.
 namespace gw::editor::render {
 class ImGuiTextureCache;
@@ -51,6 +54,10 @@ struct EditorContext {
     const std::filesystem::path*      project_root         = nullptr;
     /// RGBA8 thumbnails via Vulkan → ImGui (optional).
     gw::editor::render::ImGuiTextureCache* imgui_textures = nullptr;
+    /// Filled by the Viewport panel; consumed next frame in `begin_frame` scene
+    /// raster (same view/proj as debug overlay, one frame latent vs interaction).
+    glm::mat4*            scene_raster_view  = nullptr;
+    glm::mat4*            scene_raster_proj  = nullptr;
 };
 
 // ---------------------------------------------------------------------------

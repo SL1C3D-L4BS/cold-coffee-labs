@@ -54,10 +54,8 @@ struct ExposureParams {
 };
 
 // -----------------------------------------------------------------------
-// LuminanceHistogram — 64-bucket luminance distribution drawn by the
-// HistogramPanel. The renderer updates `buckets` each frame; until the
-// reference-renderer histogram lands, the editor synthesises a plausible
-// shape so the cockpit looks populated end-to-end.
+// LuminanceHistogram — 64-bucket luminance distribution. The editor fills
+// `buckets` from a small GPU readback of the viewport scene colour each frame.
 // -----------------------------------------------------------------------
 struct LuminanceHistogram {
     static constexpr std::size_t kBucketCount = 64;
@@ -87,7 +85,9 @@ struct DebugToggles {
 struct FrameStats {
     float fps              = 0.f;
     float cpu_ms           = 0.f;    // time this frame spent on the CPU
-    /// Vulkan timestamp span scene pass → post/ImGui (editor CB), not full frame-graph yet.
+    /// Editor CB: time between the ALL_COMMANDS timestamp (after offscene RT+hist)
+    /// and the end of the main swapchain ImGui pass — i.e. mostly the docking UI,
+    /// not the viewport scene RT. Full GPU frame graph is post–Phase 8.
     float gpu_ms = 0.f;
     std::uint64_t frame_id = 0;
 

@@ -7,17 +7,11 @@
 #include <filesystem>
 #include <memory>
 
-// Forward-declare Vulkan / VMA — defined in editor_app.cpp TU via volk + vk_mem_alloc.h.
-struct VkDevice_T;
-struct VkPhysicalDevice_T;
-struct VkQueue_T;
-struct VkCommandPool_T;
+// Canonical Vk* from volk. Do not add parallel `using Vk* =` aliases (clashes on include order).
+#include <volk.h>
+
 struct VmaAllocator_T;
-using VkDevice            = VkDevice_T*;
-using VkPhysicalDevice    = VkPhysicalDevice_T*;
-using VkQueue             = VkQueue_T*;
-using VkCommandPool       = VkCommandPool_T*;
-using VmaAllocator        = VmaAllocator_T*;
+using VmaAllocator = VmaAllocator_T*; // <vk_mem_alloc.h> in .cpp; opaque here.
 
 namespace gw::editor::render {
 

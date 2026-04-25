@@ -1,6 +1,7 @@
 // editor/viewport/editor_camera.cpp
-// TODO(Phase 10): replace GLFW raw-reads with engine::InputEvent.
 #include "editor_camera.hpp"
+
+#include <imgui.h>
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -85,17 +86,15 @@ void EditorCamera::update(float dt, bool viewport_hovered, GLFWwindow* window) {
 }
 
 void EditorCamera::update_orbit(float dt, bool hovered, GLFWwindow* w) {
+    (void)w;
     if (!hovered) { rmb_down_ = mmb_down_ = false; return; }
 
-    double mx, my;
-    glfwGetCursorPos(w, &mx, &my);
-    double dx = mx - last_mouse_x_;
-    double dy = my - last_mouse_y_;
-    last_mouse_x_ = mx;
-    last_mouse_y_ = my;
+    const ImGuiIO& io = ImGui::GetIO();
+    const double   dx = static_cast<double>(io.MouseDelta.x);
+    const double   dy = static_cast<double>(io.MouseDelta.y);
 
-    bool rmb = (glfwGetMouseButton(w, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS);
-    bool mmb = (glfwGetMouseButton(w, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS);
+    const bool rmb = ImGui::IsMouseDown(ImGuiMouseButton_Right);
+    const bool mmb = ImGui::IsMouseDown(ImGuiMouseButton_Middle);
 
     if (rmb && rmb_down_) {
         state_.orbit_yaw   += static_cast<float>(dx) * 0.005f;
@@ -132,16 +131,14 @@ void EditorCamera::update_orbit(float dt, bool hovered, GLFWwindow* w) {
 }
 
 void EditorCamera::update_fly(float dt, bool hovered, GLFWwindow* w) {
+    (void)w;
     if (!hovered) { rmb_down_ = false; return; }
 
-    double mx, my;
-    glfwGetCursorPos(w, &mx, &my);
-    double dx = mx - last_mouse_x_;
-    double dy = my - last_mouse_y_;
-    last_mouse_x_ = mx;
-    last_mouse_y_ = my;
+    const ImGuiIO& io = ImGui::GetIO();
+    const double   dx = static_cast<double>(io.MouseDelta.x);
+    const double   dy = static_cast<double>(io.MouseDelta.y);
 
-    bool rmb = (glfwGetMouseButton(w, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS);
+    const bool rmb = ImGui::IsMouseDown(ImGuiMouseButton_Right);
     if (rmb) {
         if (rmb_down_) {
             state_.fly_yaw   += static_cast<float>(dx) * 0.003f;
@@ -152,8 +149,10 @@ void EditorCamera::update_fly(float dt, bool hovered, GLFWwindow* w) {
 
         // WASD + QE movement.
         float speed = state_.fly_speed;
-        if (glfwGetKey(w, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)  speed *= 4.f;
-        if (glfwGetKey(w, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) speed *= 0.25f;
+        if (ImGui::IsKeyDown(ImGuiKey_LeftShift) || ImGui::IsKeyDown(ImGuiKey_RightShift))
+            speed *= 4.f;
+        if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_RightCtrl))
+            speed *= 0.25f;
 
         glm::vec3 fwd{
             std::cos(state_.fly_pitch) * std::sin(state_.fly_yaw),
@@ -163,12 +162,12 @@ void EditorCamera::update_fly(float dt, bool hovered, GLFWwindow* w) {
         glm::vec3 up{0.f, 1.f, 0.f};
 
         float  s = speed * dt;
-        if (glfwGetKey(w, GLFW_KEY_W) == GLFW_PRESS) state_.position += fwd   * s;
-        if (glfwGetKey(w, GLFW_KEY_S) == GLFW_PRESS) state_.position -= fwd   * s;
-        if (glfwGetKey(w, GLFW_KEY_A) == GLFW_PRESS) state_.position -= right * s;
-        if (glfwGetKey(w, GLFW_KEY_D) == GLFW_PRESS) state_.position += right * s;
-        if (glfwGetKey(w, GLFW_KEY_E) == GLFW_PRESS) state_.position += up    * s;
-        if (glfwGetKey(w, GLFW_KEY_Q) == GLFW_PRESS) state_.position -= up    * s;
+        if (ImGui::IsKeyDown(ImGuiKey_W)) state_.position += fwd * s;
+        if (ImGui::IsKeyDown(ImGuiKey_S)) state_.position -= fwd * s;
+        if (ImGui::IsKeyDown(ImGuiKey_A)) state_.position -= right * s;
+        if (ImGui::IsKeyDown(ImGuiKey_D)) state_.position += right * s;
+        if (ImGui::IsKeyDown(ImGuiKey_E)) state_.position += up * s;
+        if (ImGui::IsKeyDown(ImGuiKey_Q)) state_.position -= up * s;
 
         state_.target = state_.position + fwd;
     } else {
@@ -177,16 +176,14 @@ void EditorCamera::update_fly(float dt, bool hovered, GLFWwindow* w) {
 }
 
 void EditorCamera::update_ortho(float dt, bool hovered, GLFWwindow* w) {
+    (void)w;
     if (!hovered) { mmb_down_ = false; return; }
 
-    double mx, my;
-    glfwGetCursorPos(w, &mx, &my);
-    double dx = mx - last_mouse_x_;
-    double dy = my - last_mouse_y_;
-    last_mouse_x_ = mx;
-    last_mouse_y_ = my;
+    const ImGuiIO& io = ImGui::GetIO();
+    const double   dx = static_cast<double>(io.MouseDelta.x);
+    const double   dy = static_cast<double>(io.MouseDelta.y);
 
-    bool mmb = (glfwGetMouseButton(w, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS);
+    const bool mmb = ImGui::IsMouseDown(ImGuiMouseButton_Middle);
     if (mmb && mmb_down_) {
         float pan = state_.orbit_dist * 0.002f;
         switch (state_.ortho_axis) {

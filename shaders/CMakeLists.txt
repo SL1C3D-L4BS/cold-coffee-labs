@@ -59,8 +59,9 @@ add_shader_library(ibl_shaders
 )
 
 # Post-processing shaders (Week 031 + Studio Renderer additions)
-# ADR-0091 sibling: every .hlsl under shaders/ must appear here exactly once.
-# `tools/lint/check_shader_registration.py` enforces this in CI.
+# ADR-0091 sibling: every *stage* .hlsl (.vert/.frag/.comp/...) must appear in a SOURCES list.
+# Include-only libraries (no `main`, no SPIR-V target) are allowlisted in
+# `tools/lint/check_shader_registration.py` (e.g. post/tonemap_pq.hlsl). That script enforces CI.
 set(POST_SHADER_SOURCES
     post/tonemap.frag.hlsl
     post/tonemap_aces.frag.hlsl
@@ -148,6 +149,19 @@ add_shader_library(world_shaders
     SOURCES ${WORLD_SHADER_SOURCES}
     INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/engine/render/shaders
     OUTPUT_DIR ${CMAKE_BINARY_DIR}/shaders/world
+)
+
+# Editor offscreen scene pass (Wave 1C — unlit + depth, blockout / placeholder mesh).
+set(EDITOR_SHADER_SOURCES
+    editor/scene_unlit.vert.hlsl
+    editor/scene_unlit.frag.hlsl
+)
+
+add_shader_library(editor_shaders
+    SOURCE_BASE "${CMAKE_CURRENT_SOURCE_DIR}"
+    SOURCES ${EDITOR_SHADER_SOURCES}
+    INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/editor
+    OUTPUT_DIR ${CMAKE_BINARY_DIR}/shaders/editor
 )
 
 # Hot-reload target for development (optional)

@@ -10,6 +10,9 @@
 #include "editor/selection/selection_context.hpp"
 #include "editor/viewport/editor_camera.hpp"
 
+#include <cstdint>
+#include <unordered_map>
+
 namespace gw::editor {
 
 enum class GizmoOp    { Translate, Rotate, Scale };
@@ -60,7 +63,10 @@ public:
     [[nodiscard]] const glm::mat4& delta_matrix() const noexcept { return delta_; }
 
     /// Clears cached entity → matrix map (call each frame before set_entity_matrix).
-    void clear_entity_matrices() noexcept { entity_mats_.clear(); }
+    void clear_entity_matrices() noexcept {
+        entity_mats_.clear();
+        entity_mats_.reserve(256);
+    }
 
     /// World matrix ImGuizmo manipulated last (single-selection pivot).
     [[nodiscard]] const glm::mat4& pivot_matrix() const noexcept { return pivot_mat_; }
@@ -74,9 +80,10 @@ private:
     glm::mat4  pivot_mat_ = glm::mat4{1.f};
     glm::mat4  delta_     = glm::mat4{1.f};
 
-    // Simple flat map: entity handle → world matrix (Phase 7 placeholder).
-    struct EntityEntry { EntityHandle handle; glm::mat4 mat; };
-    std::vector<EntityEntry> entity_mats_;
+    // Generational entity id → world matrix (O(1) lookup for multi-select pivots).
+    // Wave 1C: selection is small (≪256); `unordered_map` is fine. A `FlatMap` or
+    // sorted `std::vector` is only worth it if profiling shows this as hot.
+    std::unordered_map<std::uint64_t, glm::mat4> entity_mats_;
 };
 
 }  // namespace gw::editor

@@ -1,4 +1,4 @@
-// editor/panels/audit/heatmap_panel.cpp — Part C §23 scaffold.
+// editor/panels/audit/heatmap_panel.cpp — Wave 1: director encounter pressure preview.
 
 #include "editor/panels/audit/heatmap_panel.hpp"
 
@@ -11,17 +11,22 @@ namespace gw::editor::panels::audit {
 
 void HeatmapPanel::on_imgui_render(gw::editor::EditorContext& ctx) {
     (void)ctx;
-    if (!visible_) return;
+    if (!visible_) {
+        return;
+    }
     ImGui::Begin(name(), &visible_);
 
-    ImGui::TextDisabled("Encounter / heat → director (plan week 159)");
-    static float heat_intensity = 0.5f;
-    ImGui::SliderFloat("Heat (stub)", &heat_intensity, 0.f, 1.f);
-    if (ImGui::Button("Evaluate director (BLD-tier scaffold)")) {
+    ImGui::TextUnformatted(
+        "Encounter pressure → director policy preview. Values feed a live "
+        "`gw::services::director::evaluate` call so designers can feel spawn cadence "
+        "before shipping a Blacklake slice.");
+    static float normalized_sin_driver = 0.5f;
+    ImGui::SliderFloat("Normalized sin driver", &normalized_sin_driver, 0.f, 1.f);
+    if (ImGui::Button("Evaluate director policy")) {
         gw::services::director::DirectorRequest dr{};
-        dr.seed         = 0xE001u;
-        dr.logical_tick = 1;
-        dr.normalized_sin = heat_intensity;
+        dr.seed           = 0xE001u;
+        dr.logical_tick   = 1;
+        dr.normalized_sin = normalized_sin_driver;
         dr.current_state  = gw::services::director::IntensityState::BuildUp;
         (void)gw::services::director::evaluate(dr);
     }

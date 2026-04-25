@@ -71,6 +71,11 @@ add_executable(gw_tests
     "${CMAKE_SOURCE_DIR}/editor/shell/franchise_roots.cpp"
     unit/editor/selection_test.cpp
     unit/editor/editor_context_test.cpp
+    unit/editor/editor_field_ipc_test.cpp
+    # Wave 1C — a11y TOML round-trip (temp path; does not touch APPDATA).
+    unit/editor/editor_a11y_toml_test.cpp
+    "${CMAKE_SOURCE_DIR}/editor/a11y/editor_a11y.cpp"
+    "${CMAKE_SOURCE_DIR}/editor/config/editor_paths.cpp"
     # Editor implementation units needed by tests (not part of gw_editor binary).
     "${CMAKE_SOURCE_DIR}/editor/selection/selection_context.cpp"
     # Phase 10 — Runtime I: Audio
@@ -192,6 +197,7 @@ add_executable(gw_tests
     "${CMAKE_SOURCE_DIR}/editor/render/imgui_texture_cache.cpp"
     "${CMAKE_SOURCE_DIR}/editor/theme/theme_registry.cpp"
     "${CMAKE_SOURCE_DIR}/editor/theme/imgui_style_from_palette.cpp"
+    "${CMAKE_SOURCE_DIR}/editor/theme/graph_theme.cpp"
     "${CMAKE_SOURCE_DIR}/editor/panels/sacrilege/ambient_cg_browser.cpp"
     "${CMAKE_SOURCE_DIR}/editor/panels/sacrilege/circle_editor_panel.cpp"
     "${CMAKE_SOURCE_DIR}/editor/panels/sacrilege/encounter_editor_panel.cpp"
@@ -280,6 +286,9 @@ if(TARGET greywater::imgui)
 endif()
 if(TARGET greywater::imguizmo)
     target_link_libraries(gw_tests PRIVATE greywater::imguizmo)
+endif()
+if(TARGET greywater::imnodes)
+    target_link_libraries(gw_tests PRIVATE greywater::imnodes)
 endif()
 
 # Pull in Vulkan/VMA headers that asset headers need.
