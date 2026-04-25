@@ -1,5 +1,9 @@
-// PBR fragment shader stub for forward+ rendering
-// Week 028: Basic PBR shader for reference renderer
+// PBR-oriented fragment entry for the reference / tooling path (not the
+// production deferred or forward+ cluster). This file intentionally stays
+// small: albedo is texture-modulated; normal and metallic-roughness samplers
+// are declared for binding parity but are not sampled here yet; lighting is
+// a constant ambient plus one hard-coded directional term (no StructuredBuffer
+// light loop is executed).
 
 // Material properties
 struct Material {
@@ -9,7 +13,7 @@ struct Material {
     float ao;
 };
 
-// Light data (will be filled by forward+ system)
+// Light record shape reserved for a future multi-light pass (buffer unused in main()).
 struct Light {
     float3 position;
     float3 color;
@@ -39,7 +43,7 @@ float4 main(PSInput input) : SV_Target {
     float3 albedo = material.albedo * albedoTexture.Sample(textureSampler, input.texCoord).rgb;
     float3 normal = normalize(input.normal);
     
-    // Basic lighting calculation (will be replaced by forward+)
+    // Minimal lambert-ish term until the real light loop is wired.
     float3 finalColor = albedo * 0.1; // Ambient
     
     // Simple directional light (temporary)

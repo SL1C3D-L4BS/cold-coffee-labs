@@ -39,6 +39,7 @@ struct GLFWwindow;
 namespace gw::assets { class AssetDatabase; }
 namespace gw::assets::vfs { class VirtualFilesystem; }
 namespace gw::editor::render { class EditorScenePass; }
+namespace gw::editor::bld { class McpStdioSession; }
 
 namespace gw::editor {
 
@@ -93,6 +94,8 @@ private:
     // by ImGui in the Viewport panel, cleared/rendered by begin_frame().
     void create_scene_rt(uint32_t w, uint32_t h);
     void destroy_scene_rt();
+    /// Binds scene + gbuffer thumbnail descriptors to the Render Targets panel.
+    void sync_render_targets_thumbnails();
 
     // -----------------------------------------------------------------------
     // Docking layout — built once on first launch.
@@ -102,6 +105,8 @@ private:
     void reload_imgui_fonts_for_a11y() noexcept;
     void update_clear_colors_from_theme();
     void build_launcher_ui();
+    /// After panels render: drain BLD Copilot MCP turns (`GW_BLD_SERVER_EXE`).
+    void poll_bld_copilot_mcp();
     /// Set project root, chdir for relative content/ paths, recent list, main editor.
     void open_project(const std::filesystem::path& root);
     /// Export current `.gwscene` and spawn `sandbox_playable` from the same bin dir (Phase 24 loop).
@@ -182,6 +187,8 @@ private:
     char shell_path_manual_[1024]{};
     std::vector<gw::editor::shell::RecentProject> recent_projects_;
     std::filesystem::path project_root_;
+    std::unique_ptr<gw::editor::bld::McpStdioSession> bld_mcp_;
+    unsigned                                           mcp_next_jsonrpc_id_ = 2;
     std::optional<std::filesystem::path> pending_folder_drop_;
     std::unique_ptr<gw::editor::render::ImGuiTextureCache> imgui_tex_cache_;
     /// Project-scoped VFS + harness-mode asset DB (no engine HAL device).

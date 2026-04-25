@@ -20,6 +20,8 @@ struct PieDebugHudState {
     PieDebugHudFlags flags{};
     float            budget_ms_measured = 0.f;
     float            budget_ms_cap      = 1.0f;
+    /// Set from `PiePerfGuardState::warning_active` (frame EWMA vs 144 Hz cap).
+    bool             pie_perf_warning   = false;
     // Filled by GameplayHost each PIE tick; presentation only.
     float            dt_last_s          = 0.f;
     unsigned int     entity_count       = 0;

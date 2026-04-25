@@ -1,5 +1,5 @@
 #pragma once
-// editor/panels/audit/heatmap_panel.hpp — Part C §23 scaffold.
+// editor/panels/audit/heatmap_panel.hpp — Director policy preview (Wave 1 audit).
 
 #include "editor/panels/panel.hpp"
 

@@ -32,7 +32,7 @@ pub mod server;
 
 pub use capabilities::ServerCapabilities;
 pub use schema::{ErrorObject, Request, Response, ResponsePayload};
-pub use server::{Handler, McpServer, ServerError};
+pub use server::{Handler, McpServer, RegistryDispatchHandler, ServerError};
 
 #[cfg(test)]
 mod tests {

@@ -36,14 +36,22 @@ void draw_exposure(render::ExposureParams& ex, render::LuminanceHistogram& hist)
     if (!ImGui::CollapsingHeader("Luminance histogram / exposure",
                                   ImGuiTreeNodeFlags_DefaultOpen)) return;
 
-    ImGui::PlotHistogram("##lum_hist", hist.buckets.data(),
-                          static_cast<int>(hist.buckets.size()),
-                          0, nullptr, FLT_MAX, FLT_MAX, ImVec2{-1.f, 78.f});
+    if (ex.luminance_sample_valid) {
+        ImGui::PlotHistogram("##lum_hist", hist.buckets.data(),
+                              static_cast<int>(hist.buckets.size()),
+                              0, nullptr, FLT_MAX, FLT_MAX, ImVec2{-1.f, 78.f});
+    } else {
+        ImGui::TextDisabled("Histogram awaits GPU readback of the scene colour (no synthetic fill).");
+    }
 
     ImGui::SliderFloat("Min log luminance", &ex.min_log_luminance, -8.f, 0.f,  "%.3f");
     ImGui::SliderFloat("Max log luminance", &ex.max_log_luminance,  0.f, 8.f,  "%.3f");
     ImGui::SliderFloat("Gamma (output)",    &ex.gamma,              1.f, 3.f,  "%.3f");
-    ImGui::Text("Average luminance : %.6f", ex.average_luminance);
+    if (ex.luminance_sample_valid) {
+        ImGui::Text("Average luminance : %.6f", ex.average_luminance);
+    } else {
+        ImGui::TextDisabled("Average luminance : — (no GPU sample yet)");
+    }
 }
 
 }  // namespace

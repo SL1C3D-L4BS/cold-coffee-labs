@@ -1,6 +1,6 @@
 // editor/panels/render_targets_panel.cpp
-// Horizontal strip: slot 0 = offscreen scene RT; slots 1–5 = `vkCmdCopy` of
-// that RT (stand-ins until the frame graph exposes real G-buffer / MRT).
+// Horizontal strip: slot 0 = offscreen scene RT; slots 1–5 = real RGBA8
+// images (full-frame `vkCmdCopy` of scene until MRT exports land).
 
 #include "render_targets_panel.hpp"
 
@@ -13,16 +13,15 @@ namespace {
 [[nodiscard]] const char* slot_tooltip(int slot) noexcept {
     // clang-format off
     static constexpr const char* const k[6] = {
-        "Slot 0: live offscreen scene colour (RGBA8). The editor clears it each frame, optionally draws, and "
-        "the viewport samples this image. A depth target is already attached and cleared; a mesh or debug pass "
-        "can write it in a later editor wave.",
-        "Reserved: base colour / albedo. The image is a full-frame `vkCmdCopy` of the scene colour target "
-        "until the renderer provides a true MRT albedo here.",
-        "Reserved: per-pixel normals. Currently a copy of the scene colour image. Real G-buffer in a follow-on wave.",
-        "Reserved: depth view (e.g. linearized). Currently a copy of the scene colour image. A depth preview "
-        "requires a post pass or readback after geometry populates the depth image.",
-        "Reserved: metalness and roughness (or packed material data). Currently a scene-colour copy.",
-        "Reserved: ambient occlusion. Currently a scene-colour copy until a screen-space AO pass is wired in.",
+        "Slot 0: live offscreen scene colour (RGBA8). Real VkImage; cleared each frame, mesh pass draws here, "
+        "viewport + histogram read back the same image.",
+        "Cockpit label: albedo / base colour. Same extent as slot 0 — a real RGBA8 VkImage; content is a full-frame "
+        "vkCmdCopy of the scene target until a separate MRT is exposed.",
+        "Cockpit label: normals. Live image; copy of scene colour today (true G-buffer in a later engine wave).",
+        "Cockpit label: depth / linear. Live image; copy of scene colour today — greyscale depth preview needs a "
+        "shader pass once depth is consistently written.",
+        "Cockpit label: metal/rough. Live image; copy of scene colour today.",
+        "Cockpit label: SSAO. Live image; copy of scene colour today until SSA is wired to this slot.",
     };
     // clang-format on
     if (slot < 0 || slot >= 6) return k[0];
@@ -96,12 +95,10 @@ void RenderTargetsPanel::on_imgui_render(EditorContext& /*ctx*/) {
     ImGui::Separator();
     ImGui::TextDisabled("Legend");
 
-    constexpr const char* k_m = "Asterisk (*) = reserved G-buffer (or similar) name; the image is a full-frame copy "
-        "of the offscreen scene colour (slot 0), not a separate MRT. ";
-    constexpr const char* k_e = "This pass does not include: multi-render-target exports into these thumbnails, a "
-        "GPU object-ID pick buffer, or a depth buffer as greyscale / RGBA (that needs a post pass or readback after "
-        "geometry writes the depth target). The offscreen pass already clears and binds a depth target for a future "
-        "editor mesh or debug path.";
+    constexpr const char* k_m = "Asterisk (*) = semantic G-buffer name; each thumbnail is a real VkImage (not a "
+        "UI placeholder rect). Until MRT, slots 1–5 show a full-frame copy of slot 0. ";
+    constexpr const char* k_e = "Not yet: separate MRT into each slot, object-ID pick buffer, or depth shown as "
+        "greyscale (needs a post pass). Scene pass already writes colour + depth targets when allocated.";
 
     const float wrap_w = ImGui::GetContentRegionAvail().x;
     if (wrap_w > 4.f) {

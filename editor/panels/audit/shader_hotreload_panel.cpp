@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <map>
 #include <string>
+#include <vector>
 
 namespace gw::editor::panels::audit {
 namespace {
@@ -45,6 +46,13 @@ void scan_tree(const std::filesystem::path& root, std::map<std::filesystem::path
     }
 }
 
+struct DiffRow {
+    std::string   path_utf8;
+    std::uint64_t baseline_ns = 0;
+    std::uint64_t current_ns  = 0;
+    int           status = 0; // 0 same, 1 changed, 2 new, 3 deleted
+};
+
 } // namespace
 
 void ShaderHotReloadPanel::on_imgui_render(gw::editor::EditorContext& ctx) {
@@ -54,9 +62,8 @@ void ShaderHotReloadPanel::on_imgui_render(gw::editor::EditorContext& ctx) {
     ImGui::Begin(name(), &visible_);
 
     ImGui::TextUnformatted(
-        "Development-mode shader iteration: this panel tracks on-disk modification "
-        "times under shaders/. Pair changes with the Bake panel (gw_cook) and "
-        "Sacrilege Shader Forge for authored graphs.");
+        "Development-mode shader iteration: tracks on-disk modification times under "
+        "shaders/. Pair changes with the Bake panel (gw_cook) and Sacrilege Shader Forge.");
     ImGui::Separator();
 
     namespace fs = std::filesystem;
@@ -72,11 +79,14 @@ void ShaderHotReloadPanel::on_imgui_render(gw::editor::EditorContext& ctx) {
 
     static std::map<fs::path, std::uint64_t> baseline;
     static std::map<fs::path, std::uint64_t> current;
+    static std::vector<DiffRow>            last_diff_rows;
+    static std::string                     last_scan_root;
 
     ImGui::Text("Watch root: %s", shader_root.string().c_str());
     if (ImGui::Button("Establish baseline##sh_hot_base")) {
         baseline.clear();
         scan_tree(shader_root, baseline);
+        last_diff_rows.clear();
         gw::core::log_message(gw::core::LogLevel::Info, "shader_hotreload",
             std::string_view{"Shader hot-reload baseline captured."});
     }
@@ -84,11 +94,44 @@ void ShaderHotReloadPanel::on_imgui_render(gw::editor::EditorContext& ctx) {
     if (ImGui::Button("Diff now##sh_hot_diff")) {
         current.clear();
         scan_tree(shader_root, current);
+        last_diff_rows.clear();
+        last_scan_root = shader_root.string();
+
         for (const auto& [p, mt] : current) {
             const auto it = baseline.find(p);
-            if (it == baseline.end() || it->second != mt) {
-                std::string msg = "Changed: ";
-                msg += p.string();
+            DiffRow    row;
+            row.path_utf8   = p.string();
+            row.current_ns  = mt;
+            if (it == baseline.end()) {
+                row.baseline_ns = 0;
+                row.status      = 2;
+                std::string msg = "New: ";
+                msg += row.path_utf8;
+                gw::core::log_message(gw::core::LogLevel::Warn, "shader_hotreload", std::string_view{msg});
+            } else {
+                row.baseline_ns = it->second;
+                if (it->second != mt) {
+                    row.status = 1;
+                    std::string msg = "Changed: ";
+                    msg += row.path_utf8;
+                    gw::core::log_message(gw::core::LogLevel::Warn, "shader_hotreload", std::string_view{msg});
+                } else {
+                    row.status = 0;
+                }
+            }
+            last_diff_rows.push_back(std::move(row));
+        }
+        for (const auto& [p, mt] : baseline) {
+            if (current.find(p) == current.end()) {
+                const std::string pstr = p.string();
+                DiffRow         row;
+                row.path_utf8   = pstr;
+                row.baseline_ns = mt;
+                row.current_ns  = 0;
+                row.status      = 3;
+                last_diff_rows.push_back(std::move(row));
+                std::string msg = "Removed from tree: ";
+                msg += pstr;
                 gw::core::log_message(gw::core::LogLevel::Warn, "shader_hotreload", std::string_view{msg});
             }
         }
@@ -96,9 +139,47 @@ void ShaderHotReloadPanel::on_imgui_render(gw::editor::EditorContext& ctx) {
 
     ImGui::Separator();
     ImGui::TextDisabled(
-        "Runtime `ShaderManager::enable_hot_reload` is owned by the game/studio "
-        "device path; the editor surfaces filesystem churn here so authors know "
-        "when to re-run cook or launch a hot-reload-enabled runtime.");
+        "Runtime `ShaderManager::enable_hot_reload` is owned by the game/studio device path; "
+        "this table is editor-only visibility into filesystem churn.");
+    if (!last_diff_rows.empty()) {
+        if (ImGui::BeginTable("##shdiff", 4,
+                ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY, ImVec2{0.f, 180.f})) {
+            ImGui::TableSetupColumn("File");
+            ImGui::TableSetupColumn("Baseline (ns)");
+            ImGui::TableSetupColumn("Current (ns)");
+            ImGui::TableSetupColumn("Status");
+            ImGui::TableHeadersRow();
+            for (const auto& r : last_diff_rows) {
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                ImGui::TextUnformatted(r.path_utf8.c_str());
+                ImGui::TableSetColumnIndex(1);
+                if (r.baseline_ns) {
+                    ImGui::Text("%llu", static_cast<unsigned long long>(r.baseline_ns));
+                } else {
+                    ImGui::TextUnformatted("—");
+                }
+                ImGui::TableSetColumnIndex(2);
+                if (r.current_ns) {
+                    ImGui::Text("%llu", static_cast<unsigned long long>(r.current_ns));
+                } else {
+                    ImGui::TextUnformatted("—");
+                }
+                ImGui::TableSetColumnIndex(3);
+                const char* st = "same";
+                if (r.status == 1) st = "changed";
+                if (r.status == 2) st = "new";
+                if (r.status == 3) st = "deleted";
+                if (r.status == 0) {
+                    ImGui::TextDisabled("%s", st);
+                } else {
+                    ImGui::TextColored(ImVec4(1.f, 0.7f, 0.35f, 1.f), "%s", st);
+                }
+            }
+            ImGui::EndTable();
+        }
+        ImGui::TextDisabled("Last scan: %s", last_scan_root.c_str());
+    }
 
     ImGui::End();
 }

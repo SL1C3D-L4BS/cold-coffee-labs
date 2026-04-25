@@ -12,6 +12,7 @@
 
 #include <imgui.h>
 #include <algorithm>
+#include <cstdlib>
 #include <cstring>
 
 namespace gw::editor::agent {
@@ -54,6 +55,24 @@ const char* status_label(SessionStatus s) {
     return "?";
 }
 
+[[nodiscard]] const char* status_label_for_provider(SessionStatus s, int provider_index) {
+    if (provider_index == AgentPanel::k_provider_index_mcp_tools) {
+        switch (s) {
+        case SessionStatus::Disconnected:
+            return "mcp: set GW_BLD_SERVER_EXE";
+        case SessionStatus::Idle:
+            return "mcp ready";
+        case SessionStatus::Thinking:
+            return "mcp busy";
+        case SessionStatus::Acting:
+            return "mcp acting";
+        case SessionStatus::Awaiting:
+            return "mcp awaiting you";
+        }
+    }
+    return status_label(s);
+}
+
 ImVec4 status_accent(SessionStatus s) {
     using gw::editor::theme::active_accent_secondary_imgui;
     using gw::editor::theme::active_accent_strong_imgui;
@@ -77,7 +96,9 @@ AgentPanel::AgentPanel() {
     // Seed a greeting so first launch isn't blank.
     transcript_.push_back(Message{
         .role         = MsgRole::System,
-        .body         = "Brewed Logic Directive. Session offline — connect a provider to begin.",
+        .body         = "Brewed Logic Directive. Pick \"MCP — gw_bld_server\" and set "
+                        "environment variable GW_BLD_SERVER_EXE to run `docs.search` on the "
+                        "open project; other providers remain offline until wired.",
         .tool_call_id = {},
         .tool_name    = {},
     });
@@ -116,9 +137,10 @@ void AgentPanel::push_elicitation(ElicitationRequest req) {
 }
 
 bool AgentPanel::take_pending_user_input(std::string& out) {
-    if (!pending_input_) return false;
-    out            = input_buffer_;
-    input_buffer_.clear();
+    if (!pending_input_) {
+        return false;
+    }
+    out = std::move(pending_mcp_line_);
     pending_input_ = false;
     return !out.empty();
 }
@@ -157,13 +179,24 @@ void AgentPanel::on_imgui_render(EditorContext& /*ctx*/) {
 }
 
 void AgentPanel::render_header_bar() {
+    if (provider_index_ < 0 || provider_index_ >= IM_ARRAYSIZE(kProviders)) {
+        provider_index_ = 0;
+    }
     // Provider picker.
     ImGui::SetNextItemWidth(220.f);
     if (ImGui::BeginCombo("##provider", kProviders[provider_index_])) {
         for (int i = 0; i < IM_ARRAYSIZE(kProviders); ++i) {
             const bool selected = (i == provider_index_);
-            if (ImGui::Selectable(kProviders[i], selected))
+            if (ImGui::Selectable(kProviders[i], selected)) {
                 provider_index_ = i;
+                if (i == AgentPanel::k_provider_index_mcp_tools) {
+                    const char* e = std::getenv("GW_BLD_SERVER_EXE");
+                    status_ = (e != nullptr && e[0] != '\0') ? SessionStatus::Idle
+                                                           : SessionStatus::Disconnected;
+                } else {
+                    status_ = SessionStatus::Idle;
+                }
+            }
             if (selected) ImGui::SetItemDefaultFocus();
         }
         ImGui::EndCombo();
@@ -174,7 +207,9 @@ void AgentPanel::render_header_bar() {
     const ImVec4 col = status_accent(status_);
     ImGui::TextColored(col, "o");
     ImGui::SameLine(0.f, 4.f);
-    ImGui::TextDisabled("%s", status_label(status_));
+    // Use the same accent as the dot — TextDisabled reads like a broken link
+    // even when status is Idle / mcp ready.
+    ImGui::TextColored(col, "%s", status_label_for_provider(status_, provider_index_));
 
     // Stop / Clear buttons — right-aligned.
     ImGui::SameLine();
@@ -193,6 +228,13 @@ void AgentPanel::render_header_bar() {
             .role = MsgRole::System, .body = "new session.",
             .tool_call_id = {}, .tool_name = {}
         });
+        if (provider_index_ == k_provider_index_mcp_tools) {
+            const char* e = std::getenv("GW_BLD_SERVER_EXE");
+            status_ = (e != nullptr && e[0] != '\0') ? SessionStatus::Idle
+                                                   : SessionStatus::Disconnected;
+        } else {
+            status_ = SessionStatus::Idle;
+        }
     }
 }
 
@@ -282,8 +324,17 @@ void AgentPanel::render_input_area() {
     ImGui::EndDisabled();
 
     if ((submitted || clicked) && !input_buffer_.empty()) {
-        push_user(input_buffer_);
-        pending_input_ = true;
+        std::string line = input_buffer_;
+        while (!line.empty() && line.back() == '\0') {
+            line.pop_back();
+        }
+        push_user(line);
+        if (provider_index_ == AgentPanel::k_provider_index_mcp_tools) {
+            pending_input_   = true;
+            pending_mcp_line_ = std::move(line);
+        }
+        input_buffer_.clear();
+        input_buffer_.push_back('\0');
     }
 }
 

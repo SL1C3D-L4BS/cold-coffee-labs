@@ -49,8 +49,11 @@ struct ExposureParams {
     float min_log_luminance = -3.0f;
     float max_log_luminance =  1.0f;
     float gamma             =  2.20f;   // final colour-space gamma
-    // Live readout (written by the renderer; displayed by the panel).
-    float average_luminance =  0.369139f;
+    // Live readout from `EditorApplication` histogram readback only — no
+    // synthetic default; `luminance_sample_valid` is false until the first
+    // successful GPU→CPU tile resolve.
+    float average_luminance     = 0.f;
+    bool  luminance_sample_valid = false;
 };
 
 // -----------------------------------------------------------------------

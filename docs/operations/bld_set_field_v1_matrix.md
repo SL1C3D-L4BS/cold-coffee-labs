@@ -1,5 +1,7 @@
 # BLD C-ABI: `gw_editor_set_field` / `gw_editor_get_field` (v1)
 
+**`get` / `set` parity (v1):** For every **settable** row below, `gw_editor_get_field` returns JSON for the same `ComponentName.field` path (or `Name` for display name). `WorldMatrixComponent.world` and `Name` are read-style paths; `WorldMatrixComponent.dirty` is writable for cache but prefer transform updates. Implementation: [`editor/bld_api/editor_bld_api.cpp`](../../editor/bld_api/editor_bld_api.cpp).
+
 **Surface:** BLD and fuzz hooks call these from [`editor/bld_api/editor_bld_api.cpp`](../../editor/bld_api/editor_bld_api.cpp) **after** [`ensure_authoring_scene_types_for_load`](../../editor/scene/authoring_scene_load.hpp) has run on the target world (the editor’s authoring ECS).
 
 **Path syntax:**

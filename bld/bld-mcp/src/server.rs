@@ -76,17 +76,40 @@ impl Handler for StubHandler {
     }
 
     fn list(&self) -> Vec<Tool> {
-        // Expose everything already registered via `bld-tools::inventory`,
-        // so `tools/list` is live even without the Wave-9B dispatcher.
-        bld_tools::registry::all()
-            .map(|d| Tool {
-                name: d.id.to_owned(),
-                description: d.summary.to_owned(),
-                input_schema: json!({ "type": "object", "additionalProperties": true }),
-                tier: Some(format!("{}", d.tier)),
-            })
-            .collect()
+        tools_from_registry()
     }
+}
+
+/// Maps `tools/call` to `#[bld_tool]` dispatch shims registered in the
+/// current binary. Descriptor-only tools (taxonomy stubs, Sacrilege
+/// scaffolds) return a clear error until a body is linked.
+#[derive(Debug, Default)]
+pub struct RegistryDispatchHandler;
+
+impl Handler for RegistryDispatchHandler {
+    fn call(&self, tool_id: &str, args: &JsonValue) -> Result<JsonValue, ServerError> {
+        match bld_tools::registry::find_dispatch(tool_id) {
+            Some(entry) => (entry.dispatch)(args).map_err(ServerError::Tool),
+            None => Err(ServerError::Tool(format!(
+                "tool {tool_id} has no Rust dispatch entry (descriptor-only or unknown)"
+            ))),
+        }
+    }
+
+    fn list(&self) -> Vec<Tool> {
+        tools_from_registry()
+    }
+}
+
+fn tools_from_registry() -> Vec<Tool> {
+    bld_tools::registry::all()
+        .map(|d| Tool {
+            name: d.id.to_owned(),
+            description: d.summary.to_owned(),
+            input_schema: json!({ "type": "object", "additionalProperties": true }),
+            tier: Some(format!("{}", d.tier)),
+        })
+        .collect()
 }
 
 /// The MCP server state.
@@ -346,7 +369,7 @@ mod tests {
     use serde_json::json;
 
     fn server() -> McpServer {
-        McpServer::new(Box::new(StubHandler))
+        McpServer::new(Box::new(RegistryDispatchHandler))
     }
 
     #[test]

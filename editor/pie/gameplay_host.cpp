@@ -133,6 +133,8 @@ bool GameplayHost::enter_play(GameplayContext& ctx) {
     if (gameplay_init_) gameplay_init_(&ctx);
     if (gameplay_bind_world_) gameplay_bind_world_(world);
     state_ = PIEState::Playing;
+    rollback_inspector_.authoring_snapshot_bytes =
+        static_cast<std::uint64_t>(world_snapshot_.size());
     return true;
 }
 
@@ -146,6 +148,8 @@ void GameplayHost::resume() {
 
 void GameplayHost::stop(GameplayContext& ctx) {
     if (state_ == PIEState::Editor) return;
+
+    rollback_inspector_.authoring_snapshot_bytes = 0;
 
     if (gameplay_bind_world_) gameplay_bind_world_(nullptr);
     if (gameplay_shutdown_) gameplay_shutdown_();
@@ -181,9 +185,11 @@ void GameplayHost::tick(GameplayContext& ctx, float dt) {
             pie_debug_hud_.entity_count = static_cast<std::uint32_t>(
                 std::min(n, static_cast<std::size_t>(0xFFFF'FFFFull)));
         }
+        gw::editor::pie::tick_perf_guard(pie_perf_guard_, dt * 1000.0f);
+        pie_debug_hud_.budget_ms_measured = pie_perf_guard_.frame_ms_ewma;
+        pie_debug_hud_.pie_perf_warning   = pie_perf_guard_.warning_active;
         gw::editor::pie::draw_pie_debug_hud(pie_debug_hud_);
         gw::editor::pie::draw_rollback_inspector(rollback_inspector_);
-        gw::editor::pie::tick_perf_guard(pie_perf_guard_, dt * 1000.0f);
     }
 }
 

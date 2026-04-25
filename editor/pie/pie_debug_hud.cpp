@@ -17,6 +17,8 @@ void draw_pie_debug_hud(PieDebugHudState& state) noexcept {
         ImGui::Text("dt: %.4f s", static_cast<double>(state.dt_last_s));
         ImGui::Text("ECS entities: %u", state.entity_count);
         ImGui::Text("Gameplay DLL: %s", state.gameplay_dll_loaded ? "loaded" : "optional / absent");
+        ImGui::TextUnformatted("BLD: C-ABI `gw_editor_set_field` / get_field (Surface P) — live in editor. "
+            "Full MCP/Agent tool dispatch is scheduled Wave 2.");
         ImGui::Separator();
         ImGui::TextUnformatted("Overlay toggles");
         ImGui::Checkbox("Martyrdom meters", &state.flags.martyrdom_meters);
@@ -28,7 +30,10 @@ void draw_pie_debug_hud(PieDebugHudState& state) noexcept {
         ImGui::Checkbox("ECS archetypes", &state.flags.ecs_archetypes);
         ImGui::Separator();
         ImGui::Text("Overlay budget cap: %.2f ms", static_cast<double>(state.budget_ms_cap));
-        ImGui::TextDisabled("Measured editor-only overlay cost is sampled in pie_perf_guard.");
+        ImGui::Text("Frame time EWMA (PIE tick): %.3f ms", static_cast<double>(state.budget_ms_measured));
+        if (state.pie_perf_warning) {
+            ImGui::TextColored(ImVec4(1.f, 0.45f, 0.35f, 1.f), "Above 144 Hz frame budget (perf guard).");
+        }
     }
     ImGui::End();
 }

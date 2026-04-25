@@ -1,11 +1,11 @@
 #pragma once
 // editor/panels/render_targets_panel.hpp
 // Bottom "render targets" strip (Phase 7 gate E / Wave 1C). Slot 0 is the live
-// offscreen scene colour. Slots 1–5 are separate RGBA images fed by
-// `vkCmdCopyImage` from that scene RT (layout filler until real G-buffer/MRT).
-// Excluded to later waves: object-ID pick buffer, MRT in slots 1–5, and
-// depth→RGB cockpit preview (requires linearized depth once geometry writes depth).
-// The offscreen pass already clears + binds a depth target for a future mesh pass.
+// offscreen scene colour. Slots 1–5 are real RGBA8 VkImages (ImGui textures);
+// each frame they receive `vkCmdCopyImage` from the scene RT until the engine
+// exports true G-buffer / MRT into dedicated passes. Object-ID pick, per-slot
+// MRT, and depth-as-RGB still land in later waves; depth target is already
+// bound for the editor scene pass.
 // Spec ref: Phase 7 §2 gate-E.
 
 #include "panel.hpp"

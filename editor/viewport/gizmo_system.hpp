@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <unordered_map>
+#include <vector>
 
 namespace gw::editor {
 
@@ -66,7 +67,15 @@ public:
     void clear_entity_matrices() noexcept {
         entity_mats_.clear();
         entity_mats_.reserve(256);
+        spatial_buckets_.clear();
     }
+
+    /// W1C.3 — entities whose last-frame translation lies in the same or
+    /// adjacent uniform-grid cells (for pivot hints / diagnostics; picking
+    /// stays in `viewport_panel.cpp`).
+    void gather_entities_near(const glm::vec3& world,
+                              float radius_world,
+                              std::vector<EntityHandle>& out) const;
 
     /// World matrix ImGuizmo manipulated last (single-selection pivot).
     [[nodiscard]] const glm::mat4& pivot_matrix() const noexcept { return pivot_mat_; }
@@ -80,10 +89,20 @@ private:
     glm::mat4  pivot_mat_ = glm::mat4{1.f};
     glm::mat4  delta_     = glm::mat4{1.f};
 
-    // Generational entity id → world matrix (O(1) lookup for multi-select pivots).
-    // Wave 1C: selection is small (≪256); `unordered_map` is fine. A `FlatMap` or
-    // sorted `std::vector` is only worth it if profiling shows this as hot.
+    // Generational entity id → last-frame world TRS (for ImGuizmo pivot + multi-
+    // select centroid). O(1) by id; **viewport entity picking** uses a separate
+    // world-space AABB pass in `viewport_panel.cpp` (ray vs cache from
+    // `update_transforms`), not this table.
     std::unordered_map<std::uint64_t, glm::mat4> entity_mats_;
+
+    // Uniform grid on translation (world units per cell). Buckets hold entity raw
+    // bits; duplicates across cells for one entity are avoided per cell via
+    // linear scan on small vectors (typical occupancy ≪ 10 per cell).
+    float spatial_cell_world_ = 4.f;
+    std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> spatial_buckets_;
+
+    [[nodiscard]] static std::uint64_t pack_cell_index(int ix, int iy, int iz) noexcept;
+    void insert_spatial_bucket(std::uint64_t entity_bits, const glm::vec3& translation);
 };
 
 }  // namespace gw::editor

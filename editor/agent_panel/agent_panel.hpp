@@ -43,7 +43,7 @@ enum class SessionStatus : uint8_t {
     Thinking,     // awaiting provider response
     Acting,       // dispatching a tool call
     Awaiting,     // waiting on user elicitation
-    Disconnected, // BLD library not loaded
+    Disconnected, // e.g. MCP provider selected but GW_BLD_SERVER_EXE unset
 };
 
 // One pending elicitation request. Wired by Wave 9E when the bridge
@@ -79,6 +79,14 @@ public:
     // Drain the current user input. Wave 9D polls this to feed the bridge.
     [[nodiscard]] bool take_pending_user_input(std::string& out);
 
+    /// True after Send when the MCP tools provider is selected (editor polls).
+    [[nodiscard]] bool has_pending_mcp_turn() const noexcept { return pending_input_; }
+
+    [[nodiscard]] int provider_index() const noexcept { return provider_index_; }
+
+    /// Provider combo index for `MCP — gw_bld_server` (requires `GW_BLD_SERVER_EXE`).
+    static constexpr int k_provider_index_mcp_tools = 4;
+
     // Cancel button state — returns true if the user clicked "Stop" since
     // the last poll. Drains after reading.
     [[nodiscard]] bool take_stop_flag() noexcept;
@@ -93,8 +101,10 @@ private:
     // UI state.
     std::deque<Message> transcript_;
     std::string         input_buffer_;   // mutable char[] for ImGui::InputTextMultiline
-    SessionStatus       status_          = SessionStatus::Disconnected;
+    SessionStatus       status_          = SessionStatus::Idle;
     bool                pending_input_   = false;
+    /// Captured Send text for MCP poll (input buffer is cleared for ImGui).
+    std::string         pending_mcp_line_;
     bool                stop_flag_       = false;
     bool                autoscroll_      = true;
 
@@ -110,6 +120,7 @@ private:
         "mistral.rs (local)",
         "llama-cpp (local)",
         "Offline",
+        "MCP — gw_bld_server",
     };
 
     // Visual metrics.

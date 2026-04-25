@@ -1,7 +1,9 @@
 //! `gw_bld_server` — the MCP-over-stdio entry-point.
 //!
 //! Wires the pure-Rust MCP transport in `bld-mcp` to the RAG-backed
-//! tool dispatcher in `bld-agent::tools_impl`. Intended use:
+//! tool dispatcher in `bld-agent::tools_impl`. The `server` crate feature
+//! enables `bld-tools/seq-tools` so `seq.*` inventory dispatch is linked.
+//! Intended use:
 //!
 //! ```bash
 //! cargo run --features server -p bld-agent --bin gw_bld_server -- \

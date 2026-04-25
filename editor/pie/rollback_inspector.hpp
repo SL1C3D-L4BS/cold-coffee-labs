@@ -15,6 +15,8 @@ struct RollbackInspectorState {
     std::uint64_t bit_hash       = 0;   // current visited-state hash
     bool          paused         = true;
     int           step_size      = 1;
+    /// Authoring `save_world` payload size last captured at PIE entry (0 = none).
+    std::uint64_t authoring_snapshot_bytes = 0;
 };
 
 void draw_rollback_inspector(RollbackInspectorState& state) noexcept;

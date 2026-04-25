@@ -9,10 +9,11 @@
 // transforms can be composed with sub-millimetre precision across planet
 // scale without accumulating float32 round-off in the parent chain.
 //
-// The current implementation is O(n): one pass building a child-list index,
-// one recursive pass composing world matrices from the roots. Phase 9 can
-// swap in an incremental (dirty-flag driven) variant; the API does not need
-// to change.
+// The implementation is O(n) per `update_transforms` call: collect all
+// `TransformComponent` rows, Kahn topologically order by `HierarchyComponent`
+// parent links (with cycle fallback to local-only), then compose world
+// `glm::dmat4` in sorted order. A future optimization can add incremental
+// (dirty-subtree) updates; the public API is stable.
 //
 // Engine layering note: this file intentionally lives under `editor/scene/`
 // for Phase 8 because `TransformComponent` itself still lives there (a

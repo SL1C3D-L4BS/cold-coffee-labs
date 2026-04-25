@@ -90,6 +90,35 @@ glm::vec3 blockout_hit_on_ground_plane(float mouse_x, float mouse_y, float vp_x,
     return true;
 }
 
+// Ray-pick uses the same world cache as the scene pass (`update_transforms`), so
+// hierarchical transforms get a world-space AABB (Phase 7 §6.4).
+[[nodiscard]] glm::vec3 pick_world_center(const scene::TransformComponent& tc,
+                                         const scene::WorldMatrixComponent* wm) noexcept {
+    if (wm) {
+        return glm::vec3(
+            static_cast<float>(wm->world[3][0]),
+            static_cast<float>(wm->world[3][1]),
+            static_cast<float>(wm->world[3][2]));
+    }
+    return glm::vec3(static_cast<float>(tc.position.x), static_cast<float>(tc.position.y),
+                     static_cast<float>(tc.position.z));
+}
+
+[[nodiscard]] glm::vec3 pick_world_half_extent(const scene::TransformComponent& tc,
+                                                const scene::WorldMatrixComponent* wm) noexcept {
+    if (!wm) {
+        return tc.scale * 0.5f;
+    }
+    const glm::dmat4& W = wm->world;
+    const auto         col_len = [&W](int c) {
+        return glm::length(glm::dvec3(W[c][0], W[c][1], W[c][2]));
+    };
+    return 0.5f
+        * glm::vec3(static_cast<float>(std::abs(tc.scale.x) * col_len(0)),
+            static_cast<float>(std::abs(tc.scale.y) * col_len(1)),
+            static_cast<float>(std::abs(tc.scale.z) * col_len(2)));
+}
+
 void snap_translation_in_place(glm::vec3& v, float step) {
     if (!(step > 0.f)) return;
     v.x = std::round(v.x / step) * step;
@@ -399,13 +428,12 @@ void ViewportPanel::on_imgui_render(EditorContext& ctx) {
                 if (!vis.visible) {
                     return;
                 }
-                const glm::vec3 c{static_cast<float>(tc.position.x),
-                                  static_cast<float>(tc.position.y),
-                                  static_cast<float>(tc.position.z)};
-                const glm::vec3 h    = tc.scale * 0.5f;
+                const auto*     wm  = ctx.world->get_component<scene::WorldMatrixComponent>(e);
+                const glm::vec3 c   = pick_world_center(tc, wm);
+                const glm::vec3 h   = pick_world_half_extent(tc, wm);
                 const glm::vec3 bmin = c - h;
                 const glm::vec3 bmax = c + h;
-                float           t = 0.f;
+                float             t  = 0.f;
                 if (ray_intersects_aabb(ro, rd, bmin, bmax, t) && t < best_t) {
                     best_t = t;
                     best   = e;
@@ -504,16 +532,15 @@ void ViewportPanel::on_imgui_render(EditorContext& ctx) {
     debug_draw::grid(20.f, 1.f);
     debug_draw::axis(glm::mat4{1.f}, 1.0f);
     if (ctx.world) {
-        // Wire AABB for every named transform so the default Cube/Sphere show
-        // up without a selection (Vulkan mesh pass is still future Phase 8).
+        // Wire AABB for every named transform (scene RT draws blockout/mesh; debug
+        // follows world cache when `WorldMatrixComponent` is present).
         ctx.world->for_each<scene::NameComponent, scene::TransformComponent, scene::VisibilityComponent>(
             [w = ctx.world](gw::ecs::Entity e, const scene::NameComponent& nm,
                             const scene::TransformComponent& tc, const scene::VisibilityComponent&) {
                 if (w && w->get_component<scene::BlockoutPrimitiveComponent>(e)) return;
-                const glm::vec3 c{static_cast<float>(tc.position.x),
-                                  static_cast<float>(tc.position.y),
-                                  static_cast<float>(tc.position.z)};
-                const glm::vec3 h = tc.scale * 0.5f;
+                const auto*     wm = w->get_component<scene::WorldMatrixComponent>(e);
+                const glm::vec3 c  = pick_world_center(tc, wm);
+                const glm::vec3 h  = pick_world_half_extent(tc, wm);
                 std::uint32_t col = 0xFF5AC8E8; // default wire
                 if (std::strcmp(nm.c_str(), "Cube") == 0) col = 0xFF55CC88;
                 else if (std::strcmp(nm.c_str(), "Sphere") == 0) col = 0xFFCC88EE;
@@ -522,13 +549,12 @@ void ViewportPanel::on_imgui_render(EditorContext& ctx) {
             });
         ctx.world->for_each<scene::NameComponent, scene::TransformComponent, scene::VisibilityComponent,
                             scene::BlockoutPrimitiveComponent>(
-            [](gw::ecs::Entity /*e*/, const scene::NameComponent& /*nm*/,
-               const scene::TransformComponent& tc, const scene::VisibilityComponent&,
-               const scene::BlockoutPrimitiveComponent&) {
-                const glm::vec3 c{static_cast<float>(tc.position.x),
-                                  static_cast<float>(tc.position.y),
-                                  static_cast<float>(tc.position.z)};
-                const glm::vec3 h = tc.scale * 0.5f;
+            [w = ctx.world](gw::ecs::Entity e, const scene::NameComponent& /*nm*/,
+                            const scene::TransformComponent& tc, const scene::VisibilityComponent&,
+                            const scene::BlockoutPrimitiveComponent&) {
+                const auto*     wm = w->get_component<scene::WorldMatrixComponent>(e);
+                const glm::vec3 c  = pick_world_center(tc, wm);
+                const glm::vec3 h  = pick_world_half_extent(tc, wm);
                 debug_draw::aabb(c - h, c + h, 0xFFFFAA44);
             });
         for (auto e : ctx.selection.selected()) {

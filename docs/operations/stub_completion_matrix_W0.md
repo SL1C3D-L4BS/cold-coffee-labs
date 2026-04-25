@@ -12,10 +12,11 @@
 | W0.5 | Fuzz drivers wired to engine APIs (`tests/fuzz/fuzz_*.cpp`) | Eng | `ctest -R fuzz_` when `GW_FUZZ=ON` |
 | W0.6 | Perf TODOs cleared: AI budgets use `engine/ai_runtime`; `GW_GPU_TESTS=1` runs `VulkanInstance`+`hal::VulkanDevice` smoke (full `MilestoneValidator` waits on render CMake wiring). | Eng | `ctest -L perf` + optional `GW_GPU_TESTS=1` |
 
-| Wave 1+ (pointer only) | Key exit |
+| Waves 1–10 (same program) | Key exit |
 |------------------------|----------|
 | W1 | `rg` empty `on_imgui_render` in `editor/panels/audit` = 0 (per plan) |
+| W1C follow-ups | [stub_completion_matrix_W1C_followups.md](./stub_completion_matrix_W1C_followups.md) — **ordered** transform → camera → gizmo → viewport → render stack → a11y → BLD API → HAL |
 | W2 | BLD `StubHandler` → production (per plan) |
-| W3–W10 | Per plan “Exit” rows |
+| W3–W10 | Per plan “Exit” rows (all mandatory; nothing out of program scope) |
 
 *Graphify node reference: Community 4 (editor / `on_imgui_render` cluster) — see `graphify-out/GRAPH_REPORT.md`.*

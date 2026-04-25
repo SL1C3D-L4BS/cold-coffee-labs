@@ -19,6 +19,7 @@ use std::sync::Mutex;
 
 use bld_governance::secret_filter::SecretFilter;
 use bld_rag::{RagIndex, RetrievalConfig, RetrievalStrategy};
+use bld_tools::registry;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -407,6 +408,19 @@ impl RagDispatcher {
 
 impl ToolDispatcher for RagDispatcher {
     fn dispatch(&self, tool_id: &str, args: &Value) -> Result<Value, String> {
+        if let Some(entry) = registry::find_dispatch(tool_id) {
+            return (entry.dispatch)(args);
+        }
+        // Sacrilege copilot tools: descriptors always ship; host-backed bodies
+        // land in later phases. Return structured JSON so MCP/agents can branch
+        // without a generic "not handled" string.
+        if tool_id.starts_with("sacrilege.") {
+            return Ok(json!({
+                "status": "deferred",
+                "tool": tool_id,
+                "message": "Sacrilege execution path is not installed in this dispatcher build."
+            }));
+        }
         match tool_id {
             "docs.search" => self.docs_search(args),
             "docs.open" => self.docs_open(args),
@@ -606,5 +620,18 @@ mod tests {
         let d = RagDispatcher::new(loader_with(&[]));
         let err = d.dispatch("does.not.exist", &json!({})).unwrap_err();
         assert!(err.contains("not handled"));
+    }
+
+    #[test]
+    fn sacrilege_tools_return_deferred_json() {
+        let d = RagDispatcher::new(loader_with(&[]));
+        let out = d
+            .dispatch("sacrilege.exploit_detect", &json!({}))
+            .unwrap();
+        assert_eq!(out.get("status").unwrap(), "deferred");
+        assert_eq!(
+            out.get("tool").unwrap().as_str().unwrap(),
+            "sacrilege.exploit_detect"
+        );
     }
 }

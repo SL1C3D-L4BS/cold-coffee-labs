@@ -1,7 +1,6 @@
 // tests/unit/scene/transform_system_test.cpp
 // Phase 8 week 044 — dvec3 TransformComponent + hierarchical transform system.
 
-#include <ostream>
 #include <doctest/doctest.h>
 
 #include "editor/scene/components.hpp"
@@ -9,9 +8,8 @@
 
 #include "engine/core/serialization.hpp"
 #include "engine/ecs/hierarchy.hpp"
-#include "engine/ecs/world.hpp"
+#include "engine/ecs/serialize.hpp"
 #include "engine/scene/migration.hpp"
-#include "engine/scene/scene_file.hpp"
 
 #include <cstdint>
 #include <cstring>
@@ -75,6 +73,24 @@ TEST_CASE("transform_system — child world matrix is parent * local") {
     REQUIRE(wc != nullptr);
     // Translate-only parent → child world origin is parent.pos + child.pos.
     CHECK(wc->world[3].x == doctest::Approx(103.0));
+}
+
+TEST_CASE("transform_system — child with Transform-only parent in hierarchy uses local as world") {
+    // Parent has `HierarchyComponent` and reparents the child, but has no
+    // `TransformComponent` — the transform pass cannot walk through it, so
+    // the child is ordered as a root and only local is applied to world.
+    World            w;
+    const auto parent = w.create_entity();
+    const auto child  = w.create_entity();
+    w.add_component(parent, TransformComponent{});
+    w.add_component(child, TransformComponent{glm::dvec3{2.0, 0.0, 0.0}});
+    REQUIRE(w.reparent(child, parent));
+    w.remove_component<TransformComponent>(parent);
+    // Child still has parent; parent is not in the transform `records` set.
+    CHECK(gw::editor::scene::update_transforms(w) == 1);
+    const auto* wc = w.get_component<WorldMatrixComponent>(child);
+    REQUIRE(wc != nullptr);
+    CHECK(wc->world[3].x == doctest::Approx(2.0));
 }
 
 TEST_CASE("transform_system — grandchild composes through two parents") {

@@ -93,6 +93,7 @@ add_executable(gw_editor
     panels/lighting_panel.cpp
     panels/render_targets_panel.cpp
     agent_panel/agent_panel.cpp
+    bld_bridge/mcp_stdio_client.cpp
     viewport/editor_camera.cpp
     viewport/debug_draw.cpp
     viewport/gizmo_system.cpp

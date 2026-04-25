@@ -38,6 +38,7 @@
 #include "editor/panels/render_targets_panel.hpp"
 #include "editor/vscript/vscript_panel.hpp"
 #include "editor/agent_panel/agent_panel.hpp"
+#include "editor/bld_bridge/mcp_stdio_client.hpp"
 #include "editor/seq_panel/seq_panel.hpp"
 #include "editor/bld_api/editor_bld_api.hpp"
 #include "editor/scene/components.hpp"
@@ -113,6 +114,7 @@
 #include <filesystem>
 #include <fstream>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -310,6 +312,12 @@ struct EditorVulkanBackend {
     int                      gpu_timestamp_warmup_frames = 3;
 };
 
+void clear_editor_luminance_readout(gw::editor::render::RenderSettings& rs) noexcept {
+    rs.histogram.buckets.fill(0.f);
+    rs.exposure.average_luminance     = 0.f;
+    rs.exposure.luminance_sample_valid = false;
+}
+
 void build_luminance_histogram_from_rgba8(const std::uint8_t* px, std::uint32_t cw,
                                           std::uint32_t ch, std::uint32_t row_stride,
                                           gw::editor::render::LuminanceHistogram& out,
@@ -339,21 +347,30 @@ void build_luminance_histogram_from_rgba8(const std::uint8_t* px, std::uint32_t 
         }
     } else {
         average_luminance = 0.f;
+        out.buckets.fill(0.f);
     }
 }
 
 void refresh_editor_histogram_from_staging(EditorVulkanBackend* vk, uint32_t fi,
                                            gw::editor::render::RenderSettings& rs) {
-    if (!vk || !vk->hist_staging_buf[fi] || !vk->hist_staging_alloc[fi] || !vk->allocator) return;
-    if (vk->hist_sample_w[fi] == 0 || vk->hist_sample_h[fi] == 0) return;
+    if (!vk || !vk->hist_staging_buf[fi] || !vk->hist_staging_alloc[fi] || !vk->allocator) {
+        clear_editor_luminance_readout(rs);
+        return;
+    }
+    if (vk->hist_sample_w[fi] == 0 || vk->hist_sample_h[fi] == 0) {
+        clear_editor_luminance_readout(rs);
+        return;
+    }
 
     VmaAllocationInfo ainfo{};
     vmaGetAllocationInfo(vk->allocator, vk->hist_staging_alloc[fi], &ainfo);
 
     void* mapped = nullptr;
     if (vmaMapMemory(vk->allocator, vk->hist_staging_alloc[fi], &mapped) != VK_SUCCESS ||
-        !mapped)
+        !mapped) {
+        clear_editor_luminance_readout(rs);
         return;
+    }
 
     VkMappedMemoryRange inv{};
     inv.sType  = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
@@ -367,6 +384,7 @@ void refresh_editor_histogram_from_staging(EditorVulkanBackend* vk, uint32_t fi,
     build_luminance_histogram_from_rgba8(bytes, vk->hist_sample_w[fi], vk->hist_sample_h[fi],
                                          vk->hist_sample_w[fi] * 4u, rs.histogram,
                                          rs.exposure.average_luminance);
+    rs.exposure.luminance_sample_valid = true;
     vmaUnmapMemory(vk->allocator, vk->hist_staging_alloc[fi]);
 }
 
@@ -581,16 +599,7 @@ void EditorApplication::run() {
                 create_scene_rt(w, h);
                 vpp->set_scene_texture(vk_->scene_imgui_ds, w, h);
                 vpp->apply_resize(w, h);
-                if (auto* rtp = dynamic_cast<RenderTargetsPanel*>(
-                        panels_.find("Render Targets"))) {
-                    rtp->set_slot(0, reinterpret_cast<ImTextureID>(vk_->scene_imgui_ds), true);
-                    for (std::size_t ti = 0; ti < vk_->gbuffer_thumbs.size(); ++ti) {
-                        rtp->set_slot(static_cast<int>(ti + 1),
-                                      reinterpret_cast<ImTextureID>(
-                                          vk_->gbuffer_thumbs[ti].imgui_ds),
-                                      true);
-                    }
-                }
+                sync_render_targets_thumbnails();
             }
         }
 
@@ -661,8 +670,10 @@ void EditorApplication::run() {
         };
 
         build_ui();
-        if (shell_phase_ == EditorShellPhase::MainEditor)
+        if (shell_phase_ == EditorShellPhase::MainEditor) {
             panels_.render_all(ctx);
+            poll_bld_copilot_mcp();
+        }
         gw::editor::theme::draw_pulse_overlay(pulse_);
 
         end_frame();
@@ -1053,12 +1064,33 @@ void EditorApplication::create_scene_rt(uint32_t w, uint32_t h) {
     (void)editor_scene_pass_->init_or_recreate(
         vk_->device, vk_->allocator, vk_->scene_format,
         (vk_->scene_depth_view != VK_NULL_HANDLE) ? vk_->scene_depth_format : VK_FORMAT_UNDEFINED);
+
+    sync_render_targets_thumbnails();
+}
+
+void EditorApplication::sync_render_targets_thumbnails() {
+    if (!vk_ || !vk_->scene_imgui_ds) {
+        return;
+    }
+    auto* rtp = dynamic_cast<RenderTargetsPanel*>(panels_.find("Render Targets"));
+    if (!rtp) {
+        return;
+    }
+    rtp->set_slot(0, reinterpret_cast<ImTextureID>(vk_->scene_imgui_ds), true);
+    for (std::size_t ti = 0; ti < vk_->gbuffer_thumbs.size(); ++ti) {
+        if (vk_->gbuffer_thumbs[ti].imgui_ds) {
+            rtp->set_slot(static_cast<int>(ti + 1),
+                reinterpret_cast<ImTextureID>(vk_->gbuffer_thumbs[ti].imgui_ds), true);
+        }
+    }
 }
 
 void EditorApplication::destroy_scene_rt() {
     if (!vk_ || !vk_->device) return;
 
     editor_scene_pass_.reset();
+
+    clear_editor_luminance_readout(render_settings_);
 
     vk_->hist_sample_w.fill(0);
     vk_->hist_sample_h.fill(0);
@@ -1960,6 +1992,8 @@ void EditorApplication::build_launcher_ui() {
 void EditorApplication::open_project(const std::filesystem::path& root) {
     namespace fs = std::filesystem;
     project_root_ = root;
+    bld_mcp_.reset();
+    mcp_next_jsonrpc_id_ = 2;
     std::error_code ec;
     fs::current_path(project_root_, ec);
     gw::editor::shell::touch_recent_project(recent_projects_, project_root_);
@@ -2036,6 +2070,71 @@ void EditorApplication::launch_detached_headless_runtime() {
     }
     std::fprintf(stdout, "[editor] launched %s (scene %s)\n", play.string().c_str(),
                  rel.c_str());
+}
+
+void EditorApplication::poll_bld_copilot_mcp() {
+    if (shell_phase_ != EditorShellPhase::MainEditor || project_root_.empty()) {
+        return;
+    }
+    auto* raw = panels_.find("BLD Copilot");
+    if (raw == nullptr) {
+        return;
+    }
+    auto* panel = dynamic_cast<gw::editor::agent::AgentPanel*>(raw);
+    if (panel == nullptr || !panel->has_pending_mcp_turn()) {
+        return;
+    }
+
+    std::string user;
+    if (!panel->take_pending_user_input(user)) {
+        return;
+    }
+
+    const char* exe_env = std::getenv("GW_BLD_SERVER_EXE");
+    if (exe_env == nullptr || exe_env[0] == '\0') {
+        panel->push_assistant_delta(
+            "Set environment variable GW_BLD_SERVER_EXE to the path of gw_bld_server.exe "
+            "(build: cargo build -p bld-agent --features server --bin gw_bld_server), then send "
+            "again.\n");
+        panel->set_status(gw::editor::agent::SessionStatus::Disconnected);
+        return;
+    }
+
+    panel->set_status(gw::editor::agent::SessionStatus::Thinking);
+    std::string err;
+    if (!bld_mcp_) {
+        bld_mcp_ = std::make_unique<gw::editor::bld::McpStdioSession>();
+    }
+    if (!bld_mcp_->active()) {
+        const std::string root = project_root_.string();
+        if (!bld_mcp_->start(exe_env, root, err)) {
+            panel->push_assistant_delta(std::string("MCP session failed to start: ") + err + "\n");
+            bld_mcp_.reset();
+            panel->set_status(gw::editor::agent::SessionStatus::Idle);
+            return;
+        }
+        mcp_next_jsonrpc_id_ = 2;
+    }
+
+    const unsigned id = mcp_next_jsonrpc_id_++;
+    std::ostringstream body;
+    body << "{\"jsonrpc\":\"2.0\",\"id\":" << id
+         << ",\"method\":\"tools/call\",\"params\":{"
+            "\"name\":\"docs.search\","
+            "\"arguments\":{"
+            "\"query\":\""
+         << gw::editor::bld::json_escape_string(user) << "\",\"k\":8}}}";
+
+    std::string resp;
+    if (!bld_mcp_->request(body.str(), resp, err)) {
+        panel->push_assistant_delta(std::string("MCP request failed: ") + err + "\n");
+        bld_mcp_.reset();
+        panel->set_status(gw::editor::agent::SessionStatus::Idle);
+        return;
+    }
+    panel->push_assistant_delta(resp);
+    panel->push_assistant_delta("\n");
+    panel->set_status(gw::editor::agent::SessionStatus::Idle);
 }
 
 void EditorApplication::build_ui() {

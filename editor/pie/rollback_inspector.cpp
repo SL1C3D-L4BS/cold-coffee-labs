@@ -15,6 +15,12 @@ void draw_rollback_inspector(RollbackInspectorState& state) noexcept {
             "Deterministic sim lab — seed/tick/bit-hash mirror the replay harness. "
             "Step controls are presentation-first until the determinism validator "
             "IPC lands; values stay in-session for designers.");
+        if (state.authoring_snapshot_bytes > 0) {
+            ImGui::Text("Authoring snapshot at Play: %llu B",
+                static_cast<unsigned long long>(state.authoring_snapshot_bytes));
+        } else {
+            ImGui::TextDisabled("Authoring snapshot: — (enter Play to capture)");
+        }
         ImGui::Separator();
         ImGui::InputScalar("Universe seed##rb_seed", ImGuiDataType_U64, &state.seed);
         ImGui::InputScalar("Logical tick##rb_tick", ImGuiDataType_U64, &state.tick);

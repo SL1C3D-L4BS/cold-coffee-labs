@@ -10,6 +10,8 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <algorithm>
+#include <cmath>
+#include <unordered_set>
 
 namespace gw::editor {
 
@@ -29,8 +31,65 @@ ImGuizmo::MODE to_imguizmo_mode(GizmoSpace sp) noexcept {
 }  // namespace
 
 // ---------------------------------------------------------------------------
+std::uint64_t GizmoSystem::pack_cell_index(int ix, int iy, int iz) noexcept {
+    const auto u = [](int v) -> std::uint64_t {
+        return static_cast<std::uint64_t>(static_cast<std::uint32_t>(v));
+    };
+    return (u(ix) << 42) | (u(iy) << 21) | u(iz);
+}
+
+void GizmoSystem::insert_spatial_bucket(std::uint64_t entity_bits,
+                                        const glm::vec3& translation) {
+    if (spatial_cell_world_ <= 0.f) {
+        return;
+    }
+    const float inv = 1.f / spatial_cell_world_;
+    const int ix = static_cast<int>(std::floor(translation.x * inv));
+    const int iy = static_cast<int>(std::floor(translation.y * inv));
+    const int iz = static_cast<int>(std::floor(translation.z * inv));
+    const std::uint64_t key = pack_cell_index(ix, iy, iz);
+    auto& cell = spatial_buckets_[key];
+    if (std::find(cell.begin(), cell.end(), entity_bits) == cell.end()) {
+        cell.push_back(entity_bits);
+    }
+}
+
+void GizmoSystem::gather_entities_near(const glm::vec3& world,
+                                       float radius_world,
+                                       std::vector<EntityHandle>& out) const {
+    if (radius_world <= 0.f || spatial_cell_world_ <= 0.f) {
+        return;
+    }
+    const float inv = 1.f / spatial_cell_world_;
+    const int ix0 = static_cast<int>(std::floor((world.x - radius_world) * inv));
+    const int ix1 = static_cast<int>(std::floor((world.x + radius_world) * inv));
+    const int iy0 = static_cast<int>(std::floor((world.y - radius_world) * inv));
+    const int iy1 = static_cast<int>(std::floor((world.y + radius_world) * inv));
+    const int iz0 = static_cast<int>(std::floor((world.z - radius_world) * inv));
+    const int iz1 = static_cast<int>(std::floor((world.z + radius_world) * inv));
+
+    std::unordered_set<std::uint64_t> seen;
+    for (int ix = ix0; ix <= ix1; ++ix) {
+        for (int iy = iy0; iy <= iy1; ++iy) {
+            for (int iz = iz0; iz <= iz1; ++iz) {
+                const auto it = spatial_buckets_.find(pack_cell_index(ix, iy, iz));
+                if (it == spatial_buckets_.end()) {
+                    continue;
+                }
+                for (const std::uint64_t bits : it->second) {
+                    if (seen.insert(bits).second) {
+                        out.push_back(EntityHandle::from_raw_bits(bits));
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 void GizmoSystem::set_entity_matrix(EntityHandle h, const glm::mat4& m) {
     entity_mats_[h.raw_bits()] = m;
+    insert_spatial_bucket(h.raw_bits(), glm::vec3{m[3][0], m[3][1], m[3][2]});
 }
 
 glm::mat4 GizmoSystem::get_entity_matrix(EntityHandle h) const {
