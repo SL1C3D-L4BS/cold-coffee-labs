@@ -82,3 +82,11 @@ graphify-out/cost.json
 graphify-out/graph.html
 graphify-out/memory/
 graphify-out/raw/
+
+# -----------------------------------------------------------------------------
+# Local reference trees — upstream GPL / educational sources for study only
+# (e.g. id-Software/Quake under ref/Quake). Not Greywater IP; never commit
+# clones or paste verbatim into engine/ without separate legal review.
+# -----------------------------------------------------------------------------
+/ref/*
+!/ref/README.md
