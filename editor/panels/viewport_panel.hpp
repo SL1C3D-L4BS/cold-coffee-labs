@@ -92,6 +92,11 @@ private:
     float vp_x_ = 0.f, vp_y_ = 0.f, vp_w_ = 0.f, vp_h_ = 0.f;
 
     GLFWwindow* window_ = nullptr;  // borrowed from EditorApplication
+
+    /// Set each frame in `on_imgui_render`: viewport owns keyboard shortcuts
+    /// (W/E/R gizmo, F frame, Space) only when focused or hovered — W1C.2.
+    bool viewport_keyboard_active_ = false;
+
 public:
     void set_window(GLFWwindow* w) noexcept { window_ = w; }
 };

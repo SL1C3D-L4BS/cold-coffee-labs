@@ -67,10 +67,11 @@ gw_add_fuzzer(fuzz_bld_ipc        fuzz_bld_ipc.cpp)
 gw_add_fuzzer(fuzz_mod_manifest   fuzz_mod_manifest.cpp)
 gw_add_fuzzer(fuzz_replay         fuzz_replay.cpp)
 gw_add_fuzzer(fuzz_dialogue_graph fuzz_dialogue_graph.cpp)
+gw_add_fuzzer(fuzz_progs_bytecode fuzz_progs_bytecode.cpp)
 
 # Optional `ctest -R fuzz_` smoke: one second per harness (full fuzz uses README corpora).
 foreach(_gw_fuzz_t IN ITEMS fuzz_gwscene fuzz_bld_ipc fuzz_mod_manifest fuzz_replay
-                          fuzz_dialogue_graph)
+                          fuzz_dialogue_graph fuzz_progs_bytecode)
     add_test(
         NAME ${_gw_fuzz_t}
         COMMAND "$<TARGET_FILE:${_gw_fuzz_t}>" -max_total_time=1

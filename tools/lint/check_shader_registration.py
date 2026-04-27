@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: LicenseRef-Greywater-Proprietary
-# SPDX-FileCopyrightText: 2026 Cold Coffee Labs
+# SPDX-FileCopyrightText: 2026 Greywater Engine contributors
 """Ensure every *stage* `shaders/**/*.hlsl` on disk is listed in `shaders/CMakeLists.txt`.
 
 Include-only HLSL (no `main`, consumed via #include) is excluded from that set;

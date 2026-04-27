@@ -1,6 +1,7 @@
 # Frame Graph implementation (Week 025-027)
 
 target_sources(engine_render PRIVATE
+    handles.hpp
     types.hpp
     error.hpp
     command_buffer.hpp

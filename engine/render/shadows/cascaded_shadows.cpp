@@ -310,7 +310,7 @@ Result<PassHandle> CascadedShadowMapper::create_shadow_pass(
 
     PassDesc pass("CascadedShadows");
     pass.queue = QueueType::Graphics;
-    pass.execute = [this](CommandBuffer& cmd) {
+    pass.execute = [](CommandBuffer& cmd) {
         (void)cmd;
         // In Week 030 the actual depth-pass draws happen here via
         // cmd.begin_rendering()/cmd.draw() with csm.vert.hlsl pipeline.

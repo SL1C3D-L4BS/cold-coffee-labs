@@ -97,8 +97,8 @@ void RenderTargetsPanel::on_imgui_render(EditorContext& /*ctx*/) {
 
     constexpr const char* k_m = "Asterisk (*) = semantic G-buffer name; each thumbnail is a real VkImage (not a "
         "UI placeholder rect). Until MRT, slots 1–5 show a full-frame copy of slot 0. ";
-    constexpr const char* k_e = "Not yet: separate MRT into each slot, object-ID pick buffer, or depth shown as "
-        "greyscale (needs a post pass). Scene pass already writes colour + depth targets when allocated.";
+    constexpr const char* k_e = "Roadmap: expose native MRT exports per slot, object-ID pick buffer, and depth "
+        "greyscale preview (post pass). Scene pass already allocates colour + depth where the frame graph provides them.";
 
     const float wrap_w = ImGui::GetContentRegionAvail().x;
     if (wrap_w > 4.f) {

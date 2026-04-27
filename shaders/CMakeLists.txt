@@ -155,6 +155,8 @@ add_shader_library(world_shaders
 set(EDITOR_SHADER_SOURCES
     editor/scene_unlit.vert.hlsl
     editor/scene_unlit.frag.hlsl
+    editor/mesh_scene_unlit.vert.hlsl
+    editor/mesh_scene_unlit.frag.hlsl
 )
 
 add_shader_library(editor_shaders

@@ -81,6 +81,7 @@
 // Part B wire-up: module manifest, theme registry, a11y (pack.yml:
 // pre-ed-module-manifest, pre-ed-theme-menu, pre-ed-a11y-init).
 #include "editor/render/editor_scene_pass.hpp"
+#include "engine/render/hal/vulkan_device.hpp"
 #include "editor/config/editor_config.hpp"
 #include "editor/modules/modules_builtin.hpp"
 #include "editor/shell/file_dialog.hpp"
@@ -265,6 +266,9 @@ struct EditorVulkanBackend {
 
     // ----- VMA allocator (shared with engine_render's vmaCreateAllocator impl) -----
     VmaAllocator             allocator         = VK_NULL_HANDLE;
+
+    /// Borrowed HAL device for `AssetDatabase` GPU mesh/texture loads (ADR vertical slice).
+    std::unique_ptr<gw::render::hal::VulkanDevice> hal_for_assets{};
 
     // ----- Offscreen scene render target (Phase 7 §6.1) -----
     // Sized to the Viewport panel's content area; resized on demand from run().
@@ -694,8 +698,7 @@ void EditorApplication::init_window() {
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
-    window_ = glfwCreateWindow(win_w_, win_h_,
-        "Greywater Editor  |  Cold Coffee Labs", nullptr, nullptr);
+    window_ = glfwCreateWindow(win_w_, win_h_, "Greywater Editor", nullptr, nullptr);
     if (!window_) gw_fatal("glfwCreateWindow failed");
 
     glfwSetWindowUserPointer(window_, this);
@@ -875,6 +878,19 @@ void EditorApplication::init_vulkan() {
     ai.instance         = vk_->instance;
     ai.pVulkanFunctions = &vma_fns;
     GW_VKCHECK(vmaCreateAllocator(&ai, &vk_->allocator));
+
+    try {
+        vk_->hal_for_assets = std::make_unique<gw::render::hal::VulkanDevice>(
+            gw::render::hal::VulkanDevice::borrow_existing(
+                vk_->instance, vk_->physical_device, vk_->device, vk_->allocator,
+                vk_->graphics_queue, vk_->graphics_family));
+    } catch (const std::exception& ex) {
+        std::fprintf(stderr,
+                     "[editor] VulkanDevice::borrow_existing failed (GPU AssetDatabase disabled): "
+                     "%s\n",
+                     ex.what());
+        vk_->hal_for_assets.reset();
+    }
 
     // Histogram readback staging (one buffer per frame-in-flight).
     {
@@ -1402,6 +1418,11 @@ void EditorApplication::shutdown_vulkan() {
     if (vk_->device) {
         vkDeviceWaitIdle(vk_->device);
 
+        editor_asset_db_.reset();
+        if (vk_->hal_for_assets) {
+            vk_->hal_for_assets.reset();
+        }
+
         if (vk_->imgui_descriptor_pool) {
             vkDestroyDescriptorPool(vk_->device, vk_->imgui_descriptor_pool, nullptr);
             vk_->imgui_descriptor_pool = VK_NULL_HANDLE;
@@ -1626,9 +1647,21 @@ bool EditorApplication::begin_frame() {
         rinfo.pDepthAttachment       = vk_->scene_depth_view ? &depth_att : nullptr;
         vkCmdBeginRendering(cmd, &rinfo);
         if (editor_scene_pass_ && vk_->scene_depth_view) {
-            editor_scene_pass_->record(
-                cmd, vk_->device, vk_->allocator, vk_->scene_extent.width, vk_->scene_extent.height,
-                scene_raster_view_, scene_raster_proj_, scene_world_, fi, kFramesInFlight);
+            gw::assets::AssetDatabase* const adb =
+                (shell_phase_ == EditorShellPhase::MainEditor) ? editor_asset_db_.get() : nullptr;
+            editor_scene_pass_->record(render::EditorScenePass::RecordFrame{
+                .cmd                   = cmd,
+                .device                = vk_->device,
+                .allocator             = vk_->allocator,
+                .extent_w              = vk_->scene_extent.width,
+                .extent_h              = vk_->scene_extent.height,
+                .view                  = scene_raster_view_,
+                .proj                  = scene_raster_proj_,
+                .world                 = &scene_world_,
+                .frame_index           = fi,
+                .max_frames_in_flight  = kFramesInFlight,
+                .asset_db               = adb,
+            });
         }
         vkCmdEndRendering(cmd);
 
@@ -1842,14 +1875,14 @@ void EditorApplication::build_launcher_ui() {
             ImGui::TextColored(gw::editor::theme::active_accent_imgui(), "%s",
                                shell_gate_err_);
     } else if (shell_phase_ == EditorShellPhase::ChooseProject) {
-        ImGui::TextUnformatted("Sacrilege franchise");
+        ImGui::TextUnformatted("Project workspace");
         ImGui::TextDisabled(
-            "Pick a title workspace, browse, drop a folder here, or open a recent project.");
+            "Pick a workspace, browse, drop a folder here, or open a recent project.");
         ImGui::TextDisabled(
-            "Opening a project loads the full docking editor: Viewport, Sacrilege Library, "
-            "Outliner, and Inspector.");
+            "Opening a project loads the full docking editor: Viewport, Outliner, Inspector, "
+            "and authoring panels.");
         ImGui::TextDisabled(
-            "Encounter / behaviour trees: Window → Sacrilege → Encounter Editor.");
+            "Encounter / behaviour trees: Window → Authoring → Encounter Editor.");
         ImGui::Spacing();
 
         ImGui::PushStyleColor(ImGuiCol_ChildBg,
@@ -1886,9 +1919,9 @@ void EditorApplication::build_launcher_ui() {
                 gw::editor::shell::list_sacrilege_franchise_games(*repo);
             if (franchise_games.empty()) {
                 ImGui::TextColored(gw::editor::theme::active_warning_imgui(),
-                    "No franchise games listed — add entries to franchises/sacrilege/games.manifest.");
+                    "No workspaces listed — add entries to franchises/sacrilege/games.manifest.");
             } else {
-                ImGui::TextDisabled("Franchise titles");
+                ImGui::TextDisabled("Configured workspaces");
                 ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {10.f, 10.f});
                 const float card_w =
                     std::clamp(ImGui::GetContentRegionAvail().x * 0.92f, 240.f, 560.f);
@@ -2003,8 +2036,16 @@ void EditorApplication::open_project(const std::filesystem::path& root) {
     editor_asset_vfs_ = std::make_unique<gw::assets::vfs::VirtualFilesystem>();
     editor_asset_vfs_->mount("assets/", (project_root_ / "assets").string(), 0);
     editor_asset_vfs_->mount("content/", (project_root_ / "content").string(), 0);
-    editor_asset_db_ = std::make_unique<gw::assets::AssetDatabase>(
-        gw::assets::AssetDatabaseModHarnessTag{}, *editor_asset_vfs_);
+    if (vk_ && vk_->hal_for_assets) {
+        editor_asset_db_ = std::make_unique<gw::assets::AssetDatabase>(
+            *vk_->hal_for_assets, *editor_asset_vfs_);
+    } else {
+        std::fprintf(stderr,
+                     "[editor] AssetDatabase: GPU HAL unavailable — using ModHarness (see "
+                     "docs/ENGINE_EDITOR_RUNTIME_WIRING.md). Mesh/texture loads are not ship-quality.\n");
+        editor_asset_db_ = std::make_unique<gw::assets::AssetDatabase>(
+            gw::assets::AssetDatabaseModHarnessTag{}, *editor_asset_vfs_);
+    }
 
     const fs::path def_scene =
         fs::path{"content"} / "scenes" / "sacrilege_editor_default.gwscene";
@@ -2283,7 +2324,7 @@ void EditorApplication::build_ui() {
             toggle_group("Core",
                          {"Viewport", "Outliner", "Inspector", "Lighting", "Render Settings",
                           "Render Targets", "Stats", "Console"});
-            if (ImGui::BeginMenu("Sacrilege")) {
+            if (ImGui::BeginMenu("Authoring")) {
                 for (std::string_view sv :
                      gw::editor::panels::sacrilege::kRequiredSacrilegePanelNames) {
                     const std::string n{sv};

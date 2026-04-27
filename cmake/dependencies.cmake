@@ -1,12 +1,9 @@
-# Greywater dependency manifest — Phase 1 subset.
-# Every dependency is SHA-tag pinned. Upgrading a pin is an ADR-worthy change.
-#
-# docs/10 §6.3 is authoritative; this file is the living implementation.
+# Dependency manifest (CPM). Dependencies are pinned by Git tag or SHA.
 
 include("${CMAKE_SOURCE_DIR}/cmake/CPM.cmake")
 
 # --- Corrosion (Rust <-> CMake bridge for BLD) --------------------------------
-# docs/01_CONSTITUTION_AND_PROGRAM.md §2.4, non-negotiable #15: BLD lives behind Corrosion.
+# BLD (Rust workspace) is linked through Corrosion.
 CPMAddPackage(
     NAME             Corrosion
     GITHUB_REPOSITORY corrosion-rs/corrosion

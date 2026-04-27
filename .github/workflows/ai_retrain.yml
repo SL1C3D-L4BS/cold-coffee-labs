@@ -1,11 +1,4 @@
-# .github/workflows/ai_retrain.yml
-# pre-tc-ai-retrain-workflow — nightly-cron stub that runs the five
-# `tools/cook/ai/*/pipeline.yml` entries and publishes model artefacts.
-#
-# Minimum wire-up per docs/prompts/00_WIRE_UP_AUDIT.md §4: scheduled
-# workflow, calls each pipeline's entry script, uploads artefacts, opens
-# a tracking issue when any model hash changes. Real retrains (GPU-backed)
-# land in Phase 21 W138; today the workflow just proves the plumbing.
+# .github/workflows/ai_retrain.yml — scheduled stub over `tools/cook/ai/*` pipelines.
 
 name: AI Retrain (nightly)
 

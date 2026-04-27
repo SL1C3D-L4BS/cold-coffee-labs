@@ -41,7 +41,7 @@ struct CookManifest {
 // Bump this in the cooker's .cpp when the transform logic changes; that
 // invalidates the cache for every asset of that type.
 namespace rule_version {
-    static constexpr uint32_t kMesh    = 1u;
+    static constexpr uint32_t kMesh    = 2u;
     static constexpr uint32_t kTexture = 1u;
 }
 

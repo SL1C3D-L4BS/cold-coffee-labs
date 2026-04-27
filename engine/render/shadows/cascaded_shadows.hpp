@@ -69,7 +69,7 @@ public:
     ShadowMap(const ShadowMap&) = delete;
     ShadowMap& operator=(const ShadowMap&) = delete;
     ShadowMap(ShadowMap&&) = default;
-    ShadowMap& operator=(ShadowMap&&) = default;
+    ShadowMap& operator=(ShadowMap&&) = delete;
 
     [[nodiscard]] VkImage      image()      const noexcept { return image_; }
     [[nodiscard]] VkImageView  image_view() const noexcept { return image_view_; }
@@ -101,7 +101,7 @@ public:
     ShadowAtlas(const ShadowAtlas&) = delete;
     ShadowAtlas& operator=(const ShadowAtlas&) = delete;
     ShadowAtlas(ShadowAtlas&&) = default;
-    ShadowAtlas& operator=(ShadowAtlas&&) = default;
+    ShadowAtlas& operator=(ShadowAtlas&&) = delete;
 
     struct TileAllocation {
         uint32_t x = 0;
@@ -151,7 +151,7 @@ public:
     CascadedShadowMapper(const CascadedShadowMapper&) = delete;
     CascadedShadowMapper& operator=(const CascadedShadowMapper&) = delete;
     CascadedShadowMapper(CascadedShadowMapper&&) = default;
-    CascadedShadowMapper& operator=(CascadedShadowMapper&&) = default;
+    CascadedShadowMapper& operator=(CascadedShadowMapper&&) = delete;
 
     Result<std::monostate> initialize(const CascadeConfig& config);
 

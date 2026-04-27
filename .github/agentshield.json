@@ -1,0 +1,9 @@
+{
+  "policy_version": "1.1",
+  "blocked_paths": [],
+  "require_adr_reference_for": [],
+  "exempt_paths_for_volume_caps": [],
+  "enforce_commit_trailer": false,
+  "graphify_required": false,
+  "deny_on_missing_graph": false
+}

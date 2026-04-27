@@ -47,6 +47,9 @@ public:
     // Discover all cookable source files under input_root.
     void discover();
 
+    /// After `discover()`, wire glTF image URIs as texture cook dependencies.
+    void link_gltf_texture_dependencies();
+
     // Add a specific source file.
     void add_asset(const std::filesystem::path& source);
 
@@ -73,6 +76,8 @@ private:
         const std::filesystem::path& source) const;
 
     [[nodiscard]] static bool is_cookable(const std::filesystem::path& ext);
+
+    [[nodiscard]] std::size_t ensure_source_node(const std::filesystem::path& source);
 };
 
 } // namespace gw::tools::cook

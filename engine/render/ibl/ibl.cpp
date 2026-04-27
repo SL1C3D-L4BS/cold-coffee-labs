@@ -1,8 +1,9 @@
 #include "ibl.hpp"
 #include "../frame_graph/error.hpp"
+#include "engine/core/log.hpp"
 #include <algorithm>
 #include <cmath>
-#include <cstdio>
+#include <string>
 
 namespace gw::render::ibl {
 
@@ -396,7 +397,10 @@ Result<std::monostate> IBLSystem::dispatch_compute_shader(FrameGraph& frame_grap
 
 Result<std::monostate> IBLSystem::load_equirectangular_map(const std::string& filepath) {
     // Stubbed — actual KTX/HDR loading wired in Week 031.
-    std::fprintf(stderr, "[ibl] load_equirectangular_map('%s') — stub\n", filepath.c_str());
+    GW_LOG(Warn,
+           "ibl",
+           (std::string("load_equirectangular_map('") + filepath + "') — stub (ADR IBL backlog)")
+               .c_str());
     return std::monostate{};
 }
 

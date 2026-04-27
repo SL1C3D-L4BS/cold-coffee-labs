@@ -32,6 +32,20 @@ void draw_ssao(render::SSAOParams& ssao) {
     ImGui::SliderFloat("Power",       &ssao.power,        0.5f,  8.f,  "%.3f");
 }
 
+void draw_output_upscale(render::RenderSettings& rs) {
+    if (!ImGui::CollapsingHeader("Output / upscale (HAL)",
+                                  ImGuiTreeNodeFlags_DefaultOpen)) {
+        return;
+    }
+    ImGui::Checkbox("FSR 2 upscale##fsr2", &rs.fsr2_enabled);
+    ImGui::Checkbox("HDR10 metadata##hdr10", &rs.hdr_enabled);
+    ImGui::TextDisabled(
+        "W1C.9: toggles are stored on RenderSettings only. Editor scene pass does "
+        "not yet register `upscale_and_hdr_bridge` passes; engine bridge stays "
+        "off-editor until the post-FX frame-graph wave (see "
+        "`engine/render/post/upscale_and_hdr_bridge.cpp`). No Vulkan work here.");
+}
+
 void draw_exposure(render::ExposureParams& ex, render::LuminanceHistogram& hist) {
     if (!ImGui::CollapsingHeader("Luminance histogram / exposure",
                                   ImGuiTreeNodeFlags_DefaultOpen)) return;
@@ -71,6 +85,8 @@ void RenderSettingsPanel::on_imgui_render(EditorContext& /*ctx*/) {
     draw_ssao(settings_->ssao);
     ImGui::Spacing();
     draw_exposure(settings_->exposure, settings_->histogram);
+    ImGui::Spacing();
+    draw_output_upscale(*settings_);
 
     ImGui::End();
 }

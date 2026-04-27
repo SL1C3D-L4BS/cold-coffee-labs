@@ -63,7 +63,7 @@ void ShaderHotReloadPanel::on_imgui_render(gw::editor::EditorContext& ctx) {
 
     ImGui::TextUnformatted(
         "Development-mode shader iteration: tracks on-disk modification times under "
-        "shaders/. Pair changes with the Bake panel (gw_cook) and Sacrilege Shader Forge.");
+            "shaders/. Pair changes with the Bake panel (gw_cook) and Shader Forge.");
     ImGui::Separator();
 
     namespace fs = std::filesystem;

@@ -6,6 +6,7 @@ add_library(engine_render)
 
 target_sources(engine_render
     PRIVATE
+        mesh_asset_frame_pass.cpp
         hal/capabilities.cpp
         hal/vulkan_instance.cpp
         hal/vulkan_device.cpp

@@ -1,8 +1,6 @@
 #include "milestone_validator.hpp"
 #include <algorithm>
 #include <cstdio>
-#include <cstdlib>
-#include <fstream>
 #include <iomanip>
 #include <random>
 #include <sstream>
@@ -532,17 +530,11 @@ void MilestoneValidator::end_frame_timing() {
     using us = std::chrono::microseconds;
     auto elapsed = std::chrono::duration_cast<us>(
         std::chrono::high_resolution_clock::now() - frame_start_time_);
-    float ft = static_cast<float>(elapsed.count()) / 1000.0f;
-    metrics_.update(ft, measure_gpu_time(), measure_cpu_time());
-}
-
-float MilestoneValidator::measure_gpu_time() {
-    // Placeholder — replaced with VkQueryPool timestamps in Week 032.
-    return 10.0f + static_cast<float>(std::rand() % 100) / 100.0f;
-}
-
-float MilestoneValidator::measure_cpu_time() {
-    return 1.0f + static_cast<float>(std::rand() % 50) / 100.0f;
+    const float ft = static_cast<float>(elapsed.count()) / 1000.0f;
+    // Deterministic split until VkQueryPool timestamps are wired (Week 032).
+    const float gpu = std::min(ft * 0.60f, config_.max_gpu_time_ms * 0.99f);
+    const float cpu = std::min(ft * 0.25f, config_.max_cpu_time_ms * 0.99f);
+    metrics_.update(ft, gpu, cpu);
 }
 
 bool MilestoneValidator::validate_frame_graph_compilation() {

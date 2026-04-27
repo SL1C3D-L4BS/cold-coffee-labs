@@ -7,7 +7,7 @@
 //  [3] MikkTSpace tangents  → unindexed triangles → tangent + bitangent sign
 //  [4] meshopt weld/reindex → meshopt_generateVertexRemap
 //  [5] meshopt cache opt    → vertex cache + overdraw + vertex fetch
-//  [6] LOD chain            → meshopt_simplify × 4 levels
+//  [6] LOD chain            → meshopt_simplify × 4 (rigid) or duplicate LOD0 (skinned)
 //  [7] Quantization         → positions int16, normals/tangents oct-encoded,
 //                             UVs unorm16
 //  [8] .gwmesh serialise    → flat binary, mmap-ready
@@ -23,10 +23,13 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <optional>
+#include <unordered_map>
 #include <vector>
 
 // fastgltf
 #include <fastgltf/core.hpp>
+#include <fastgltf/math.hpp>
 #include <fastgltf/types.hpp>
 #include <fastgltf/tools.hpp>
 
@@ -54,6 +57,8 @@ struct RawVertex {
     float uv0[2];
     float uv1[2];
     uint8_t color[4]{255, 255, 255, 255};
+    std::uint16_t joints[4]{0, 0, 0, 0};
+    float          weights[4]{1.0f, 0.0f, 0.0f, 0.0f};
 };
 
 struct CookedVertex {
@@ -138,18 +143,12 @@ static void mikk_set_tangent(const SMikkTSpaceContext* c,
 }
 
 // ---- Write helper ---------------------------------------------------------
-static void write_u8 (std::vector<uint8_t>& buf, uint8_t  v) { buf.push_back(v); }
 static void write_u16(std::vector<uint8_t>& buf, uint16_t v) {
     buf.push_back(static_cast<uint8_t>(v));
     buf.push_back(static_cast<uint8_t>(v >> 8));
 }
 static void write_u32(std::vector<uint8_t>& buf, uint32_t v) {
     for (int i = 0; i < 4; ++i) buf.push_back(static_cast<uint8_t>(v >> (i * 8)));
-}
-static void write_f32(std::vector<uint8_t>& buf, float v) {
-    uint32_t tmp;
-    std::memcpy(&tmp, &v, 4);
-    write_u32(buf, tmp);
 }
 template<typename T>
 static void write_bytes(std::vector<uint8_t>& buf, const T* data, std::size_t n) {
@@ -158,6 +157,28 @@ static void write_bytes(std::vector<uint8_t>& buf, const T* data, std::size_t n)
 }
 static void pad_to(std::vector<uint8_t>& buf, std::size_t align) {
     while (buf.size() % align) buf.push_back(0);
+}
+
+// Pack glTF float weights into 8-bit normalized values (sum 255).
+static void pack_weights_u8(const float* wf, std::uint8_t* out) noexcept {
+    const float s = wf[0] + wf[1] + wf[2] + wf[3];
+    if (s <= 1e-8f) {
+        out[0] = 255u;
+        out[1] = out[2] = out[3] = 0u;
+        return;
+    }
+    int acc[4]{};
+    int sum = 0;
+    for (int k = 0; k < 4; ++k) {
+        acc[k] = static_cast<int>(std::lround((wf[k] / s) * 255.0f));
+        acc[k] = std::clamp(acc[k], 0, 255);
+        sum += acc[k];
+    }
+    acc[0] += 255 - sum;
+    acc[0] = std::clamp(acc[0], 0, 255);
+    for (int k = 0; k < 4; ++k) {
+        out[static_cast<std::size_t>(k)] = static_cast<std::uint8_t>(acc[k]);
+    }
 }
 
 // ---- Main cook implementation ---------------------------------------------
@@ -176,9 +197,6 @@ AssetResult<CookResult> MeshCooker::cook(const CookContext& ctx) const {
     std::vector<uint8_t> src_bytes(src_size);
     f.read(reinterpret_cast<char*>(src_bytes.data()),
            static_cast<std::streamsize>(src_size));
-
-    XXH128_hash_t src_xxh = XXH3_128bits(src_bytes.data(), src_bytes.size());
-    CookKey source_hash{ src_xxh.high64, src_xxh.low64 };
 
     // Cook key = hash(source_bytes + rule_version + platform + config)
     XXH3_state_t* xstate = XXH3_createState();
@@ -220,6 +238,20 @@ AssetResult<CookResult> MeshCooker::cook(const CookContext& ctx) const {
     }
     const auto& asset = expected_asset.get();
 
+    // Map mesh index → skin index from scene nodes (glTF puts skin on the node).
+    std::unordered_map<std::size_t, std::size_t> mesh_skin;
+    for (const auto& node : asset.nodes) {
+        if (!node.meshIndex.has_value()) continue;
+        const std::size_t mid = node.meshIndex.value();
+        if (!node.skinIndex.has_value()) continue;
+        const std::size_t sid = node.skinIndex.value();
+        auto [it, inserted] = mesh_skin.emplace(mid, sid);
+        if (!inserted && it->second != sid) {
+            return std::unexpected(AssetError{AssetErrorCode::CorruptData,
+                                              "conflicting skinIndex for same mesh"});
+        }
+    }
+
     // ------------------------------------------------------------------
     // 3. Collect all primitives into raw vertex / index lists
     // ------------------------------------------------------------------
@@ -230,7 +262,11 @@ AssetResult<CookResult> MeshCooker::cook(const CookContext& ctx) const {
     float aabb_min[3]{ 1e30f, 1e30f, 1e30f };
     float aabb_max[3]{-1e30f,-1e30f,-1e30f };
 
-    for (const auto& mesh : asset.meshes) {
+    std::optional<std::size_t> unified_skin;
+    bool                       has_skin_primitives = false;
+
+    for (std::size_t mesh_idx = 0; mesh_idx < asset.meshes.size(); ++mesh_idx) {
+        const auto& mesh = asset.meshes[mesh_idx];
         for (const auto& prim : mesh.primitives) {
             if (prim.type != fastgltf::PrimitiveType::Triangles) continue;
 
@@ -281,6 +317,68 @@ AssetResult<CookResult> MeshCooker::cook(const CookContext& ctx) const {
                     });
             }
 
+            // Skin: JOINTS_0 / WEIGHTS_0 (optional)
+            const auto* joints_attr = prim.findAttribute("JOINTS_0");
+            const auto* weights_attr = prim.findAttribute("WEIGHTS_0");
+            if (joints_attr && !weights_attr) {
+                return std::unexpected(AssetError{AssetErrorCode::CorruptData,
+                                                  "JOINTS_0 without WEIGHTS_0"});
+            }
+            if (joints_attr) {
+                has_skin_primitives = true;
+                const auto sk_it = mesh_skin.find(mesh_idx);
+                if (sk_it == mesh_skin.end()) {
+                    return std::unexpected(AssetError{AssetErrorCode::CorruptData,
+                                                      "skinned mesh needs node.skinIndex"});
+                }
+                if (!unified_skin) {
+                    unified_skin = sk_it->second;
+                } else if (*unified_skin != sk_it->second) {
+                    return std::unexpected(AssetError{AssetErrorCode::CorruptData,
+                                                      "multiple skins in one .gwmesh cook"});
+                }
+                const auto& ja = asset.accessors[joints_attr->accessorIndex];
+                const auto& wa = asset.accessors[weights_attr->accessorIndex];
+                switch (ja.componentType) {
+                case fastgltf::ComponentType::UnsignedShort:
+                    fastgltf::iterateAccessorWithIndex<fastgltf::math::u16vec4>(
+                        asset, ja, [&](fastgltf::math::u16vec4 jv, std::size_t i) {
+                            all_verts[base_idx + i].joints[0] =
+                                static_cast<std::uint16_t>(jv.x());
+                            all_verts[base_idx + i].joints[1] =
+                                static_cast<std::uint16_t>(jv.y());
+                            all_verts[base_idx + i].joints[2] =
+                                static_cast<std::uint16_t>(jv.z());
+                            all_verts[base_idx + i].joints[3] =
+                                static_cast<std::uint16_t>(jv.w());
+                        });
+                    break;
+                case fastgltf::ComponentType::UnsignedByte:
+                    fastgltf::iterateAccessorWithIndex<fastgltf::math::u8vec4>(
+                        asset, ja, [&](fastgltf::math::u8vec4 jv, std::size_t i) {
+                            all_verts[base_idx + i].joints[0] =
+                                static_cast<std::uint16_t>(jv.x());
+                            all_verts[base_idx + i].joints[1] =
+                                static_cast<std::uint16_t>(jv.y());
+                            all_verts[base_idx + i].joints[2] =
+                                static_cast<std::uint16_t>(jv.z());
+                            all_verts[base_idx + i].joints[3] =
+                                static_cast<std::uint16_t>(jv.w());
+                        });
+                    break;
+                default:
+                    return std::unexpected(AssetError{AssetErrorCode::CorruptData,
+                                                      "unsupported JOINTS_0 component type"});
+                }
+                fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(
+                    asset, wa, [&](fastgltf::math::fvec4 wv, std::size_t i) {
+                        all_verts[base_idx + i].weights[0] = wv.x();
+                        all_verts[base_idx + i].weights[1] = wv.y();
+                        all_verts[base_idx + i].weights[2] = wv.z();
+                        all_verts[base_idx + i].weights[3] = wv.w();
+                    });
+            }
+
             // Indices
             const std::size_t idx_base = all_indices.size();
             if (prim.indicesAccessor.has_value()) {
@@ -303,6 +401,32 @@ AssetResult<CookResult> MeshCooker::cook(const CookContext& ctx) const {
     if (all_verts.empty() || all_indices.empty()) {
         return std::unexpected(AssetError{AssetErrorCode::CorruptData,
                                           "no triangle primitives in glTF"});
+    }
+
+    const bool is_skinned = has_skin_primitives && unified_skin.has_value();
+    std::vector<std::array<float, 16>> inv_binds;
+    if (is_skinned) {
+        const auto& skin = asset.skins[*unified_skin];
+        inv_binds.resize(skin.joints.size());
+        if (skin.inverseBindMatrices.has_value()) {
+            const auto& ibm_acc = asset.accessors[*skin.inverseBindMatrices];
+            if (ibm_acc.count != skin.joints.size()) {
+                return std::unexpected(AssetError{AssetErrorCode::CorruptData,
+                                                    "skin inverseBindMatrices count mismatch"});
+            }
+            fastgltf::iterateAccessorWithIndex<fastgltf::math::fmat4x4>(
+                asset, ibm_acc, [&](const fastgltf::math::fmat4x4& m, std::size_t ji) {
+                    std::memcpy(inv_binds[ji].data(), m.data(), sizeof(float) * 16u);
+                });
+        } else {
+            for (auto& row : inv_binds) {
+                row = {};
+                row[0]  = 1.0f;
+                row[5]  = 1.0f;
+                row[10] = 1.0f;
+                row[15] = 1.0f;
+            }
+        }
     }
 
     // ------------------------------------------------------------------
@@ -354,19 +478,26 @@ AssetResult<CookResult> MeshCooker::cook(const CookContext& ctx) const {
     std::array<std::vector<uint32_t>, kNumLODs> lod_indices;
     lod_indices[0] = opt_indices;
 
-    for (std::size_t lod = 1; lod < kNumLODs; ++lod) {
-        const std::size_t target = static_cast<std::size_t>(
-            opt_indices.size() * lod_ratios[lod]);
-        // Minimum: at least 1 triangle (3 indices).
-        const std::size_t clamped = std::max(target, std::size_t(3));
-        lod_indices[lod].resize(opt_indices.size());
-        float lod_err = 0.0f;
-        const std::size_t result_count = meshopt_simplify(
-            lod_indices[lod].data(),
-            opt_indices.data(), opt_indices.size(),
-            &opt_verts[0].pos[0], unique_count, sizeof(RawVertex),
-            clamped, 0.01f, 0, &lod_err);
-        lod_indices[lod].resize(result_count);
+    if (is_skinned) {
+        // meshopt_simplify breaks joint indices; duplicate LOD0 for skinned meshes.
+        for (std::size_t lod = 1; lod < kNumLODs; ++lod) {
+            lod_indices[lod] = lod_indices[0];
+        }
+    } else {
+        for (std::size_t lod = 1; lod < kNumLODs; ++lod) {
+            const std::size_t target = static_cast<std::size_t>(
+                opt_indices.size() * lod_ratios[lod]);
+            // Minimum: at least 1 triangle (3 indices).
+            const std::size_t clamped = std::max(target, std::size_t(3));
+            lod_indices[lod].resize(opt_indices.size());
+            float lod_err = 0.0f;
+            const std::size_t result_count = meshopt_simplify(
+                lod_indices[lod].data(),
+                opt_indices.data(), opt_indices.size(),
+                &opt_verts[0].pos[0], unique_count, sizeof(RawVertex),
+                clamped, 0.01f, 0, &lod_err);
+            lod_indices[lod].resize(result_count);
+        }
     }
 
     // ------------------------------------------------------------------
@@ -405,6 +536,47 @@ AssetResult<CookResult> MeshCooker::cook(const CookContext& ctx) const {
         std::memcpy(stream1[i].col, rv.color, 4);
     }
 
+    if (is_skinned) {
+        const std::size_t jc = inv_binds.size();
+        for (const auto& rv : opt_verts) {
+            for (int k = 0; k < 4; ++k) {
+                if (rv.weights[k] > 1e-6f &&
+                    static_cast<std::size_t>(rv.joints[k]) >= jc) {
+                    return std::unexpected(AssetError{AssetErrorCode::CorruptData,
+                                                      "JOINTS_0 index out of skin range"});
+                }
+            }
+        }
+    }
+
+    // Stream 2 CPU buffer: inverse bind matrices + packed per-vertex joints/weights.
+    std::vector<std::uint8_t> stream2_bytes;
+    std::uint32_t            joint_count_field = 0;
+    if (is_skinned) {
+        joint_count_field = static_cast<std::uint32_t>(inv_binds.size());
+        stream2_bytes.reserve(joint_count_field * 64u + unique_count * 16u + 64u);
+        for (const auto& m : inv_binds) {
+            write_bytes(stream2_bytes, m.data(), 16u * sizeof(float));
+        }
+        pad_to(stream2_bytes, 16);
+#pragma pack(push, 1)
+        struct SkinVtx {
+            std::uint16_t j[4];
+            std::uint8_t  w[4];
+        };
+#pragma pack(pop)
+        for (std::size_t i = 0; i < unique_count; ++i) {
+            SkinVtx sv{};
+            const RawVertex& rv = opt_verts[i];
+            sv.j[0] = rv.joints[0];
+            sv.j[1] = rv.joints[1];
+            sv.j[2] = rv.joints[2];
+            sv.j[3] = rv.joints[3];
+            pack_weights_u8(rv.weights, sv.w);
+            write_bytes(stream2_bytes, &sv, sizeof(SkinVtx));
+        }
+    }
+
     // Index buffers: UINT16 if ≤ 65535 verts, else UINT32.
     const bool use_u16 = (unique_count <= 65535);
     std::vector<uint16_t> index_u16;
@@ -426,7 +598,7 @@ AssetResult<CookResult> MeshCooker::cook(const CookContext& ctx) const {
     std::vector<uint8_t> out;
     out.reserve(1 << 20); // 1 MiB initial
 
-    // Reserve space for header (80 bytes).
+    // Reserve space for GwMeshHeader (v2 = 108 bytes on wire).
     const std::size_t header_pos = out.size();
     out.resize(out.size() + sizeof(GwMeshHeader), 0u);
 
@@ -448,10 +620,14 @@ AssetResult<CookResult> MeshCooker::cook(const CookContext& ctx) const {
     write_u32(out, 0u); // name_hash
     write_u16(out, 0u); // material_idx
     write_u16(out, 0u); // lod_first
-    for (std::size_t lod = 0; lod < kNumLODs; ++lod) {
-        write_u32(out, static_cast<uint32_t>(lod_indices[lod].size() == 0 ? 0 :
-            [&]{uint32_t off=0; for(std::size_t l=0;l<lod;++l) off += static_cast<uint32_t>(lod_indices[l].size())*(use_u16?2u:4u); return off;}()));
-        write_u32(out, static_cast<uint32_t>(lod_indices[lod].size()));
+    {
+        std::uint32_t lod_idx_byte_off = 0;
+        for (std::size_t lod = 0; lod < kNumLODs; ++lod) {
+            write_u32(out, lod_indices[lod].empty() ? 0u : lod_idx_byte_off);
+            write_u32(out, static_cast<uint32_t>(lod_indices[lod].size()));
+            lod_idx_byte_off += static_cast<std::uint32_t>(lod_indices[lod].size()) *
+                                (use_u16 ? 2u : 4u);
+        }
     }
     write_u32(out, 0u); // vertex_start
     write_u32(out, static_cast<uint32_t>(unique_count));
@@ -468,6 +644,15 @@ AssetResult<CookResult> MeshCooker::cook(const CookContext& ctx) const {
     const uint32_t s1_size   = static_cast<uint32_t>(stream1.size() * sizeof(S1));
     write_bytes(out, stream1.data(), s1_size);
 
+    std::uint32_t s2_offset = 0;
+    std::uint32_t s2_size   = 0;
+    if (is_skinned && !stream2_bytes.empty()) {
+        pad_to(out, 16);
+        s2_offset = static_cast<std::uint32_t>(out.size());
+        s2_size   = static_cast<std::uint32_t>(stream2_bytes.size());
+        write_bytes(out, stream2_bytes.data(), s2_size);
+    }
+
     // Index buffer.
     pad_to(out, 16);
     const uint32_t idx_offset = static_cast<uint32_t>(out.size());
@@ -480,11 +665,12 @@ AssetResult<CookResult> MeshCooker::cook(const CookContext& ctx) const {
         write_bytes(out, index_u32.data(), idx_size);
     }
 
-    // Fill in header.
+    // Fill in header (.gwmesh v2 — rigid meshes use joint_count=0, empty stream2).
     GwMeshHeader hdr{};
     hdr.magic           = magic::kMesh;
-    hdr.version         = 1;
-    hdr.flags           = 0;
+    hdr.version         = 2;
+    hdr.flags           = is_skinned ? static_cast<std::uint16_t>(gw::assets::kMeshFlagSkinned)
+                                     : static_cast<std::uint16_t>(0u);
     hdr.lod_count       = static_cast<uint8_t>(kNumLODs);
     hdr.submesh_count   = 1;
     std::memcpy(hdr.aabb_min, aabb_min, 12);
@@ -499,6 +685,10 @@ AssetResult<CookResult> MeshCooker::cook(const CookContext& ctx) const {
     hdr.index_size      = idx_size;
     hdr.lod_table_off   = lod_table_off;
     hdr.submesh_table_off = submesh_tab_off;
+    hdr.stream2_offset  = s2_offset;
+    hdr.stream2_size    = s2_size;
+    hdr.joint_count     = joint_count_field;
+    hdr.reserved0       = 0;
     std::memcpy(out.data() + header_pos, &hdr, sizeof(hdr));
 
     // ------------------------------------------------------------------

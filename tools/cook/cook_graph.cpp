@@ -1,5 +1,8 @@
 #include "cook_graph.hpp"
 #include <algorithm>
+#include <cstring>
+#include <fstream>
+#include <iterator>
 #include <queue>
 #include <unordered_set>
 
@@ -22,6 +25,80 @@ CookGraph::CookGraph(std::filesystem::path input_root,
 
 bool CookGraph::is_cookable(const std::filesystem::path& ext) {
     return kCookableExts.count(ext.string()) > 0;
+}
+
+namespace {
+
+void collect_gltf_uri_strings(const std::string& json, std::vector<std::string>& out) {
+    static constexpr char kKey[] = "\"uri\"";
+    std::size_t             p     = 0;
+    while ((p = json.find(kKey, p)) != std::string::npos) {
+        p += sizeof(kKey) - 1u;
+        while (p < json.size() &&
+               (json[p] == ' ' || json[p] == '\t' || json[p] == '\n' || json[p] == '\r')) {
+            ++p;
+        }
+        if (p >= json.size() || json[p] != ':') {
+            continue;
+        }
+        ++p;
+        while (p < json.size() && (json[p] == ' ' || json[p] == '\t')) {
+            ++p;
+        }
+        if (p >= json.size() || json[p] != '"') {
+            continue;
+        }
+        ++p;
+        const std::size_t e = json.find('"', p);
+        if (e == std::string::npos) {
+            break;
+        }
+        out.emplace_back(json.substr(p, e - p));
+        p = e;
+    }
+}
+
+}  // namespace
+
+std::size_t CookGraph::ensure_source_node(const std::filesystem::path& source) {
+    const std::string key = std::filesystem::weakly_canonical(source).string();
+    if (const auto it = source_to_index_.find(key); it != source_to_index_.end()) {
+        return it->second;
+    }
+    add_asset(source);
+    return source_to_index_.at(key);
+}
+
+void CookGraph::link_gltf_texture_dependencies() {
+    namespace fs = std::filesystem;
+    for (std::size_t i = 0; i < nodes_.size(); ++i) {
+        if (nodes_[i].source.extension() != ".gltf") {
+            continue;
+        }
+        std::ifstream f(nodes_[i].source);
+        if (!f) {
+            continue;
+        }
+        const std::string json((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+        std::vector<std::string> uris;
+        collect_gltf_uri_strings(json, uris);
+        const fs::path base = nodes_[i].source.parent_path();
+        for (const auto& u : uris) {
+            if (u.rfind("data:", 0) == 0) {
+                continue;
+            }
+            const fs::path abs = fs::weakly_canonical(base / fs::path(u));
+            std::error_code  ec;
+            if (!fs::is_regular_file(abs, ec) || !is_cookable(abs.extension())) {
+                continue;
+            }
+            const std::size_t dep = ensure_source_node(abs);
+            auto&             deps = nodes_[i].deps;
+            if (std::find(deps.begin(), deps.end(), dep) == deps.end()) {
+                deps.push_back(dep);
+            }
+        }
+    }
 }
 
 std::filesystem::path CookGraph::compute_output(
@@ -51,6 +128,7 @@ void CookGraph::discover() {
             add_asset(entry.path());
         }
     }
+    link_gltf_texture_dependencies();
 }
 
 void CookGraph::add_asset(const std::filesystem::path& source) {
@@ -73,10 +151,9 @@ void CookGraph::resolve_cache(void* /*cache*/) {
 }
 
 AssetResult<std::vector<std::size_t>> CookGraph::topological_order() const {
-    // Kahn's algorithm.  Since our current graph has no cross-asset deps
-    // (textures and meshes are independent), this is simply an identity
-    // permutation.  The full dependency tracking (glTF → textures) is a
-    // Phase 6 follow-up once material assets are declared.
+    // Kahn's algorithm. Cross-asset edges are populated by
+    // `link_gltf_texture_dependencies()` for `.gltf` image URIs; other sources
+    // remain isolated unless future cookers append deps.
     const std::size_t N = nodes_.size();
     std::vector<uint32_t> indegree(N, 0);
     std::vector<std::vector<std::size_t>> adj(N);

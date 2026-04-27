@@ -18,6 +18,7 @@ void ensure_authoring_scene_types_for_load(gw::ecs::World& w) {
     (void)w.component_registry().id_of<VisibilityComponent>();
     (void)w.component_registry().id_of<WorldMatrixComponent>();
     (void)w.component_registry().id_of<BlockoutPrimitiveComponent>();
+    (void)w.component_registry().id_of<EditorCookedMeshComponent>();
     (void)w.component_registry().id_of<gw::ecs::HierarchyComponent>();
 }
 

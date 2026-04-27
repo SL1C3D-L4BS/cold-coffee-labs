@@ -1,7 +1,5 @@
-# engine/vscript — Visual Scripting IR + parser + interpreter (+ bytecode VM
-# and cook pipeline in Wave 4). CLAUDE.md non-negotiable #14: text IR is the
-# ground-truth; node graph is a projection.
-# Phase 8 week 045 (ADR 0009 in docs/10_APPENDIX_ADRS_AND_REFERENCES.md).
+# engine/vscript — visual scripting IR, parser, interpreter, bytecode VM,
+# and cook-time integration. Text IR is authoritative; node graphs are views.
 
 target_sources(greywater_core
     PRIVATE

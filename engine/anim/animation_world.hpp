@@ -21,11 +21,12 @@
 
 #include "engine/core/events/event_bus.hpp"
 
+#include <glm/mat4x4.hpp>
+
 #include <cstdint>
 #include <memory>
 #include <span>
 #include <string_view>
-#include <vector>
 
 namespace gw::events { class CrossSubsystemBus; }
 namespace gw::jobs   { class Scheduler; }
@@ -133,6 +134,13 @@ public:
     [[nodiscard]] bool get_local_pose(InstanceHandle h, Pose& out) const;
     // Same but composes parents to emit world-space joint transforms.
     [[nodiscard]] bool get_world_pose(InstanceHandle h, Pose& out) const;
+
+    // Mesh skinning (Community 0/8 animation graph): palette[j] = world_joint[j]
+    // * inverse_bind[j]. `inverse_bind` must match joint order in the cooked
+    // .gwmesh stream2 inverse-bind block and the instance skeleton.
+    [[nodiscard]] bool build_skin_matrix_palette(InstanceHandle h,
+                                                 std::span<const glm::mat4> inverse_bind,
+                                                 std::span<glm::mat4> out_palette) const noexcept;
 
     // IK — applied after graph evaluation. Each call is one-shot: the IK
     // goal is consumed in the next fixed step.

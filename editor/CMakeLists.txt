@@ -100,6 +100,7 @@ add_executable(gw_editor
     scene/transform_system.cpp
     scene/authoring_scene_load.cpp
     scene/blockout_physics_sync.cpp
+    scene/blockout_brush_export.cpp
     vscript/vscript_panel.cpp
     selection/selection_context.cpp
     reflect/widget_drawer.cpp
@@ -171,6 +172,7 @@ target_include_directories(gw_editor PRIVATE
 target_link_libraries(gw_editor PRIVATE
     greywater::core
     greywater::assets
+    greywater::anim
     greywater::material
     engine_render
     greywater::world

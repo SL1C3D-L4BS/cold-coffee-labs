@@ -5,6 +5,7 @@
 
 add_library(greywater_gameplay SHARED
     gameplay.cpp
+    gameplay_dll_linkage.cpp
     simulation_tick.cpp
     # Phase 23 — Sacrilege enemy archetypes (BT + combat sim).
     enemies/enemy_bt.cpp

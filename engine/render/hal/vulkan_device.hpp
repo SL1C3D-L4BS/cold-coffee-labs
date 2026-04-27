@@ -19,6 +19,13 @@ public:
     explicit VulkanDevice(VkInstance instance, VkPhysicalDevice physical_device);
     ~VulkanDevice();
 
+    /// Wraps an existing logical device + VMA allocator (Greywater editor, tests).
+    /// Destroys only the HAL-owned graphics command pool; does not destroy
+    /// @p device or @p allocator.
+    [[nodiscard]] static VulkanDevice borrow_existing(
+        VkInstance instance, VkPhysicalDevice physical_device, VkDevice device,
+        VmaAllocator allocator, VkQueue graphics_queue, uint32_t graphics_queue_family);
+
     VulkanDevice(const VulkanDevice&) = delete;
     VulkanDevice& operator=(const VulkanDevice&) = delete;
 
@@ -52,6 +59,18 @@ public:
     [[nodiscard]] VkCommandPool graphics_command_pool() const noexcept { return graphics_cmd_pool_; }
 
 private:
+    enum class BorrowTag : std::uint8_t { kExistingDevice = 0 };
+
+    /// Constructs a HAL view over an editor- or test-owned device (see
+    /// `borrow_existing`). Not used for the normal `VkCreateDevice` path.
+    VulkanDevice(BorrowTag,
+                   VkInstance             instance,
+                   VkPhysicalDevice       physical_device,
+                   VkDevice               device,
+                   VmaAllocator           allocator,
+                   VkQueue                graphics_queue,
+                   std::uint32_t          graphics_queue_family);
+
     void release() noexcept;
     void init_queues() noexcept;
     void init_vma();
@@ -77,6 +96,9 @@ private:
     VkPhysicalDeviceMemoryProperties memory_properties_{};
 
     RHICapabilities                  caps_{};
+
+    /// When true, `release()` omits `vmaDestroyAllocator` / `vkDestroyDevice`.
+    bool borrows_device_and_allocator_{false};
 };
 
 }  // namespace hal

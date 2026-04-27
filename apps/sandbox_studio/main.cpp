@@ -187,8 +187,12 @@ int main() {
     }
 
     {
-        gw::assets::vfs::VirtualFilesystem  vfs;
-        gw::assets::AssetDatabase     assets{gw::assets::AssetDatabaseModHarnessTag{}, vfs};
+        // GPU-less Phase-18 exit gate: ModRegistry only needs VFS + manifest IO.
+        // Ship mesh loads use `AssetDatabase(VulkanDevice&, vfs)` (see
+        // `docs/ENGINE_EDITOR_RUNTIME_WIRING.md`); this binary intentionally does
+        // not bootstrap Vulkan.
+        gw::assets::vfs::VirtualFilesystem vfs;
+        gw::assets::AssetDatabase           assets{gw::assets::AssetDatabaseModHarnessTag{}, vfs};
         gw::scripting::ModRegistry    mods(world, assets);
         const std::filesystem::path   man = std::filesystem::path(GW_BUILD_ROOT) / "mods" / "mod_manifest.json";
         if (!gw::platform::FileSystem::exists(man)) {

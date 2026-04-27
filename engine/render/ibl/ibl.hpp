@@ -5,10 +5,8 @@
 #include "../hal/vulkan_device.hpp"
 #include "engine/math/vec.hpp"
 #include "engine/math/mat.hpp"
-#include <optional>
 #include <string>
 #include <vector>
-#include <memory>
 #include <vk_mem_alloc.h>
 #include <volk.h>
 
@@ -98,7 +96,7 @@ public:
     IBLSystem(const IBLSystem&) = delete;
     IBLSystem& operator=(const IBLSystem&) = delete;
     IBLSystem(IBLSystem&&) = default;
-    IBLSystem& operator=(IBLSystem&&) = default;
+    IBLSystem& operator=(IBLSystem&&) = delete;
 
     Result<std::monostate> initialize(const IBLConfig& config);
     Result<std::monostate> load_environment_map(const std::string& filepath);

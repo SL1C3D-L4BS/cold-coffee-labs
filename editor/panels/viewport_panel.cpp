@@ -22,11 +22,71 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <limits>
+#include <vector>
 
 namespace gw::editor {
 
 namespace {
+
+namespace fs = std::filesystem;
+
+[[nodiscard]] bool project_abs_to_asset_vfs(const fs::path& project_root,
+                                            const fs::path& abs_file,
+                                            std::array<char, 192>& out_vfs) noexcept {
+    std::error_code ec;
+    const fs::path root_c = fs::weakly_canonical(project_root, ec);
+    if (ec || root_c.empty()) return false;
+    const fs::path abs_c = fs::weakly_canonical(abs_file, ec);
+    if (ec || abs_c.empty()) return false;
+
+    for (const char* top : {"assets", "content"}) {
+        const fs::path mount = root_c / top;
+        fs::path       rel   = fs::relative(abs_c, mount, ec);
+        if (ec || rel.empty()) continue;
+        const std::string gen = rel.generic_string();
+        if (!gen.empty() && gen.rfind("..", 0) == 0) continue;
+        std::string vfs = std::string(top) + "/" + gen;
+        if (vfs.size() >= out_vfs.size()) continue;
+        std::memcpy(out_vfs.data(), vfs.c_str(), vfs.size() + 1u);
+        return true;
+    }
+    return false;
+}
+
+[[nodiscard]] fs::path weak_canonical_under_project(const fs::path& project_root,
+                                                    const fs::path& asset_path) noexcept {
+    std::error_code ec;
+    fs::path        p = asset_path;
+    if (!p.is_absolute()) {
+        p = project_root / p;
+    }
+    return fs::weakly_canonical(p, ec);
+}
+
+/// Resolves a dropped browser path to a cooked `.gwmesh` on disk (same stem as
+/// `.glb` / `.gltf`, or direct `.gwmesh`) and fills `out_mesh` VFS path.
+[[nodiscard]] bool try_attach_cooked_mesh_for_drop(const fs::path& project_root,
+                                                     const std::string&              path_str,
+                                                     scene::EditorCookedMeshComponent& out_mesh) noexcept {
+    const fs::path dropped{path_str};
+    const auto     ext = dropped.extension();
+    fs::path       gwmesh_abs;
+    if (ext == ".gwmesh") {
+        gwmesh_abs = weak_canonical_under_project(project_root, dropped);
+    } else if (ext == ".glb" || ext == ".gltf") {
+        const fs::path src = weak_canonical_under_project(project_root, dropped);
+        gwmesh_abs         = src.parent_path() / (src.stem().string() + ".gwmesh");
+    } else {
+        return false;
+    }
+    std::error_code ec;
+    if (!fs::is_regular_file(gwmesh_abs, ec)) {
+        return false;
+    }
+    return project_abs_to_asset_vfs(project_root, gwmesh_abs, out_mesh.cooked_vfs_path);
+}
 
 glm::vec3 blockout_hit_on_ground_plane(float mouse_x, float mouse_y, float vp_x, float vp_y,
                                        float vp_w, float vp_h, const glm::mat4& view,
@@ -339,12 +399,22 @@ void ViewportPanel::on_imgui_render(EditorContext& ctx) {
             auto* world = ctx.world;
             ctx.cmd_stack.push(std::make_unique<undo::CreateEntityCommand>(
                 std::move(leaf),
-                [world, path = std::move(asset_path)](const char* nm) -> EntityHandle {
+                [world, path = std::move(asset_path), project_root = ctx.project_root](
+                    const char* nm) -> EntityHandle {
                     if (!world) return kNullEntity;
                     const auto e = world->create_entity();
                     world->add_component(e, scene::NameComponent{nm});
                     world->add_component(e, scene::TransformComponent{});
                     world->add_component(e, scene::VisibilityComponent{});
+
+                    if (project_root && !project_root->empty()) {
+                        scene::EditorCookedMeshComponent mesh{};
+                        if (try_attach_cooked_mesh_for_drop(*project_root, path, mesh)) {
+                            world->add_component(e, std::move(mesh));
+                            return e;
+                        }
+                    }
+
                     // Wave 1C: blockout box + path hint for future mesh cook; scene pass
                     // rasterizes this primitive with world cache from `update_transforms`.
                     scene::BlockoutPrimitiveComponent blk{};
@@ -420,25 +490,57 @@ void ViewportPanel::on_imgui_render(EditorContext& ctx) {
         const glm::vec3 ro = glm::vec3(w0);
         const glm::vec3 rd = glm::normalize(glm::vec3(w1 - w0));
 
-        gw::ecs::Entity best = gw::ecs::Entity::null();
-        float           best_t = std::numeric_limits<float>::infinity();
+        // W1C.3 + W1C.4 — reuse `GizmoSystem` uniform-grid for broadphase before
+        // ray vs AABB; fall back to full scan if the sphere misses every cell.
+        gizmo_.clear_entity_matrices();
         ctx.world->for_each<scene::TransformComponent, scene::VisibilityComponent>(
             [&](gw::ecs::Entity e, const scene::TransformComponent& tc,
                 const scene::VisibilityComponent& vis) {
                 if (!vis.visible) {
                     return;
                 }
-                const auto*     wm  = ctx.world->get_component<scene::WorldMatrixComponent>(e);
-                const glm::vec3 c   = pick_world_center(tc, wm);
-                const glm::vec3 h   = pick_world_half_extent(tc, wm);
-                const glm::vec3 bmin = c - h;
-                const glm::vec3 bmax = c + h;
-                float             t  = 0.f;
-                if (ray_intersects_aabb(ro, rd, bmin, bmax, t) && t < best_t) {
-                    best_t = t;
-                    best   = e;
-                }
+                gizmo_.set_entity_matrix(e, trs_to_mat4(tc));
             });
+        std::vector<EntityHandle> pick_candidates;
+        const float                pick_radius =
+            std::max(512.f, camera_.state().orbit_dist * 64.f);
+        gizmo_.gather_entities_near(ro, pick_radius, pick_candidates);
+
+        gw::ecs::Entity best = gw::ecs::Entity::null();
+        float           best_t = std::numeric_limits<float>::infinity();
+        const auto      consider = [&](gw::ecs::Entity e) {
+            const auto* tc = ctx.world->get_component<scene::TransformComponent>(e);
+            const auto* vis = ctx.world->get_component<scene::VisibilityComponent>(e);
+            if (!tc || !vis || !vis->visible) {
+                return;
+            }
+            const auto*     wm  = ctx.world->get_component<scene::WorldMatrixComponent>(e);
+            const glm::vec3 c   = pick_world_center(*tc, wm);
+            const glm::vec3 h   = pick_world_half_extent(*tc, wm);
+            const glm::vec3 bmin = c - h;
+            const glm::vec3 bmax = c + h;
+            float             t  = 0.f;
+            if (ray_intersects_aabb(ro, rd, bmin, bmax, t) && t < best_t) {
+                best_t = t;
+                best   = e;
+            }
+        };
+
+        if (pick_candidates.empty()) {
+            ctx.world->for_each<scene::TransformComponent, scene::VisibilityComponent>(
+                [&](gw::ecs::Entity e, const scene::TransformComponent& tc,
+                    const scene::VisibilityComponent& vis) {
+                    if (!vis.visible) {
+                        return;
+                    }
+                    (void)tc;
+                    consider(e);
+                });
+        } else {
+            for (const EntityHandle h : pick_candidates) {
+                consider(h);
+            }
+        }
 
         const bool shift = ImGui::GetIO().KeyShift;
         if (best != gw::ecs::Entity::null()) {
@@ -584,12 +686,26 @@ void ViewportPanel::on_imgui_render(EditorContext& ctx) {
         debug_draw::clear();
     }
 
+    // W1C.2 — same frame as ImGui: only consume W/E/R/Space/F when this dock
+    // window is focused or hovered so GLFW keys do not hit gizmo while typing
+    // in Console, asset fields, etc.
+    viewport_keyboard_active_ =
+        ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) ||
+        ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows);
+
     ImGui::End();
     ImGui::PopStyleVar();
 }
 
 // ---------------------------------------------------------------------------
-void ViewportPanel::on_event(int glfw_key, int /*action*/) {
+void ViewportPanel::on_event(int glfw_key, int action) {
+    if (action != GLFW_PRESS) {
+        return;
+    }
+    if (!viewport_keyboard_active_) {
+        return;
+    }
+
     gizmo_.on_key(glfw_key);
 
     // Camera mode shortcuts.

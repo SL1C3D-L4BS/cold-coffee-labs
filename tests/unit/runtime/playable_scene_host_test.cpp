@@ -57,3 +57,32 @@ TEST_CASE("playable_scene_host — load blockout gwscene creates static bodies")
     std::error_code ec;
     std::filesystem::remove(path, ec);
 }
+
+TEST_CASE("playable_scene_host — counts cooked mesh entities") {
+    gw::ecs::World src;
+    gw::editor::scene::ensure_authoring_scene_types_for_load(src);
+
+    const auto e = src.create_entity();
+    gw::editor::scene::TransformComponent t{};
+    gw::editor::scene::EditorCookedMeshComponent mesh{};
+    static constexpr const char kPath[] = "assets/meshes/parity_stub.gwmesh";
+    (void)std::snprintf(mesh.cooked_vfs_path.data(), mesh.cooked_vfs_path.size(), "%s", kPath);
+    src.add_component(e, t);
+    src.add_component(e, mesh);
+
+    const auto path = unique_scene_path();
+    REQUIRE(gw::scene::save_scene(path, src).has_value());
+
+    gw::runtime::EngineConfig cfg{};
+    cfg.headless      = true;
+    cfg.deterministic = true;
+    gw::runtime::Engine engine{cfg};
+
+    gw::runtime::PlayableSceneLoadSummary sum{};
+    REQUIRE(gw::runtime::load_authoring_scene_into_physics(
+        engine, path.generic_string(), sum));
+    CHECK(sum.cooked_mesh_entities == 1u);
+
+    std::error_code ec;
+    std::filesystem::remove(path, ec);
+}

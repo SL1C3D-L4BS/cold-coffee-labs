@@ -109,26 +109,54 @@ AssetResult<StagedBuffer> create_device_local_buffer(
 
 } // anonymous namespace
 
+std::uint32_t MeshAsset::stream2_skin_packed_vertex_byte_offset() const noexcept {
+    if (!skinned() || header_.joint_count == 0u) {
+        return 0u;
+    }
+    const std::uint64_t ib_bytes =
+        static_cast<std::uint64_t>(header_.joint_count) * 64u;
+    return static_cast<std::uint32_t>((ib_bytes + 15ull) & ~15ull);
+}
+
 // ---------------------------------------------------------------------------
 // MeshAsset::upload
 // ---------------------------------------------------------------------------
 AssetOk MeshAsset::upload(render::hal::VulkanDevice& device,
                            std::span<const uint8_t> raw)
 {
-    if (raw.size() < sizeof(GwMeshHeader)) {
+    if (raw.size() < kGwMeshHeaderV1Bytes) {
         return std::unexpected(AssetError{AssetErrorCode::CorruptData,
                                           "gwmesh too small for header"});
     }
 
-    std::memcpy(&header_, raw.data(), sizeof(GwMeshHeader));
+    uint16_t file_version = 0;
+    std::memcpy(&file_version, raw.data() + 4u, sizeof(file_version));
+
+    if (file_version == 1u) {
+        if (raw.size() < kGwMeshHeaderV1Bytes) {
+            return std::unexpected(AssetError{AssetErrorCode::CorruptData,
+                                              "gwmesh v1 header truncated"});
+        }
+        std::memset(&header_, 0, sizeof(header_));
+        std::memcpy(&header_, raw.data(), kGwMeshHeaderV1Bytes);
+        header_.stream2_offset = 0;
+        header_.stream2_size   = 0;
+        header_.joint_count    = 0;
+        header_.reserved0      = 0;
+    } else if (file_version == 2u) {
+        if (raw.size() < kGwMeshHeaderV2Bytes) {
+            return std::unexpected(AssetError{AssetErrorCode::CorruptData,
+                                              "gwmesh v2 header truncated"});
+        }
+        std::memcpy(&header_, raw.data(), sizeof(GwMeshHeader));
+    } else {
+        return std::unexpected(AssetError{AssetErrorCode::UnsupportedVersion,
+                                            "unsupported gwmesh version"});
+    }
 
     if (header_.magic != magic::kMesh) {
         return std::unexpected(AssetError{AssetErrorCode::InvalidMagic,
                                           "gwmesh magic mismatch"});
-    }
-    if (header_.version != 1u) {
-        return std::unexpected(AssetError{AssetErrorCode::UnsupportedVersion,
-                                          "unsupported gwmesh version"});
     }
 
     // Populate AABB.
@@ -173,6 +201,33 @@ AssetOk MeshAsset::upload(render::hal::VulkanDevice& device,
         stream1_alloc_ = res->alloc;
     }
 
+    // --- Upload stream 2 (skin: inverse binds + packed joint weights) -------
+    inverse_bind_bytes_.clear();
+    if (header_.stream2_size > 0) {
+        if (static_cast<std::size_t>(header_.stream2_offset) + header_.stream2_size > raw.size()) {
+            return std::unexpected(AssetError{AssetErrorCode::CorruptData,
+                                              "gwmesh stream2 out of bounds"});
+        }
+        if ((header_.flags & kMeshFlagSkinned) != 0 && header_.joint_count > 0u) {
+            const std::size_t ib_bytes =
+                static_cast<std::size_t>(header_.joint_count) * kInverseBindMat4Bytes;
+            if (ib_bytes > header_.stream2_size) {
+                return std::unexpected(AssetError{AssetErrorCode::CorruptData,
+                                                  "gwmesh stream2 inverse binds truncated"});
+            }
+            const auto* const ib_begin =
+                reinterpret_cast<const std::byte*>(raw.data() + header_.stream2_offset);
+            inverse_bind_bytes_.assign(ib_begin, ib_begin + static_cast<std::ptrdiff_t>(ib_bytes));
+        }
+        const void* s2 = raw.data() + header_.stream2_offset;
+        auto res = create_device_local_buffer(device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                                                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                               s2, header_.stream2_size);
+        if (!res) return std::unexpected(res.error());
+        stream2_buf_   = res->buffer;
+        stream2_alloc_ = res->alloc;
+    }
+
     // --- Upload index buffer -----------------------------------------------
     if (header_.index_size > 0) {
         const void* idx = raw.data() + header_.index_offset;
@@ -192,7 +247,8 @@ AssetOk MeshAsset::upload(render::hal::VulkanDevice& device,
     for (const auto& sub : submeshes_) {
         max_verts = std::max(max_verts, sub.vertex_start + sub.vertex_count);
     }
-    index_type_ = (max_verts <= 65535u) ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32;
+    index_type_ = (max_verts <= 65535u) ? MeshIndexElementType::Uint16
+                                        : MeshIndexElementType::Uint32;
 
     device_ = &device;
 
@@ -209,9 +265,11 @@ void MeshAsset::destroy_gpu() noexcept {
     VmaAllocator vma = device_->vma_allocator();
     if (stream0_buf_)  vmaDestroyBuffer(vma, stream0_buf_, stream0_alloc_);
     if (stream1_buf_)  vmaDestroyBuffer(vma, stream1_buf_, stream1_alloc_);
+    if (stream2_buf_)  vmaDestroyBuffer(vma, stream2_buf_, stream2_alloc_);
     if (index_buf_)    vmaDestroyBuffer(vma, index_buf_,   index_alloc_);
-    stream0_buf_ = stream1_buf_ = index_buf_ = VK_NULL_HANDLE;
-    stream0_alloc_ = stream1_alloc_ = index_alloc_ = VK_NULL_HANDLE;
+    stream0_buf_ = stream1_buf_ = stream2_buf_ = index_buf_ = VK_NULL_HANDLE;
+    stream0_alloc_ = stream1_alloc_ = stream2_alloc_ = index_alloc_ = VK_NULL_HANDLE;
+    inverse_bind_bytes_.clear();
 }
 
 } // namespace gw::assets

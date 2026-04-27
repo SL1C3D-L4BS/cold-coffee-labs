@@ -26,6 +26,7 @@ add_executable(gw_tests
     containers_test.cpp
     string_test.cpp
     unit/render/frame_graph_test.cpp
+    unit/render/mesh_asset_frame_pass_test.cpp
     unit/render/authoring_lighting_blob_test.cpp
     unit/render/render_visibility_policy_test.cpp
     # Phase 7 fullstack Path-A — Editor CommandStack (ADR 0005 in docs/10_APPENDIX_ADRS_AND_REFERENCES.md)
@@ -60,6 +61,8 @@ add_executable(gw_tests
     unit/assets/cook_cache_test.cpp
     unit/assets/cook_trust_test.cpp
     unit/assets/mesh_cooker_test.cpp
+    unit/assets/mesh_skin_header_contract_test.cpp
+    unit/anim/skin_palette_test.cpp
     unit/assets/asset_db_test.cpp
     unit/assets/vfs_test.cpp
     # Phase 6 — Integration
@@ -112,6 +115,14 @@ add_executable(gw_tests
     integration/engine_boot_test.cpp
     integration/runtime_scene_boot_test.cpp
     unit/runtime/playable_scene_host_test.cpp
+    unit/runtime/progs_vm_test.cpp
+    unit/level_architect/brush_aabb_test.cpp
+    unit/level_architect/brush_spatial_index_test.cpp
+    unit/level_architect/blockout_brush_index_integration_test.cpp
+    "${CMAKE_SOURCE_DIR}/editor/scene/blockout_brush_export.cpp"
+    unit/net/progs_vm_tick_determinism_test.cpp
+    unit/gameplay/trigger_zone_test.cpp
+    unit/gameplay/trigger_weapon_parity_table_test.cpp
     # Phase 12 — Physics (ADR-0031..0038)
     unit/physics/world_lifecycle_test.cpp
     unit/physics/rigid_body_test.cpp
@@ -140,6 +151,8 @@ add_executable(gw_tests
     unit/net/lag_comp_test.cpp
     unit/net/desync_detector_test.cpp
     unit/net/lockstep_test.cpp
+    unit/net/qw_parity_lockstep_symmetry_test.cpp
+    unit/net/client_prediction_reconcile_test.cpp
     unit/net/voice_test.cpp
     unit/net/session_test.cpp
     unit/net/cvars_console_test.cpp

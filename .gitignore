@@ -35,12 +35,9 @@ Cargo.lock
 *.exe
 compile_commands.json
 
-# Content source (per docs/10 §4 — tracked assets live in /assets, sources under /content are gitignored).
+# Content source: tracked cooked assets live under /assets; large sources under /content are local-only.
 /content/
 !/content/.gitkeep
-
-# Franchise game content/ mirrors the same rule: local pulls (e.g. AmbientCG) live under content/textures/.
-franchises/**/content/textures/
 
 # Python bytecode caches (local tooling).
 __pycache__/
@@ -84,8 +81,9 @@ graphify-out/memory/
 graphify-out/raw/
 
 # -----------------------------------------------------------------------------
-# Local reference trees — upstream GPL / educational sources for study only
-# (e.g. id-Software/Quake under ref/Quake). Not Greywater IP; never commit
+# Local reference trees — upstream GPL / mixed-license sources for study only
+# (e.g. ref/Quake, ref/ioq3, ref/DarkPlaces, ref/Daemon). Not Greywater IP;
+# never commit
 # clones or paste verbatim into engine/ without separate legal review.
 # -----------------------------------------------------------------------------
 /ref/*

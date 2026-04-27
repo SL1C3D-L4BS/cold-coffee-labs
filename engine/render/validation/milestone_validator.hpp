@@ -116,8 +116,8 @@ public:
 
     MilestoneValidator(const MilestoneValidator&) = delete;
     MilestoneValidator& operator=(const MilestoneValidator&) = delete;
-    MilestoneValidator(MilestoneValidator&&) = default;
-    MilestoneValidator& operator=(MilestoneValidator&&) = default;
+    MilestoneValidator(MilestoneValidator&&)            = delete;
+    MilestoneValidator& operator=(MilestoneValidator&&) = delete;
 
     Result<std::monostate> initialize(const MilestoneConfig& config);
 
@@ -155,10 +155,8 @@ private:
     Result<std::monostate> cleanup_test_scene();
     Result<std::monostate> render_test_frame();
 
-    void  begin_frame_timing();
-    void  end_frame_timing();
-    float measure_gpu_time();
-    float measure_cpu_time();
+    void begin_frame_timing();
+    void end_frame_timing();
 
     bool validate_frame_graph_compilation();
 

@@ -11,6 +11,7 @@
 #include "engine/physics/determinism_hash.hpp"
 
 #include <glm/common.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
 #include <algorithm>
@@ -20,12 +21,18 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
-#include <variant>
 #include <vector>
 
 namespace gw::anim {
 
 namespace {
+
+[[nodiscard]] glm::mat4 joint_trs_to_mat4(const JointTransform& j) noexcept {
+    glm::mat4 m = glm::translate(glm::mat4(1.0f), j.translation);
+    m *= glm::mat4_cast(j.rotation);
+    m = glm::scale(m, j.scale);
+    return m;
+}
 
 // Short-arc NLERP (local helper — matches pose.cpp::nlerp_short).
 inline glm::quat nlerp_short(glm::quat a, glm::quat b, float w) noexcept {
@@ -708,6 +715,23 @@ bool AnimationWorld::get_world_pose(InstanceHandle h, Pose& out) const {
             out[k].rotation    = pw.rotation * loc.rotation;
             out[k].scale       = pw.scale * loc.scale;
         }
+    }
+    return true;
+}
+
+bool AnimationWorld::build_skin_matrix_palette(InstanceHandle h,
+                                               std::span<const glm::mat4> inverse_bind,
+                                               std::span<glm::mat4> out_palette) const noexcept {
+    if (inverse_bind.empty()) return false;
+    if (out_palette.size() < inverse_bind.size()) return false;
+    const auto* i = impl_->inst_ptr(h);
+    if (!i) return false;
+    Pose world;
+    if (!get_world_pose(h, world)) return false;
+    if (world.size() < inverse_bind.size()) return false;
+    const std::size_t n = inverse_bind.size();
+    for (std::size_t j = 0; j < n; ++j) {
+        out_palette[j] = joint_trs_to_mat4(world[j]) * inverse_bind[j];
     }
     return true;
 }

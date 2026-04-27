@@ -1,6 +1,7 @@
 #pragma once
 
-#include <cstdint>
+#include "handles.hpp"
+
 #include <functional>
 #include <string>
 #include <variant>
@@ -11,13 +12,6 @@ namespace gw::render::frame_graph {
 
 // Forward declarations
 class CommandBuffer;
-
-// Opaque handles for resources and passes
-using PassHandle = uint32_t;
-using ResourceHandle = uint32_t;
-
-constexpr PassHandle INVALID_PASS_HANDLE = ~0u;
-constexpr ResourceHandle INVALID_RESOURCE_HANDLE = ~0u;
 
 // Queue types for multi-queue scheduling (Week 027)
 enum class QueueType : uint8_t {

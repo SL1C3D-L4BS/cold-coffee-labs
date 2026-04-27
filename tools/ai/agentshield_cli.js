@@ -2,12 +2,7 @@
 /**
  * tools/ai/agentshield_cli.js — self-contained AgentShield policy gate.
  *
- * Drop-in replacement for the speculative
- * `third_party/everything-claude-code/packages/agentshield/bin/cli.js`
- * referenced by ADR-0120. The upstream ECC v1.10.0 release does not
- * ship an agentshield package yet, so we implement the policy locally
- * against `.cursor/agentshield.json` (schema pinned at policy_version
- * "1.1").
+ * Local policy runner for `.github/agentshield.json` (policy_version "1.1").
  *
  * Exit codes:
  *   0  - all policies passed (or only non-critical warnings)
@@ -17,7 +12,7 @@
  *
  * Usage:
  *   node tools/ai/agentshield_cli.js \
- *     --config .cursor/agentshield.json \
+ *     --config .github/agentshield.json \
  *     --base origin/main \
  *     --head HEAD \
  *     [--fail-on critical] [--json]
@@ -31,7 +26,7 @@ const { execSync } = require('child_process');
 
 function parseArgs(argv) {
   const args = {
-    config: '.cursor/agentshield.json',
+    config: '.github/agentshield.json',
     base: 'origin/main',
     head: 'HEAD',
     failOn: 'critical',

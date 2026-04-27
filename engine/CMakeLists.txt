@@ -94,6 +94,9 @@ add_subdirectory(vfx)
 # Phase 18 — Mod surface + gameplay_module host (engine/scripting/).
 add_subdirectory(scripting)
 
+# Progs VM host (ADR-0122) — bytecode runtime under engine/runtime/.
+add_subdirectory(runtime)
+
 # Phase 19-A — Blacklake universe / HEC + SDR (engine/world/).
 add_subdirectory(world)
 

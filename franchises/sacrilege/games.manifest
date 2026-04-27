@@ -1,8 +1,0 @@
-# Sacrilege franchise — cold-start editor workspaces.
-# Each slug is a folder: franchises/sacrilege/<slug>/  (project_root for that title)
-# Columns: slug<TAB>Display name
-# Ref: docs/07_SACRILEGE.md (GW-SAC-001); docs/prompts/phase29/p29-apostasy.md, p29-silentium.md, p29-witness.md
-sacrilege	Sacrilege
-apostasy	Sacrilege II: Apostasy
-silentium	Sacrilege: Silentium
-witness	Sacrilege: The Witness

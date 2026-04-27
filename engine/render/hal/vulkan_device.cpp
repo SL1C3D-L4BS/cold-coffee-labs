@@ -11,6 +11,48 @@ namespace gw {
 namespace render {
 namespace hal {
 
+VulkanDevice VulkanDevice::borrow_existing(VkInstance instance,
+                                           VkPhysicalDevice physical_device,
+                                           VkDevice               device,
+                                           VmaAllocator           allocator,
+                                           VkQueue                graphics_queue,
+                                           uint32_t               graphics_queue_family) {
+    return VulkanDevice(BorrowTag::kExistingDevice,
+                        instance,
+                        physical_device,
+                        device,
+                        allocator,
+                        graphics_queue,
+                        graphics_queue_family);
+}
+
+VulkanDevice::VulkanDevice(BorrowTag /*borrow*/,
+                           VkInstance       instance,
+                           VkPhysicalDevice physical_device,
+                           VkDevice         device,
+                           VmaAllocator     allocator,
+                           VkQueue          graphics_queue,
+                           uint32_t         graphics_queue_family)
+    : instance_(instance)
+    , device_(device)
+    , physical_device_(physical_device)
+    , allocator_(allocator)
+    , graphics_queue_(graphics_queue)
+    , compute_queue_(graphics_queue)
+    , transfer_queue_(graphics_queue)
+    , graphics_queue_family_(graphics_queue_family)
+    , compute_queue_family_(graphics_queue_family)
+    , transfer_queue_family_(graphics_queue_family)
+    , borrows_device_and_allocator_(true) {
+    vkGetPhysicalDeviceProperties(physical_device, &properties_);
+    vkGetPhysicalDeviceFeatures(physical_device, &features_);
+    vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties_);
+    caps_ = probe_capabilities(physical_device);
+
+    volkLoadDevice(device);
+    init_command_pools();
+}
+
 VulkanDevice::VulkanDevice(VkInstance instance, VkPhysicalDevice physical_device)
     : instance_(instance)
     , physical_device_(physical_device) {
@@ -273,12 +315,14 @@ VulkanDevice::VulkanDevice(VulkanDevice&& other) noexcept
     , features_(other.features_)
     , properties_(other.properties_)
     , memory_properties_(other.memory_properties_)
-    , caps_(other.caps_) {
+    , caps_(other.caps_)
+    , borrows_device_and_allocator_(other.borrows_device_and_allocator_) {
     other.instance_          = VK_NULL_HANDLE;
     other.device_            = VK_NULL_HANDLE;
     other.physical_device_   = VK_NULL_HANDLE;
     other.allocator_         = VK_NULL_HANDLE;
     other.graphics_cmd_pool_ = VK_NULL_HANDLE;
+    other.borrows_device_and_allocator_ = false;
 }
 
 VulkanDevice& VulkanDevice::operator=(VulkanDevice&& other) noexcept {
@@ -299,11 +343,13 @@ VulkanDevice& VulkanDevice::operator=(VulkanDevice&& other) noexcept {
         properties_            = other.properties_;
         memory_properties_     = other.memory_properties_;
         caps_                  = other.caps_;
+        borrows_device_and_allocator_ = other.borrows_device_and_allocator_;
         other.instance_          = VK_NULL_HANDLE;
         other.device_            = VK_NULL_HANDLE;
         other.physical_device_   = VK_NULL_HANDLE;
         other.allocator_         = VK_NULL_HANDLE;
         other.graphics_cmd_pool_ = VK_NULL_HANDLE;
+        other.borrows_device_and_allocator_ = false;
     }
     return *this;
 }
@@ -315,12 +361,15 @@ void VulkanDevice::release() noexcept {
             vkDestroyCommandPool(device_, graphics_cmd_pool_, nullptr);
             graphics_cmd_pool_ = VK_NULL_HANDLE;
         }
-        if (allocator_ != VK_NULL_HANDLE) {
-            vmaDestroyAllocator(allocator_);
-            allocator_ = VK_NULL_HANDLE;
+        if (!borrows_device_and_allocator_) {
+            if (allocator_ != VK_NULL_HANDLE) {
+                vmaDestroyAllocator(allocator_);
+                allocator_ = VK_NULL_HANDLE;
+            }
+            vkDestroyDevice(device_, nullptr);
         }
-        vkDestroyDevice(device_, nullptr);
         device_ = VK_NULL_HANDLE;
+        borrows_device_and_allocator_ = false;
     }
 }
 

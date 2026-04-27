@@ -44,11 +44,9 @@ pub enum ServerError {
     Denied,
 }
 
-/// What a tool looks like to the server. Implemented by the agent crate.
-///
-/// We use a trait object so the server is generic over the tool registry.
-/// The default implementation is `StubHandler`, which reports every call
-/// as not-yet-implemented — useful in smoke tests.
+/// What a tool looks like to the server. Production binaries embed a
+/// `Handler` that forwards to `bld_agent::RagDispatcher`; unit tests use
+/// [`RegistryDispatchHandler`] to hit `bld_tools::registry` directly.
 pub trait Handler: Send + Sync {
     /// Resolve + dispatch a tool call. `args` is JSON, `result` is JSON.
     ///
@@ -61,23 +59,6 @@ pub trait Handler: Send + Sync {
 
     /// List every tool this handler knows about as MCP `Tool` descriptors.
     fn list(&self) -> Vec<Tool>;
-}
-
-/// Zero-tool handler — every call returns `Unimplemented`. Used in Phase 9A
-/// smoke tests before Wave 9B lands the real dispatch.
-#[derive(Debug, Default)]
-pub struct StubHandler;
-
-impl Handler for StubHandler {
-    fn call(&self, tool_id: &str, _args: &JsonValue) -> Result<JsonValue, ServerError> {
-        Err(ServerError::Tool(format!(
-            "tool {tool_id} not implemented yet (Phase 9A stub)"
-        )))
-    }
-
-    fn list(&self) -> Vec<Tool> {
-        tools_from_registry()
-    }
 }
 
 /// Maps `tools/call` to `#[bld_tool]` dispatch shims registered in the

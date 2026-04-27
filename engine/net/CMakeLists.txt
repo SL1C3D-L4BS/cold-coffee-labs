@@ -65,6 +65,8 @@ target_sources(greywater_net
             lag_comp.hpp
             desync_detector.hpp
             lockstep.hpp
+            qw_parity_contract.hpp
+            client_prediction.hpp
             voice.hpp
             session.hpp
             network_world.hpp

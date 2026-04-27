@@ -1,5 +1,5 @@
 #pragma once
-// editor/panels/sacrilege/shader_forge_panel.hpp — Phase 28 scaffold.
+// editor/panels/sacrilege/shader_forge_panel.hpp — Shader Forge (ImGui shell; graph wiring per ADR-0108).
 
 #include "editor/panels/panel.hpp"
 

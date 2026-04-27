@@ -124,4 +124,17 @@ struct BlockoutPrimitiveComponent {
 
 static_assert(sizeof(BlockoutPrimitiveComponent) == 196);
 
+// ---------------------------------------------------------------------------
+// EditorCookedMeshComponent — VFS path to a cooked `.gwmesh` plus resident
+// `AssetDatabase` handle bits (editor session only; rebuilt after load).
+// ---------------------------------------------------------------------------
+struct EditorCookedMeshComponent {
+    std::array<char, 192> cooked_vfs_path{};
+    std::uint64_t         mesh_handle_bits = 0;
+    /// `gw::anim::InstanceHandle::id`; 0 = bind-pose palette only.
+    std::uint32_t         anim_instance_id = 0;
+};
+
+static_assert(std::is_trivially_copyable_v<EditorCookedMeshComponent>);
+
 } // namespace gw::editor::scene

@@ -5,7 +5,6 @@
 #include "engine/assets/mesh_asset.hpp"
 #include <algorithm>
 #include <cmath>
-#include <cstring>
 
 using namespace gw::assets;
 
@@ -92,9 +91,10 @@ TEST_CASE("GwMeshHeader magic and version constants") {
     CHECK(magic::kMesh == 0x4853574Du); // 'MWSH'
     GwMeshHeader hdr{};
     hdr.magic   = magic::kMesh;
-    hdr.version = 1u;
+    hdr.version = 2u;
     CHECK(hdr.magic   == magic::kMesh);
-    CHECK(hdr.version == 1u);
+    CHECK(hdr.version == 2u);
+    CHECK(sizeof(GwMeshHeader) == kGwMeshHeaderV2Bytes);
 }
 
 // ---------------------------------------------------------------------------

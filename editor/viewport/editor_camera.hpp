@@ -4,9 +4,9 @@
 // Spec ref: Phase 7 §6.3.
 // When the viewport is hovered, input is sampled from Dear ImGui (mouse delta,
 // buttons, WASD) so navigation respects ImGui capture; GLFW remains the
-// scroll source via EditorApplication's callback. Wave 1C: this is the intended
-// editor path; PIE / gameplay uses the engine input stack — no Phase-10 split
-// TODO is outstanding for this file.
+// scroll source via EditorApplication's callback. Gizmo / frame hotkeys (W/E/R,
+// Space, F) are gated in `ViewportPanel::on_event` when the Viewport dock has
+// ImGui focus or hover (W1C.2) so GLFW key events do not fire while typing elsewhere.
 
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
